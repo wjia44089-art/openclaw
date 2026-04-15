@@ -3,7 +3,6 @@ import { loadSessionStore, updateSessionStore } from "../config/sessions/store.j
 import type { SessionEntry } from "../config/sessions/types.js";
 import { LiveSessionModelSwitchError } from "./live-model-switch-error.js";
 import {
-  normalizeStoredOverrideModel,
   resolveDefaultModelForAgent,
   resolvePersistedSelectedModelRef,
 } from "./model-selection.js";
@@ -16,6 +15,7 @@ import {
 export { LiveSessionModelSwitchError } from "./live-model-switch-error.js";
 export type LiveSessionModelSelection = EmbeddedRunModelSwitchRequest;
 import { normalizeOptionalString } from "../shared/string-coerce.js";
+
 export function resolveLiveSessionModelSelection(params: {
   cfg?: { session?: { store?: string } } | undefined;
   sessionKey?: string;
@@ -39,22 +39,15 @@ export function resolveLiveSessionModelSelection(params: {
     agentId,
   });
   const entry = loadSessionStore(storePath, { skipCache: true })[sessionKey];
-  const normalizedSelection = normalizeStoredOverrideModel({
-    providerOverride: entry?.providerOverride,
-    modelOverride: entry?.modelOverride,
-  });
   const persisted = resolvePersistedSelectedModelRef({
     defaultProvider: defaultModelRef.provider,
     runtimeProvider: entry?.modelProvider,
     runtimeModel: entry?.model,
-    overrideProvider: normalizedSelection.providerOverride,
-    overrideModel: normalizedSelection.modelOverride,
+    overrideProvider: entry?.providerOverride,
+    overrideModel: entry?.modelOverride,
   });
   const provider =
-    persisted?.provider ??
-    normalizedSelection.providerOverride ??
-    entry?.providerOverride?.trim() ??
-    defaultModelRef.provider;
+    persisted?.provider ?? entry?.providerOverride?.trim() ?? defaultModelRef.provider;
   const model = persisted?.model ?? defaultModelRef.model;
   const authProfileId = normalizeOptionalString(entry?.authProfileOverride);
   return {

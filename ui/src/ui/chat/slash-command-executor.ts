@@ -3,10 +3,7 @@
  * Calls gateway RPC methods and returns formatted results.
  */
 
-import {
-  createChatModelOverride,
-  resolvePreferredServerChatModelValue,
-} from "../chat-model-ref.ts";
+import { createChatModelOverride, resolvePreferredServerChatModel } from "../chat-model-ref.ts";
 import type { GatewayBrowserClient } from "../gateway.ts";
 import {
   DEFAULT_AGENT_ID,
@@ -208,35 +205,22 @@ async function executeModel(
   }
 
   try {
-    const requestedModel = args.trim();
     const [patched, resolvedModelCatalog] = await Promise.all([
       client.request<SessionsPatchResult>("sessions.patch", {
         key: sessionKey,
-        model: requestedModel,
+        model: args.trim(),
       }),
       modelCatalog
         ? Promise.resolve(modelCatalog)
         : loadModelCatalog(client, { allowFailure: true }),
     ]);
-    const resolvedModel = patched.resolved?.model ?? requestedModel;
-    let resolvedValue = resolvePreferredServerChatModelValue(
-      resolvedModel,
+    const resolvedValue = resolvePreferredServerChatModel(
+      patched.resolved?.model ?? args.trim(),
       patched.resolved?.modelProvider,
       resolvedModelCatalog,
-    );
-    const requestedOverride = createChatModelOverride(requestedModel);
-    const resolvedProvider = patched.resolved?.modelProvider?.trim();
-    if (
-      requestedOverride?.kind === "qualified" &&
-      resolvedProvider &&
-      resolvedValue &&
-      !resolvedValue.toLowerCase().startsWith(`${resolvedProvider.toLowerCase()}/`) &&
-      requestedOverride.value.toLowerCase().endsWith(`/${resolvedModel.trim().toLowerCase()}`)
-    ) {
-      resolvedValue = requestedOverride.value;
-    }
+    ).value;
     return {
-      content: `Model set to \`${requestedModel}\`.`,
+      content: `Model set to \`${args.trim()}\`.`,
       action: "refresh",
       sessionPatch: { modelOverride: createChatModelOverride(resolvedValue) },
     };

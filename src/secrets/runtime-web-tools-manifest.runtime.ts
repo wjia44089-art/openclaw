@@ -1,5 +1,1 @@
-export {
-  resolveManifestContractOwnerPluginId,
-  resolveManifestContractPluginIds,
-  resolveManifestContractPluginIdsByCompatibilityRuntimePath,
-} from "../plugins/manifest-registry.js";
+export { resolveManifestContractOwnerPluginId } from "../plugins/manifest-registry.js";

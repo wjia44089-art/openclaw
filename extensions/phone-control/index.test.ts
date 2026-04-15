@@ -80,7 +80,7 @@ async function withRegisteredPhoneControl(
     });
 
     let command: OpenClawPluginCommandDefinition | undefined;
-    void registerPhoneControl.register(
+    registerPhoneControl.register(
       createApi({
         stateDir,
         getConfig: () => config,
@@ -115,7 +115,7 @@ describe("phone-control plugin", () => {
         channel: "webchat",
         gatewayClientScopes: ["operator.admin"],
       });
-      const text = res?.text ?? "";
+      const text = String(res?.text ?? "");
       const nodes = (
         getConfig().gateway as { nodes?: { allowCommands?: string[]; denyCommands?: string[] } }
       ).nodes;
@@ -138,7 +138,7 @@ describe("phone-control plugin", () => {
         gatewayClientScopes: ["operator.write"],
       });
 
-      expect(res?.text ?? "").toContain("requires operator.admin");
+      expect(String(res?.text ?? "")).toContain("requires operator.admin");
       expect(writeConfigFile).not.toHaveBeenCalled();
     });
   });
@@ -150,7 +150,7 @@ describe("phone-control plugin", () => {
         channel: "telegram",
       });
 
-      expect(res?.text ?? "").toContain("Phone control: armed");
+      expect(String(res?.text ?? "")).toContain("Phone control: armed");
       expect(writeConfigFile).toHaveBeenCalledTimes(1);
     });
   });
@@ -162,7 +162,7 @@ describe("phone-control plugin", () => {
         channel: "telegram",
       });
 
-      expect(res?.text ?? "").toContain("Phone control: disarmed.");
+      expect(String(res?.text ?? "")).toContain("Phone control: disarmed.");
       expect(writeConfigFile).not.toHaveBeenCalled();
     });
   });
@@ -174,7 +174,7 @@ describe("phone-control plugin", () => {
         channel: "telegram",
         gatewayClientScopes: ["operator.write"],
       });
-      expect(armRes?.text ?? "").toContain("requires operator.admin");
+      expect(String(armRes?.text ?? "")).toContain("requires operator.admin");
       expect(writeConfigFile).not.toHaveBeenCalled();
 
       const disarmRes = await command.handler({
@@ -182,7 +182,7 @@ describe("phone-control plugin", () => {
         channel: "telegram",
         gatewayClientScopes: ["operator.write"],
       });
-      expect(disarmRes?.text ?? "").toContain("requires operator.admin");
+      expect(String(disarmRes?.text ?? "")).toContain("requires operator.admin");
       expect(writeConfigFile).not.toHaveBeenCalled();
     });
   });
@@ -195,7 +195,7 @@ describe("phone-control plugin", () => {
         gatewayClientScopes: ["operator.admin"],
       });
 
-      expect(res?.text ?? "").toContain("sms.send");
+      expect(String(res?.text ?? "")).toContain("sms.send");
       expect(writeConfigFile).toHaveBeenCalledTimes(1);
     });
   });
@@ -214,7 +214,7 @@ describe("phone-control plugin", () => {
         gatewayClientScopes: ["operator.admin"],
       });
 
-      expect(res?.text ?? "").toContain("disarmed");
+      expect(String(res?.text ?? "")).toContain("disarmed");
       expect(writeConfigFile).toHaveBeenCalledTimes(2);
     });
   });

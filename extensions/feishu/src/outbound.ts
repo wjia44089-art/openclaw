@@ -4,9 +4,8 @@ import { createAttachedChannelResultAdapter } from "openclaw/plugin-sdk/channel-
 import { normalizeLowercaseStringOrEmpty } from "openclaw/plugin-sdk/text-runtime";
 import { resolveFeishuAccount } from "./accounts.js";
 import { createFeishuClient } from "./client.js";
-import { cleanupAmbientCommentTypingReaction } from "./comment-reaction.js";
 import { parseFeishuCommentTarget } from "./comment-target.js";
-import { deliverCommentThreadText } from "./drive.js";
+import { replyComment } from "./drive.js";
 import { sendMediaFeishu } from "./media.js";
 import { chunkTextForOutbound, type ChannelOutboundAdapter } from "./outbound-runtime-api.js";
 import { sendMarkdownCardFeishu, sendMessageFeishu, sendStructuredCardFeishu } from "./send.js";
@@ -81,7 +80,6 @@ async function sendCommentThreadReply(params: {
   cfg: Parameters<typeof sendMessageFeishu>[0]["cfg"];
   to: string;
   text: string;
-  replyId?: string;
   accountId?: string;
 }) {
   const target = parseFeishuCommentTarget(params.to);
@@ -90,34 +88,17 @@ async function sendCommentThreadReply(params: {
   }
   const account = resolveFeishuAccount({ cfg: params.cfg, accountId: params.accountId });
   const client = createFeishuClient(account);
-  const replyId = params.replyId?.trim();
-  try {
-    const result = await deliverCommentThreadText(client, {
-      file_token: target.fileToken,
-      file_type: target.fileType,
-      comment_id: target.commentId,
-      content: params.text,
-    });
-    return {
-      messageId:
-        (typeof result.reply_id === "string" && result.reply_id) ||
-        (typeof result.comment_id === "string" && result.comment_id) ||
-        "",
-      chatId: target.commentId,
-      result,
-    };
-  } finally {
-    if (replyId) {
-      void cleanupAmbientCommentTypingReaction({
-        client,
-        deliveryContext: {
-          channel: "feishu",
-          to: params.to,
-          threadId: replyId,
-        },
-      });
-    }
-  }
+  const result = await replyComment(client, {
+    file_token: target.fileToken,
+    file_type: target.fileType,
+    comment_id: target.commentId,
+    content: params.text,
+  });
+  return {
+    messageId: typeof result.reply_id === "string" ? result.reply_id : "",
+    chatId: target.commentId,
+    result,
+  };
 }
 
 async function sendOutboundText(params: {
@@ -132,7 +113,6 @@ async function sendOutboundText(params: {
     cfg,
     to,
     text,
-    replyId: replyToMessageId,
     accountId,
   });
   if (commentResult) {

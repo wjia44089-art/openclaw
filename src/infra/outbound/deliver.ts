@@ -1,4 +1,7 @@
-import { sendMediaWithLeadingCaption } from "openclaw/plugin-sdk/reply-payload";
+import {
+  resolveSendableOutboundReplyParts,
+  sendMediaWithLeadingCaption,
+} from "openclaw/plugin-sdk/reply-payload";
 import {
   chunkByParagraph,
   chunkMarkdownTextWithMode,
@@ -10,9 +13,9 @@ import { loadChannelOutboundAdapter } from "../../channels/plugins/outbound/load
 import type {
   ChannelOutboundAdapter,
   ChannelOutboundContext,
-} from "../../channels/plugins/types.adapters.js";
+} from "../../channels/plugins/types.js";
+import type { OpenClawConfig } from "../../config/config.js";
 import { resolveMirroredTranscriptText } from "../../config/sessions/transcript-mirror.js";
-import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { fireAndForgetHook } from "../../hooks/fire-and-forget.js";
 import { createInternalHookEvent, triggerInternalHook } from "../../hooks/internal-hooks.js";
 import {
@@ -28,22 +31,15 @@ import { resolveAgentScopedOutboundMediaAccess } from "../../media/read-capabili
 import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
 import { formatErrorMessage } from "../errors.js";
 import { throwIfAborted } from "./abort.js";
-import type { OutboundDeliveryResult } from "./deliver-types.js";
 import { ackDelivery, enqueueDelivery, failDelivery } from "./delivery-queue.js";
 import type { OutboundIdentity } from "./identity.js";
 import type { DeliveryMirror } from "./mirror.js";
-import {
-  createOutboundPayloadPlan,
-  projectOutboundPayloadPlanForDelivery,
-  summarizeOutboundPayloadForTransport,
-  type NormalizedOutboundPayload,
-  type OutboundPayloadPlan,
-} from "./payloads.js";
+import type { NormalizedOutboundPayload } from "./payloads.js";
+import { normalizeReplyPayloadsForDelivery } from "./payloads.js";
 import { resolveOutboundSendDep, type OutboundSendDeps } from "./send-deps.js";
 import type { OutboundSessionContext } from "./session-context.js";
 import type { OutboundChannel } from "./targets.js";
 
-export type { OutboundDeliveryResult } from "./deliver-types.js";
 export type { NormalizedOutboundPayload } from "./payloads.js";
 export { normalizeOutboundPayloads } from "./payloads.js";
 export { resolveOutboundSendDep, type OutboundSendDeps } from "./send-deps.js";
@@ -66,6 +62,20 @@ async function loadChannelBootstrapRuntime() {
   channelBootstrapRuntimePromise ??= import("./channel-bootstrap.runtime.js");
   return await channelBootstrapRuntimePromise;
 }
+
+export type OutboundDeliveryResult = {
+  channel: Exclude<OutboundChannel, "none">;
+  messageId: string;
+  chatId?: string;
+  channelId?: string;
+  roomId?: string;
+  conversationId?: string;
+  timestamp?: number;
+  toJid?: string;
+  pollId?: string;
+  // Channel docking: stash channel-specific fields here to avoid core type churn.
+  meta?: Record<string, unknown>;
+};
 
 type Chunker = (text: string, limit: number) => string[];
 
@@ -291,8 +301,12 @@ type DeliverOutboundPayloadsCoreParams = {
   gatewayClientScopes?: readonly string[];
 };
 
-function collectPayloadMediaSources(plan: readonly OutboundPayloadPlan[]): string[] {
-  return plan.flatMap((entry) => entry.parts.mediaUrls);
+function collectPayloadMediaSources(payloads: ReplyPayload[]): string[] {
+  const mediaSources: string[] = [];
+  for (const payload of normalizeReplyPayloadsForDelivery(payloads)) {
+    mediaSources.push(...resolveSendableOutboundReplyParts(payload).mediaUrls);
+  }
+  return mediaSources;
 }
 
 export type DeliverOutboundPayloadsParams = DeliverOutboundPayloadsCoreParams & {
@@ -324,11 +338,11 @@ function normalizeEmptyPayloadForDelivery(payload: ReplyPayload): ReplyPayload |
 }
 
 function normalizePayloadsForChannelDelivery(
-  plan: readonly OutboundPayloadPlan[],
+  payloads: ReplyPayload[],
   handler: ChannelHandler,
 ): ReplyPayload[] {
   const normalizedPayloads: ReplyPayload[] = [];
-  for (const payload of projectOutboundPayloadPlanForDelivery(plan)) {
+  for (const payload of normalizeReplyPayloadsForDelivery(payloads)) {
     let sanitizedPayload = payload;
     if (handler.sanitizeText && sanitizedPayload.text) {
       if (!handler.shouldSkipPlainTextSanitization?.(sanitizedPayload)) {
@@ -352,7 +366,14 @@ function normalizePayloadsForChannelDelivery(
 }
 
 function buildPayloadSummary(payload: ReplyPayload): NormalizedOutboundPayload {
-  return summarizeOutboundPayloadForTransport(payload);
+  const parts = resolveSendableOutboundReplyParts(payload);
+  return {
+    text: parts.text,
+    mediaUrls: parts.mediaUrls,
+    audioAsVoice: payload.audioAsVoice === true ? true : undefined,
+    interactive: payload.interactive,
+    channelData: payload.channelData,
+  };
 }
 
 function createMessageSentEmitter(params: {
@@ -507,7 +528,6 @@ export async function deliverOutboundPayloads(
         forceDocument: params.forceDocument,
         silent: params.silent,
         mirror: params.mirror,
-        session: params.session,
         gatewayClientScopes: params.gatewayClientScopes,
       }).catch(() => null); // Best-effort — don't block delivery if queue write fails.
 
@@ -553,21 +573,13 @@ async function deliverOutboundPayloadsCore(
   params: DeliverOutboundPayloadsCoreParams,
 ): Promise<OutboundDeliveryResult[]> {
   const { cfg, channel, to, payloads } = params;
-  const outboundPayloadPlan = createOutboundPayloadPlan(payloads);
   const accountId = params.accountId;
   const deps = params.deps;
   const abortSignal = params.abortSignal;
   const mediaAccess = resolveAgentScopedOutboundMediaAccess({
     cfg,
     agentId: params.session?.agentId ?? params.mirror?.agentId,
-    mediaSources: collectPayloadMediaSources(outboundPayloadPlan),
-    sessionKey: params.session?.key,
-    messageProvider: params.session?.key ? undefined : channel,
-    accountId: params.session?.requesterAccountId ?? accountId,
-    requesterSenderId: params.session?.requesterSenderId,
-    requesterSenderName: params.session?.requesterSenderName,
-    requesterSenderUsername: params.session?.requesterSenderUsername,
-    requesterSenderE164: params.session?.requesterSenderE164,
+    mediaSources: collectPayloadMediaSources(payloads),
   });
   const results: OutboundDeliveryResult[] = [];
   const handler = await createChannelHandler({
@@ -636,7 +648,7 @@ async function deliverOutboundPayloadsCore(
       results.push(await handler.sendText(chunk, overrides));
     }
   };
-  const normalizedPayloads = normalizePayloadsForChannelDelivery(outboundPayloadPlan, handler);
+  const normalizedPayloads = normalizePayloadsForChannelDelivery(payloads, handler);
   const hookRunner = getGlobalHookRunner();
   const sessionKeyForInternalHooks = params.mirror?.sessionKey ?? params.session?.key;
   const mirrorIsGroup = params.mirror?.isGroup;

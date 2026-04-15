@@ -7,20 +7,14 @@ export function shouldAllowCooldownProbeForReason(
     reason === "rate_limit" ||
     reason === "overloaded" ||
     reason === "billing" ||
-    reason === "unknown" ||
-    reason === "timeout"
+    reason === "unknown"
   );
 }
 
 export function shouldUseTransientCooldownProbeSlot(
   reason: FailoverReason | null | undefined,
 ): boolean {
-  return (
-    reason === "rate_limit" ||
-    reason === "overloaded" ||
-    reason === "unknown" ||
-    reason === "timeout"
-  );
+  return reason === "rate_limit" || reason === "overloaded" || reason === "unknown";
 }
 
 export function shouldPreserveTransientCooldownProbeSlot(

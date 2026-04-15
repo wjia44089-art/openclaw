@@ -72,7 +72,6 @@ function extractOwner(relPath: string): string | null {
     case "test":
       return null;
   }
-  throw new Error("Unsupported topology scope");
 }
 
 function extractExtensionId(relPath: string): string | null {

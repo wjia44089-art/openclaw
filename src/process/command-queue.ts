@@ -1,8 +1,4 @@
-import {
-  diagnosticLogger as diag,
-  logLaneDequeue,
-  logLaneEnqueue,
-} from "../logging/diagnostic-runtime.js";
+import { diagnosticLogger as diag, logLaneDequeue, logLaneEnqueue } from "../logging/diagnostic.js";
 import { resolveGlobalSingleton } from "../shared/global-singleton.js";
 import { CommandLane } from "./lanes.js";
 /**

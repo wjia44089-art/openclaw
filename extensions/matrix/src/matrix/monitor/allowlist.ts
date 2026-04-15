@@ -92,3 +92,7 @@ export function resolveMatrixAllowListMatch(params: {
   ];
   return resolveAllowlistMatchByCandidates<MatrixAllowListMatchSource>({ allowList, candidates });
 }
+
+export function resolveMatrixAllowListMatches(params: { allowList: string[]; userId?: string }) {
+  return resolveMatrixAllowListMatch(params).allowed;
+}

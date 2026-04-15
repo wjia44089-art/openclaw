@@ -1,9 +1,13 @@
 import type { MediaUnderstandingModelConfig } from "../config/types.tools.js";
 import { normalizeMediaProviderId } from "./provider-id.js";
-import type {
-  MediaUnderstandingCapability,
-  MediaUnderstandingCapabilityRegistry,
-} from "./types.js";
+import type { MediaUnderstandingCapability } from "./types.js";
+
+export type MediaUnderstandingCapabilityRegistry = Map<
+  string,
+  {
+    capabilities?: MediaUnderstandingCapability[];
+  }
+>;
 
 const MEDIA_CAPABILITIES = ["audio", "image", "video"] as const;
 

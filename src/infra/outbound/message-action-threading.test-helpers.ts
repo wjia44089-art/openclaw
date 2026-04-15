@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { OpenClawConfig } from "../../config/types.openclaw.js";
+import type { OpenClawConfig } from "../../config/config.js";
 
 type AutoThreadResolver = (params: {
   cfg: OpenClawConfig;

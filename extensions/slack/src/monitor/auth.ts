@@ -3,11 +3,9 @@ import {
   allowListMatches,
   normalizeAllowList,
   normalizeAllowListLower,
-  resolveSlackAllowListMatch,
   resolveSlackUserAllowed,
 } from "./allow-list.js";
 import { resolveSlackChannelConfig } from "./channel-config.js";
-import { inferSlackChannelType } from "./channel-type.js";
 import { normalizeSlackChannelType, type SlackMonitorContext } from "./context.js";
 
 type ResolvedAllowFromLists = {
@@ -155,14 +153,11 @@ export type SlackSystemEventAuthResult = {
   allowed: boolean;
   reason?:
     | "missing-sender"
-    | "missing-expected-sender"
     | "sender-mismatch"
     | "channel-not-allowed"
-    | "ambiguous-channel-type"
     | "dm-disabled"
     | "sender-not-allowlisted"
-    | "sender-not-channel-allowed"
-    | "sender-not-authorized";
+    | "sender-not-channel-allowed";
   channelType?: "im" | "mpim" | "channel" | "group";
   channelName?: string;
 };
@@ -173,10 +168,6 @@ export async function authorizeSlackSystemEventSender(params: {
   channelId?: string;
   channelType?: string | null;
   expectedSenderId?: string;
-  /** When true, requires expectedSenderId, rejects ambiguous channel types,
-   *  and applies interactive-only owner allowFrom checks without changing the
-   *  open-by-default channel behavior when no allowlists are configured. */
-  interactiveEvent?: boolean;
 }): Promise<SlackSystemEventAuthResult> {
   const senderId = params.senderId?.trim();
   if (!senderId) {
@@ -188,11 +179,6 @@ export async function authorizeSlackSystemEventSender(params: {
     return { allowed: false, reason: "sender-mismatch" };
   }
 
-  // Interactive events require an expected sender to cross-verify the actor.
-  if (params.interactiveEvent && !expectedSenderId) {
-    return { allowed: false, reason: "missing-expected-sender" };
-  }
-
   const channelId = params.channelId?.trim();
   let channelType = normalizeSlackChannelType(params.channelType, channelId);
   let channelName: string | undefined;
@@ -202,8 +188,7 @@ export async function authorizeSlackSystemEventSender(params: {
       type?: "im" | "mpim" | "channel" | "group";
     } = await params.ctx.resolveChannelName(channelId).catch(() => ({}));
     channelName = info.name;
-    const resolvedTypeSource = params.channelType ?? info.type;
-    channelType = normalizeSlackChannelType(resolvedTypeSource, channelId);
+    channelType = normalizeSlackChannelType(params.channelType ?? info.type, channelId);
     if (
       !params.ctx.isChannelAllowed({
         channelId,
@@ -217,31 +202,6 @@ export async function authorizeSlackSystemEventSender(params: {
         channelType,
         channelName,
       };
-    }
-
-    // For interactive events, reject when channel type could not be positively
-    // determined from either the explicit type or the channel ID prefix. This
-    // prevents a DM from being misclassified as "channel" and skipping
-    // DM-specific authorization.
-    if (params.interactiveEvent) {
-      const inferredFromId = inferSlackChannelType(channelId);
-      const sourceNormalized =
-        typeof resolvedTypeSource === "string"
-          ? resolvedTypeSource.toLowerCase().trim()
-          : undefined;
-      const sourceIsKnownType =
-        sourceNormalized === "im" ||
-        sourceNormalized === "mpim" ||
-        sourceNormalized === "channel" ||
-        sourceNormalized === "group";
-      if (inferredFromId === undefined && !sourceIsKnownType) {
-        return {
-          allowed: false,
-          reason: "ambiguous-channel-type",
-          channelType,
-          channelName,
-        };
-      }
     }
   }
 
@@ -275,8 +235,8 @@ export async function authorizeSlackSystemEventSender(params: {
       }
     }
   } else if (!channelId) {
-    // No channel context. Preserve the existing open default unless a global
-    // allowFrom list is configured.
+    // No channel context. Apply allowFrom if configured so we fail closed
+    // for privileged interactive events when owner allowlist is present.
     const allowFromLower = await resolveAllowFromLower(false);
     if (allowFromLower.length > 0) {
       const senderAllowListed = isSlackSenderAllowListed({
@@ -290,9 +250,6 @@ export async function authorizeSlackSystemEventSender(params: {
       }
     }
   } else {
-    const allowFromLower = await resolveAllowFromLower(false);
-    const ownerAllowlistConfigured = allowFromLower.length > 0;
-    const allowFromLowerWithoutWildcard = allowFromLower.filter((entry) => entry !== "*");
     const channelConfig = resolveSlackChannelConfig({
       channelId,
       channelName,
@@ -303,23 +260,6 @@ export async function authorizeSlackSystemEventSender(params: {
     });
     const channelUsersAllowlistConfigured =
       Array.isArray(channelConfig?.users) && channelConfig.users.length > 0;
-    const ownerMatch = ownerAllowlistConfigured
-      ? resolveSlackAllowListMatch({
-          allowList: allowFromLower,
-          id: senderId,
-          name: senderName,
-          allowNameMatching: params.ctx.allowNameMatching,
-        })
-      : { allowed: false };
-    const ownerAllowed = ownerMatch.allowed;
-    const ownerExplicitlyAllowed =
-      allowFromLowerWithoutWildcard.length > 0 &&
-      resolveSlackAllowListMatch({
-        allowList: allowFromLowerWithoutWildcard,
-        id: senderId,
-        name: senderName,
-        allowNameMatching: params.ctx.allowNameMatching,
-      }).allowed;
     if (channelUsersAllowlistConfigured) {
       const channelUserAllowed = resolveSlackUserAllowed({
         allowList: channelConfig?.users,
@@ -327,37 +267,14 @@ export async function authorizeSlackSystemEventSender(params: {
         userName: senderName,
         allowNameMatching: params.ctx.allowNameMatching,
       });
-      if (channelUserAllowed || (params.interactiveEvent && ownerExplicitlyAllowed)) {
+      if (!channelUserAllowed) {
         return {
-          allowed: true,
+          allowed: false,
+          reason: "sender-not-channel-allowed",
           channelType,
           channelName,
         };
       }
-      return {
-        allowed: false,
-        reason:
-          params.interactiveEvent && ownerAllowlistConfigured
-            ? "sender-not-authorized"
-            : "sender-not-channel-allowed",
-        channelType,
-        channelName,
-      };
-    }
-    if (params.interactiveEvent && ownerAllowed) {
-      return {
-        allowed: true,
-        channelType,
-        channelName,
-      };
-    }
-    if (params.interactiveEvent && ownerAllowlistConfigured) {
-      return {
-        allowed: false,
-        reason: "sender-not-allowlisted",
-        channelType,
-        channelName,
-      };
     }
   }
 

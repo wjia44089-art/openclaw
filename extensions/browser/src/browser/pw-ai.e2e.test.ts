@@ -32,7 +32,6 @@ function createPage(opts: { targetId: string; snapshotFull?: string; hasSnapshot
     context: () => context,
     locator,
     on: vi.fn(),
-    url: vi.fn(() => `https://example.test/${opts.targetId}`),
     ...(opts.hasSnapshotForAI === false
       ? {}
       : {
@@ -87,8 +86,8 @@ describe("pw-ai", () => {
     });
 
     expect(res.snapshot).toBe("TWO");
-    expect(p1.session.detach).toHaveBeenCalled();
-    expect(p2.session.detach).toHaveBeenCalled();
+    expect(p1.session.detach).toHaveBeenCalledTimes(1);
+    expect(p2.session.detach).toHaveBeenCalledTimes(1);
   });
 
   it("registers aria refs from ai snapshots for act commands", async () => {

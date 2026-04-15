@@ -1,5 +1,4 @@
-import type { ChannelApprovalAdapter, ChannelApprovalCapability } from "./types.adapters.js";
-import type { ChannelPlugin } from "./types.plugin.js";
+import type { ChannelApprovalAdapter, ChannelApprovalCapability, ChannelPlugin } from "./types.js";
 
 export function resolveChannelApprovalCapability(
   plugin?: Pick<ChannelPlugin, "approvalCapability"> | null,

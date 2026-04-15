@@ -1,15 +1,9 @@
-import type { CompactEmbeddedPiSessionDirect } from "./compact.runtime.types.js";
+import { compactEmbeddedPiSessionDirect as compactEmbeddedPiSessionDirectImpl } from "./compact.js";
 
-let compactRuntimePromise: Promise<typeof import("./compact.js")> | null = null;
+type CompactEmbeddedPiSessionDirect = typeof import("./compact.js").compactEmbeddedPiSessionDirect;
 
-function loadCompactRuntime() {
-  compactRuntimePromise ??= import("./compact.js");
-  return compactRuntimePromise;
-}
-
-export async function compactEmbeddedPiSessionDirect(
+export function compactEmbeddedPiSessionDirect(
   ...args: Parameters<CompactEmbeddedPiSessionDirect>
 ): ReturnType<CompactEmbeddedPiSessionDirect> {
-  const { compactEmbeddedPiSessionDirect } = await loadCompactRuntime();
-  return compactEmbeddedPiSessionDirect(...args);
+  return compactEmbeddedPiSessionDirectImpl(...args);
 }

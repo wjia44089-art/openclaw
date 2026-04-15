@@ -9,7 +9,6 @@ import {
 } from "./provider-openai-codex-oauth-tls.js";
 
 const manualInputPromptMessage = "Paste the authorization code (or full redirect URL):";
-const openAICodexOAuthOriginator = "openclaw";
 
 export async function loginOpenAICodexOAuth(params: {
   prompter: WizardPrompter;
@@ -20,6 +19,8 @@ export async function loginOpenAICodexOAuth(params: {
 }): Promise<OAuthCredentials | null> {
   const { prompter, runtime, isRemote, openUrl, localBrowserMessage } = params;
 
+  // Ensure env-based proxy dispatcher is active before any outbound fetch calls,
+  // including the TLS preflight check.
   ensureGlobalUndiciEnvProxyDispatcher();
 
   const preflight = await runOpenAIOAuthTlsPreflight();
@@ -60,7 +61,6 @@ export async function loginOpenAICodexOAuth(params: {
     const creds = await loginOpenAICodex({
       onAuth: baseOnAuth,
       onPrompt,
-      originator: openAICodexOAuthOriginator,
       onManualCodeInput: isRemote
         ? async () =>
             await onPrompt({

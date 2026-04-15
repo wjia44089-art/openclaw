@@ -1,6 +1,5 @@
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { normalizeOptionalString } from "../shared/string-coerce.js";
-import { resolveGatewayCredentialsWithSecretInputs } from "./credentials-secret-inputs.js";
 import {
   type ExplicitGatewayAuth,
   isGatewaySecretRefUnavailableError,
@@ -66,13 +65,15 @@ export async function resolveGatewayProbeAuthWithSecretInputs(params: {
   explicitAuth?: ExplicitGatewayAuth;
 }): Promise<{ token?: string; password?: string }> {
   const policy = buildGatewayProbeCredentialPolicy(params);
-  return await resolveGatewayCredentialsWithSecretInputs({
-    config: policy.config,
-    env: policy.env,
-    explicitAuth: policy.explicitAuth,
-    modeOverride: policy.modeOverride,
-    remoteTokenFallback: policy.remoteTokenFallback,
-  });
+  return await import("./call.js").then(({ resolveGatewayCredentialsWithSecretInputs }) =>
+    resolveGatewayCredentialsWithSecretInputs({
+      config: policy.config,
+      env: policy.env,
+      explicitAuth: policy.explicitAuth,
+      modeOverride: policy.modeOverride,
+      remoteTokenFallback: policy.remoteTokenFallback,
+    }),
+  );
 }
 
 export async function resolveGatewayProbeAuthSafeWithSecretInputs(params: {

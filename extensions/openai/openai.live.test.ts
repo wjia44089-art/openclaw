@@ -240,7 +240,7 @@ describeLive("openai plugin live", () => {
       timeoutMs: 30_000,
     });
 
-    const text = (transcription?.text ?? "").toLowerCase();
+    const text = String(transcription?.text ?? "").toLowerCase();
     expect(text.length).toBeGreaterThan(0);
     expect(text).toContain("openclaw");
     expect(text).toMatch(/\bok\b/);
@@ -330,7 +330,7 @@ describeLive("openai plugin live", () => {
         provider: "openai",
       });
 
-      expect((description?.text ?? "").toLowerCase()).toContain("orange");
+      expect(String(description?.text ?? "").toLowerCase()).toContain("orange");
     } finally {
       await fs.rm(agentDir, { recursive: true, force: true });
     }

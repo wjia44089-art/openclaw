@@ -13,11 +13,11 @@ export async function runDaemonStatus(opts: DaemonStatusOptions) {
     }
     const status = await gatherDaemonStatus({
       rpc: opts.rpc,
-      probe: opts.probe,
-      requireRpc: opts.requireRpc,
-      deep: opts.deep === true,
+      probe: Boolean(opts.probe),
+      requireRpc: Boolean(opts.requireRpc),
+      deep: Boolean(opts.deep),
     });
-    printDaemonStatus(status, { json: opts.json });
+    printDaemonStatus(status, { json: Boolean(opts.json) });
     if (opts.requireRpc && !status.rpc?.ok) {
       defaultRuntime.exit(1);
     }

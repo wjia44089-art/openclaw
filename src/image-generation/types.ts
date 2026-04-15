@@ -1,6 +1,6 @@
-import type { AuthProfileStore } from "../agents/auth-profiles/types.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
-import type { MediaNormalizationEntry } from "../media-generation/normalization.types.js";
+import type { AuthProfileStore } from "../agents/auth-profiles.js";
+import type { OpenClawConfig } from "../config/config.js";
+import type { MediaNormalizationEntry } from "../media-generation/runtime-shared.js";
 
 export type GeneratedImageAsset = {
   buffer: Buffer;

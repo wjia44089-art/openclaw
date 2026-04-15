@@ -1,7 +1,6 @@
 import { isMessagingToolDuplicate } from "../../agents/pi-embedded-helpers.js";
-import type { MessagingToolSend } from "../../agents/pi-embedded-messaging.types.js";
-import { getChannelPlugin } from "../../channels/plugins/index.js";
-import { normalizeAnyChannelId } from "../../channels/registry.js";
+import type { MessagingToolSend } from "../../agents/pi-embedded-runner.js";
+import { getChannelPlugin, normalizeChannelId } from "../../channels/plugins/index.js";
 import { normalizeTargetForProvider } from "../../infra/outbound/target-normalization.js";
 import { normalizeOptionalAccountId } from "../../routing/account-id.js";
 import {
@@ -71,7 +70,7 @@ function normalizeProviderForComparison(value?: string): string | undefined {
     return undefined;
   }
   const lowered = normalizeLowercaseStringOrEmpty(trimmed);
-  const normalizedChannel = normalizeAnyChannelId(trimmed);
+  const normalizedChannel = normalizeChannelId(trimmed);
   if (normalizedChannel) {
     return normalizedChannel;
   }
@@ -127,7 +126,10 @@ export function shouldSuppressMessagingToolReplies(params: {
   if (!provider) {
     return false;
   }
-  const originRawTarget = normalizeOptionalString(params.originatingTo);
+  const originTarget = normalizeTargetForProvider(provider, params.originatingTo);
+  if (!originTarget) {
+    return false;
+  }
   const originAccount = normalizeOptionalAccountId(params.accountId);
   const sentTargets = params.messagingToolSentTargets ?? [];
   if (sentTargets.length === 0) {
@@ -141,20 +143,12 @@ export function shouldSuppressMessagingToolReplies(params: {
     if (targetProvider !== provider) {
       return false;
     }
+    const targetKey = normalizeTargetForProvider(targetProvider, target.to);
+    if (!targetKey) {
+      return false;
+    }
     const targetAccount = normalizeOptionalAccountId(target.accountId);
     if (originAccount && targetAccount && originAccount !== targetAccount) {
-      return false;
-    }
-    const targetRaw = normalizeOptionalString(target.to);
-    if (originRawTarget && targetRaw === originRawTarget && !target.threadId) {
-      return true;
-    }
-    const originTarget = normalizeTargetForProvider(provider, originRawTarget);
-    if (!originTarget) {
-      return false;
-    }
-    const targetKey = normalizeTargetForProvider(targetProvider, targetRaw);
-    if (!targetKey) {
       return false;
     }
     return targetsMatchForSuppression({

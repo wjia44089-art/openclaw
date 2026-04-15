@@ -89,7 +89,9 @@ function combineDebounceEntries(entries: BlueBubblesDebounceEntry[]): Normalized
   const latestTimestamp = timestamps.length > 0 ? Math.max(...timestamps) : first.timestamp;
 
   // Collect all message IDs for reference
-  const messageId = entries.map((e) => e.message.messageId).find((id): id is string => Boolean(id));
+  const messageIds = entries
+    .map((e) => e.message.messageId)
+    .filter((id): id is string => Boolean(id));
 
   // Prefer reply context from any entry that has it
   const entryWithReply = entries.find((e) => e.message.replyToId);
@@ -100,7 +102,7 @@ function combineDebounceEntries(entries: BlueBubblesDebounceEntry[]): Normalized
     attachments: allAttachments.length > 0 ? allAttachments : first.attachments,
     timestamp: latestTimestamp,
     // Use first message's ID as primary (for reply reference), but we've coalesced others
-    messageId: messageId ?? first.messageId,
+    messageId: messageIds[0] ?? first.messageId,
     // Preserve reply context if present
     replyToId: entryWithReply?.message.replyToId ?? first.replyToId,
     replyToBody: entryWithReply?.message.replyToBody ?? first.replyToBody,

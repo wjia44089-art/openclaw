@@ -16,8 +16,6 @@ export type FailoverDecisionLoggerInput = {
   profileFailureReason?: AuthProfileFailureReason | null;
   provider: string;
   model: string;
-  sourceProvider?: string;
-  sourceModel?: string;
   profileId?: string;
   fallbackConfigured: boolean;
   timedOut?: boolean;
@@ -50,11 +48,8 @@ export function createFailoverDecisionLogger(
   const safeRunId = sanitizeForConsole(normalizedBase.runId) ?? "-";
   const safeProvider = sanitizeForConsole(normalizedBase.provider) ?? "-";
   const safeModel = sanitizeForConsole(normalizedBase.model) ?? "-";
-  const safeSourceProvider = sanitizeForConsole(normalizedBase.sourceProvider) ?? safeProvider;
-  const safeSourceModel = sanitizeForConsole(normalizedBase.sourceModel) ?? safeModel;
   const profileText = safeProfileId ?? "-";
   const reasonText = normalizedBase.failoverReason ?? "none";
-  const sourceChanged = safeSourceProvider !== safeProvider || safeSourceModel !== safeModel;
   return (decision, extra) => {
     const observedError = buildApiErrorObservationFields(normalizedBase.rawError);
     log.warn("embedded run failover decision", {
@@ -67,8 +62,6 @@ export function createFailoverDecisionLogger(
       profileFailureReason: normalizedBase.profileFailureReason,
       provider: normalizedBase.provider,
       model: normalizedBase.model,
-      sourceProvider: normalizedBase.sourceProvider ?? normalizedBase.provider,
-      sourceModel: normalizedBase.sourceModel ?? normalizedBase.model,
       profileId: safeProfileId,
       fallbackConfigured: normalizedBase.fallbackConfigured,
       timedOut: normalizedBase.timedOut,
@@ -77,8 +70,7 @@ export function createFailoverDecisionLogger(
       ...observedError,
       consoleMessage:
         `embedded run failover decision: runId=${safeRunId} stage=${normalizedBase.stage} decision=${decision} ` +
-        `reason=${reasonText} from=${safeSourceProvider}/${safeSourceModel}` +
-        `${sourceChanged ? ` to=${safeProvider}/${safeModel}` : ""} profile=${profileText}`,
+        `reason=${reasonText} provider=${safeProvider}/${safeModel} profile=${profileText}`,
     });
   };
 }

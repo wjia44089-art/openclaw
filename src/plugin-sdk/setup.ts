@@ -10,10 +10,12 @@ export type { ChannelSetupInput } from "../channels/plugins/types.core.js";
 export type {
   ChannelSetupDmPolicy,
   ChannelSetupWizardAdapter,
+} from "../channels/plugins/setup-wizard-types.js";
+export type {
   ChannelSetupWizard,
   ChannelSetupWizardAllowFromEntry,
   ChannelSetupWizardTextInput,
-} from "../channels/plugins/setup-wizard-types.js";
+} from "../channels/plugins/setup-wizard.js";
 
 export { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "../routing/session-key.js";
 export { formatCliCommand } from "../cli/command-format.js";

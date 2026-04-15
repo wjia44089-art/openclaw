@@ -21,9 +21,6 @@ describe("memory-wiki plugin", () => {
     expect(registerMemoryPromptSupplement).toHaveBeenCalledTimes(1);
     expect(registerGatewayMethod.mock.calls.map((call) => call[0])).toEqual([
       "wiki.status",
-      "wiki.importRuns",
-      "wiki.importInsights",
-      "wiki.palace",
       "wiki.init",
       "wiki.doctor",
       "wiki.compile",

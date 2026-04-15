@@ -36,7 +36,7 @@ export function createMatrixBotSdkMock(params: MatrixBotSdkMockParams = {}): Mat
       warn = vi.fn();
       error = vi.fn();
     },
-    MatrixClient: params.matrixClient ?? function MatrixClient() {},
+    MatrixClient: params.matrixClient ?? class {},
     LogService: {
       setLogger: vi.fn(),
       ...(params.includeVerboseLogService
@@ -47,9 +47,7 @@ export function createMatrixBotSdkMock(params: MatrixBotSdkMockParams = {}): Mat
           }
         : {}),
     },
-    SimpleFsStorageProvider:
-      params.simpleFsStorageProvider ?? function SimpleFsStorageProvider() {},
-    RustSdkCryptoStorageProvider:
-      params.rustSdkCryptoStorageProvider ?? function RustSdkCryptoStorageProvider() {},
+    SimpleFsStorageProvider: params.simpleFsStorageProvider ?? class {},
+    RustSdkCryptoStorageProvider: params.rustSdkCryptoStorageProvider ?? class {},
   };
 }

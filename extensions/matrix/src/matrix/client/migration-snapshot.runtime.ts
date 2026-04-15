@@ -1,1 +1,1 @@
-export { maybeCreateMatrixMigrationSnapshot } from "../../migration-snapshot-backup.js";
+export { maybeCreateMatrixMigrationSnapshot } from "../../matrix-migration.runtime.js";

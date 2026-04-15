@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  isNumericTelegramSenderUserId,
-  isNumericTelegramUserId,
-  normalizeTelegramAllowFromEntry,
-} from "./allow-from.js";
+import { isNumericTelegramUserId, normalizeTelegramAllowFromEntry } from "./allow-from.js";
 import {
   resolveTelegramGroupRequireMention,
   resolveTelegramGroupToolPolicy,
@@ -237,17 +233,6 @@ describe("telegram allow-from helpers", () => {
     ] as const;
     for (const testCase of cases) {
       expect(isNumericTelegramUserId(testCase.value)).toBe(testCase.expected);
-    }
-  });
-
-  it("accepts only positive numeric sender user IDs", () => {
-    const cases = [
-      { value: "123456789", expected: true },
-      { value: "-1001234567890", expected: false },
-      { value: "@someone", expected: false },
-    ] as const;
-    for (const testCase of cases) {
-      expect(isNumericTelegramSenderUserId(testCase.value)).toBe(testCase.expected);
     }
   });
 });

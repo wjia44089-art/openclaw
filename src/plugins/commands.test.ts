@@ -5,7 +5,6 @@ import {
   clearPluginCommands,
   executePluginCommand,
   getPluginCommandSpecs,
-  listProviderPluginCommandSpecs,
   listPluginCommands,
   matchPluginCommand,
   registerPluginCommand,
@@ -187,33 +186,6 @@ beforeEach(() => {
           },
         },
       },
-      {
-        pluginId: "signal",
-        source: "test",
-        plugin: {
-          ...createChannelTestPluginBase({ id: "signal", label: "Signal" }),
-          commands: {
-            nativeCommandsAutoEnabled: true,
-          },
-          bindings: {
-            resolveCommandConversation: ({ senderId }: { senderId?: string }) => {
-              const normalizedSenderId = senderId?.trim();
-              return normalizedSenderId ? { conversationId: `dm:${normalizedSenderId}` } : null;
-            },
-          },
-        },
-      },
-      {
-        pluginId: "slack",
-        source: "test",
-        plugin: {
-          ...createChannelTestPluginBase({
-            id: "slack",
-            label: "Slack",
-            capabilities: { nativeCommands: true, chatTypes: ["direct", "group"] },
-          }),
-        },
-      },
     ]),
   );
 });
@@ -265,7 +237,6 @@ describe("registerPluginCommand", () => {
         name: "demo_cmd",
         description: "Demo command",
         pluginId: "demo-plugin",
-        acceptsArgs: false,
       },
     ]);
     expect(getPluginCommandSpecs()).toEqual([
@@ -275,23 +246,6 @@ describe("registerPluginCommand", () => {
         acceptsArgs: false,
       },
     ]);
-  });
-
-  it("matches underscore aliases for hyphenated command names", () => {
-    registerPluginCommand("demo-plugin", {
-      name: "active-memory",
-      description: "Active Memory command",
-      acceptsArgs: true,
-      handler: async () => ({ text: "ok" }),
-    });
-
-    expect(matchPluginCommand("/active_memory status")).toMatchObject({
-      command: expect.objectContaining({
-        name: "active-memory",
-        pluginId: "demo-plugin",
-      }),
-      args: "status",
-    });
   });
 
   it("supports provider-specific native command aliases", () => {
@@ -309,25 +263,6 @@ describe("registerPluginCommand", () => {
       { provider: "discord", expectedNames: ["discordvoice"] },
       { provider: "telegram", expectedNames: ["talkvoice"] },
       { provider: "slack", expectedNames: [] },
-    ]);
-  });
-
-  it("allows Slack to resolve provider-native plugin specs without changing shared native gating", () => {
-    const result = registerVoiceCommandForTest({
-      nativeNames: {
-        default: "talkvoice",
-        discord: "discordvoice",
-      },
-      description: "Demo command",
-    });
-
-    expect(result).toEqual({ ok: true });
-    expect(listProviderPluginCommandSpecs("slack")).toEqual([
-      {
-        name: "talkvoice",
-        description: "Demo command",
-        acceptsArgs: false,
-      },
     ]);
   });
 
@@ -509,19 +444,6 @@ describe("registerPluginCommand", () => {
         accountId: "default",
       },
       expected: null,
-    },
-    {
-      name: "resolves sender-keyed command bindings when only senderId is available",
-      params: {
-        channel: "signal",
-        senderId: "signal-user-42",
-        accountId: "default",
-      },
-      expected: {
-        channel: "signal",
-        accountId: "default",
-        conversationId: "dm:signal-user-42",
-      },
     },
   ] as const)("$name", ({ params, expected }) => {
     expectBindingConversationCase(params, expected);

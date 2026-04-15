@@ -87,7 +87,8 @@ describe("config observe recovery", () => {
       const lines = (await fsp.readFile(auditPath, "utf-8")).trim().split("\n").filter(Boolean);
       const observe = lines
         .map((line) => JSON.parse(line) as Record<string, unknown>)
-        .findLast((line) => line.event === "config.observe");
+        .filter((line) => line.event === "config.observe")
+        .at(-1);
       expect(observe?.restoredFromBackup).toBe(true);
       expect(observe?.suspicious).toEqual(
         expect.arrayContaining(["gateway-mode-missing-vs-last-good", "update-channel-only-root"]),
@@ -153,7 +154,8 @@ describe("config observe recovery", () => {
       const lines = (await fsp.readFile(auditPath, "utf-8")).trim().split("\n").filter(Boolean);
       const observe = lines
         .map((line) => JSON.parse(line) as Record<string, unknown>)
-        .findLast((line) => line.event === "config.observe");
+        .filter((line) => line.event === "config.observe")
+        .at(-1);
       expect(observe?.backupHash).toBeTypeOf("string");
       expect(observe?.lastKnownGoodIno ?? null).toBeNull();
     });

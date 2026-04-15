@@ -1,10 +1,6 @@
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
-import {
-  buildGatewayDistEntrypointCandidates,
-  findFirstAccessibleGatewayEntrypoint,
-  isGatewayDistEntrypointPath,
-} from "./gateway-entrypoint.js";
 import { isBunRuntime, isNodeRuntime } from "./runtime-binary.js";
 
 type GatewayProgramArgs = {
@@ -14,6 +10,13 @@ type GatewayProgramArgs = {
 
 type GatewayRuntimePreference = "auto" | "node" | "bun";
 
+function platformNodeFlags(): string[] {
+  if (os.arch() === "riscv64") {
+    return ["--disable-wasm-trap-handler"];
+  }
+  return [];
+}
+
 async function resolveCliEntrypointPathForService(): Promise<string> {
   const argv1 = process.argv[1];
   if (!argv1) {
@@ -22,28 +25,15 @@ async function resolveCliEntrypointPathForService(): Promise<string> {
 
   const normalized = path.resolve(argv1);
   const resolvedPath = await resolveRealpathSafe(normalized);
-  const looksLikeDist = isGatewayDistEntrypointPath(resolvedPath);
+  const looksLikeDist = /[/\\]dist[/\\].+\.(cjs|js|mjs)$/.test(resolvedPath);
   if (looksLikeDist) {
-    const preferredDistEntrypoint = await findFirstAccessibleGatewayEntrypoint(
-      buildGatewayDistEntrypointCandidates(normalized, resolvedPath),
-      async (candidate) => {
-        try {
-          await fs.access(candidate);
-          return true;
-        } catch {
-          return false;
-        }
-      },
-    );
-    if (preferredDistEntrypoint) {
-      return preferredDistEntrypoint;
-    }
+    await fs.access(resolvedPath);
     // Prefer the original (possibly symlinked) path over the resolved realpath.
     // This keeps LaunchAgent/systemd paths stable across package version updates,
     // since symlinks like node_modules/openclaw -> .pnpm/openclaw@X.Y.Z/...
     // are automatically updated by pnpm, while the resolved path contains
     // version-specific directories that break after updates.
-    const normalizedLooksLikeDist = isGatewayDistEntrypointPath(normalized);
+    const normalizedLooksLikeDist = /[/\\]dist[/\\].+\.(cjs|js|mjs)$/.test(normalized);
     if (normalizedLooksLikeDist && normalized !== resolvedPath) {
       try {
         await fs.access(normalized);
@@ -191,7 +181,7 @@ async function resolveCliProgramArguments(params: {
       params.nodePath ?? (isNodeRuntime(execPath) ? execPath : await resolveNodePath());
     const cliEntrypointPath = await resolveCliEntrypointPathForService();
     return {
-      programArguments: [nodePath, cliEntrypointPath, ...params.args],
+      programArguments: [nodePath, ...platformNodeFlags(), cliEntrypointPath, ...params.args],
     };
   }
 
@@ -217,8 +207,9 @@ async function resolveCliProgramArguments(params: {
   if (!params.dev) {
     try {
       const cliEntrypointPath = await resolveCliEntrypointPathForService();
+      const nodeFlags = isNodeRuntime(execPath) ? platformNodeFlags() : [];
       return {
-        programArguments: [execPath, cliEntrypointPath, ...params.args],
+        programArguments: [execPath, ...nodeFlags, cliEntrypointPath, ...params.args],
       };
     } catch (error) {
       // If running under bun or another runtime that can execute TS directly

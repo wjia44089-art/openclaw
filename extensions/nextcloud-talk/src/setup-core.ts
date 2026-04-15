@@ -123,7 +123,7 @@ async function promptNextcloudTalkAllowFrom(params: {
     message: "Nextcloud Talk allowFrom (user id)",
     placeholder: "username",
     parseEntries: (raw) => ({
-      entries: raw
+      entries: String(raw)
         .split(/[\n,;]+/g)
         .map(normalizeLowercaseStringOrEmpty)
         .filter(Boolean),

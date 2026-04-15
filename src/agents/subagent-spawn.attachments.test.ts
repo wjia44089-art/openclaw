@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createSubagentSpawnTestConfig,
   loadSubagentSpawnModuleForTest,
@@ -14,15 +14,7 @@ let configOverride: Record<string, unknown> = {
   ...createSubagentSpawnTestConfig(),
 };
 let workspaceDirOverride = "";
-let subagentSpawnModule: Awaited<ReturnType<typeof loadSubagentSpawnModuleForTest>>;
-
-beforeAll(async () => {
-  subagentSpawnModule = await loadSubagentSpawnModuleForTest({
-    callGatewayMock,
-    loadConfig: () => configOverride,
-    workspaceDir: workspaceDirOverride || os.tmpdir(),
-  });
-});
+let resetSubagentRegistryForTests: typeof import("./subagent-registry.js").resetSubagentRegistryForTests;
 
 // --- decodeStrictBase64 ---
 
@@ -30,7 +22,11 @@ describe("decodeStrictBase64", () => {
   const maxBytes = 1024;
 
   it("valid base64 returns buffer with correct bytes", async () => {
-    const { decodeStrictBase64 } = subagentSpawnModule;
+    const { decodeStrictBase64 } = await loadSubagentSpawnModuleForTest({
+      callGatewayMock,
+      loadConfig: () => configOverride,
+      workspaceDir: workspaceDirOverride || os.tmpdir(),
+    });
     const input = "hello world";
     const encoded = Buffer.from(input).toString("base64");
     const result = decodeStrictBase64(encoded, maxBytes);
@@ -39,41 +35,69 @@ describe("decodeStrictBase64", () => {
   });
 
   it("empty string returns null", async () => {
-    const { decodeStrictBase64 } = subagentSpawnModule;
+    const { decodeStrictBase64 } = await loadSubagentSpawnModuleForTest({
+      callGatewayMock,
+      loadConfig: () => configOverride,
+      workspaceDir: workspaceDirOverride || os.tmpdir(),
+    });
     expect(decodeStrictBase64("", maxBytes)).toBeNull();
   });
 
   it("bad padding (length % 4 !== 0) returns null", async () => {
-    const { decodeStrictBase64 } = subagentSpawnModule;
+    const { decodeStrictBase64 } = await loadSubagentSpawnModuleForTest({
+      callGatewayMock,
+      loadConfig: () => configOverride,
+      workspaceDir: workspaceDirOverride || os.tmpdir(),
+    });
     expect(decodeStrictBase64("abc", maxBytes)).toBeNull();
   });
 
   it("non-base64 chars returns null", async () => {
-    const { decodeStrictBase64 } = subagentSpawnModule;
+    const { decodeStrictBase64 } = await loadSubagentSpawnModuleForTest({
+      callGatewayMock,
+      loadConfig: () => configOverride,
+      workspaceDir: workspaceDirOverride || os.tmpdir(),
+    });
     expect(decodeStrictBase64("!@#$", maxBytes)).toBeNull();
   });
 
   it("whitespace-only returns null (empty after strip)", async () => {
-    const { decodeStrictBase64 } = subagentSpawnModule;
+    const { decodeStrictBase64 } = await loadSubagentSpawnModuleForTest({
+      callGatewayMock,
+      loadConfig: () => configOverride,
+      workspaceDir: workspaceDirOverride || os.tmpdir(),
+    });
     expect(decodeStrictBase64("   ", maxBytes)).toBeNull();
   });
 
   it("pre-decode oversize guard: encoded string > maxEncodedBytes * 2 returns null", async () => {
-    const { decodeStrictBase64 } = subagentSpawnModule;
+    const { decodeStrictBase64 } = await loadSubagentSpawnModuleForTest({
+      callGatewayMock,
+      loadConfig: () => configOverride,
+      workspaceDir: workspaceDirOverride || os.tmpdir(),
+    });
     // maxEncodedBytes = ceil(1024/3)*4 = 1368; *2 = 2736
     const oversized = "A".repeat(2737);
     expect(decodeStrictBase64(oversized, maxBytes)).toBeNull();
   });
 
   it("decoded byteLength exceeds maxDecodedBytes returns null", async () => {
-    const { decodeStrictBase64 } = subagentSpawnModule;
+    const { decodeStrictBase64 } = await loadSubagentSpawnModuleForTest({
+      callGatewayMock,
+      loadConfig: () => configOverride,
+      workspaceDir: workspaceDirOverride || os.tmpdir(),
+    });
     const bigBuf = Buffer.alloc(1025, 0x42);
     const encoded = bigBuf.toString("base64");
     expect(decodeStrictBase64(encoded, maxBytes)).toBeNull();
   });
 
   it("valid base64 at exact boundary returns Buffer", async () => {
-    const { decodeStrictBase64 } = subagentSpawnModule;
+    const { decodeStrictBase64 } = await loadSubagentSpawnModuleForTest({
+      callGatewayMock,
+      loadConfig: () => configOverride,
+      workspaceDir: workspaceDirOverride || os.tmpdir(),
+    });
     const exactBuf = Buffer.alloc(1024, 0x41);
     const encoded = exactBuf.toString("base64");
     const result = decodeStrictBase64(encoded, maxBytes);
@@ -90,7 +114,12 @@ describe("spawnSubagentDirect filename validation", () => {
       path.join(os.tmpdir(), `openclaw-subagent-attachments-${process.pid}-${Date.now()}-`),
     );
     configOverride = createSubagentSpawnTestConfig(workspaceDirOverride);
-    subagentSpawnModule.resetSubagentRegistryForTests();
+    ({ resetSubagentRegistryForTests } = await loadSubagentSpawnModuleForTest({
+      callGatewayMock,
+      loadConfig: () => configOverride,
+      workspaceDir: workspaceDirOverride,
+    }));
+    resetSubagentRegistryForTests();
     callGatewayMock.mockClear();
     setupAcceptedSubagentGatewayMock(callGatewayMock);
   });
@@ -112,7 +141,11 @@ describe("spawnSubagentDirect filename validation", () => {
   const validContent = Buffer.from("hello").toString("base64");
 
   async function spawnWithName(name: string) {
-    const { spawnSubagentDirect } = subagentSpawnModule;
+    const { spawnSubagentDirect } = await loadSubagentSpawnModuleForTest({
+      callGatewayMock,
+      loadConfig: () => configOverride,
+      workspaceDir: workspaceDirOverride,
+    });
     return spawnSubagentDirect(
       {
         task: "test",
@@ -147,7 +180,11 @@ describe("spawnSubagentDirect filename validation", () => {
   });
 
   it("duplicate name returns attachments_duplicate_name", async () => {
-    const { spawnSubagentDirect } = subagentSpawnModule;
+    const { spawnSubagentDirect } = await loadSubagentSpawnModuleForTest({
+      callGatewayMock,
+      loadConfig: () => configOverride,
+      workspaceDir: workspaceDirOverride,
+    });
     const result = await spawnSubagentDirect(
       {
         task: "test",
@@ -182,7 +219,11 @@ describe("spawnSubagentDirect filename validation", () => {
       return {};
     });
 
-    const { spawnSubagentDirect } = subagentSpawnModule;
+    const { spawnSubagentDirect } = await loadSubagentSpawnModuleForTest({
+      callGatewayMock,
+      loadConfig: () => configOverride,
+      workspaceDir: workspaceDirOverride,
+    });
     const result = await spawnSubagentDirect(
       {
         task: "test",

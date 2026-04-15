@@ -1,8 +1,9 @@
-import { getActivePluginChannelRegistryFromState } from "../plugins/runtime-channel-state.js";
+import { getActivePluginChannelRegistry, getActivePluginRegistry } from "../plugins/runtime.js";
 import {
   normalizeOptionalLowercaseString,
   normalizeOptionalString,
 } from "../shared/string-coerce.js";
+import { getChatChannelMeta, listChatChannels, type ChatChannelMeta } from "./chat-meta.js";
 import {
   CHANNEL_IDS,
   CHAT_CHANNEL_ALIASES,
@@ -11,9 +12,7 @@ import {
   normalizeChatChannelId,
   type ChatChannelId,
 } from "./ids.js";
-import type { ChannelId } from "./plugins/channel-id.types.js";
-import type { ChannelMeta } from "./plugins/types.core.js";
-export { getChatChannelMeta, listChatChannels } from "./chat-meta.js";
+import type { ChannelId, ChannelMeta } from "./plugins/types.js";
 export { CHANNEL_IDS, CHAT_CHANNEL_ORDER } from "./ids.js";
 export type { ChatChannelId } from "./ids.js";
 
@@ -25,18 +24,18 @@ type RegisteredChannelPluginEntry = {
 };
 
 function listRegisteredChannelPluginEntries(): RegisteredChannelPluginEntry[] {
-  const channelRegistry = getActivePluginChannelRegistryFromState();
+  const channelRegistry = getActivePluginChannelRegistry();
   if (channelRegistry && channelRegistry.channels && channelRegistry.channels.length > 0) {
     return channelRegistry.channels;
   }
-  return [];
+  return getActivePluginRegistry()?.channels ?? [];
 }
 
 function findRegisteredChannelPluginEntry(
   normalizedKey: string,
 ): RegisteredChannelPluginEntry | undefined {
   return listRegisteredChannelPluginEntries().find((entry) => {
-    const id = normalizeOptionalLowercaseString(entry.plugin.id ?? "") ?? "";
+    const id = normalizeOptionalLowercaseString(String(entry.plugin.id ?? "")) ?? "";
     if (id && id === normalizedKey) {
       return true;
     }
@@ -57,7 +56,13 @@ function findRegisteredChannelPluginEntryById(
     (entry) => normalizeOptionalLowercaseString(entry.plugin.id) === normalizedId,
   );
 }
-export { CHAT_CHANNEL_ALIASES, listChatChannelAliases, normalizeChatChannelId };
+export {
+  CHAT_CHANNEL_ALIASES,
+  getChatChannelMeta,
+  listChatChannelAliases,
+  listChatChannels,
+  normalizeChatChannelId,
+};
 
 // Channel docking: prefer this helper in shared code. Importing from
 // `src/channels/plugins/*` can eagerly load channel implementations.
@@ -94,12 +99,12 @@ export function getRegisteredChannelPluginMeta(
   return findRegisteredChannelPluginEntryById(id)?.plugin.meta ?? null;
 }
 
-export function formatChannelPrimerLine(meta: ChannelMeta): string {
+export function formatChannelPrimerLine(meta: ChatChannelMeta): string {
   return `${meta.label}: ${meta.blurb}`;
 }
 
 export function formatChannelSelectionLine(
-  meta: ChannelMeta,
+  meta: ChatChannelMeta,
   docsLink: (path: string, label?: string) => string,
 ): string {
   const docsPrefix = meta.selectionDocsPrefix ?? "Docs:";

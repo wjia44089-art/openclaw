@@ -45,10 +45,7 @@ export async function runSignalSseLoop({
     logVerbose(message);
   };
 
-  for (;;) {
-    if (abortSignal?.aborted) {
-      break;
-    }
+  while (!abortSignal?.aborted) {
     try {
       await streamSignalEvents({
         baseUrl,

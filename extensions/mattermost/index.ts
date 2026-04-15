@@ -6,7 +6,7 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk/channel-entry-contra
 
 function registerSlashCommandRoute(api: OpenClawPluginApi): void {
   const register = loadBundledEntryExportSync<(api: OpenClawPluginApi) => void>(import.meta.url, {
-    specifier: "./slash-route-api.js",
+    specifier: "./runtime-api.js",
     exportName: "registerSlashCommandRoute",
   });
   register(api);

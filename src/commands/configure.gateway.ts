@@ -1,5 +1,5 @@
+import type { OpenClawConfig } from "../config/config.js";
 import { resolveGatewayPort } from "../config/config.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { isValidEnvSecretRefId, type SecretInput } from "../config/types.secrets.js";
 import {
   maybeAddTailnetOriginToControlUiAllowedOrigins,
@@ -42,7 +42,7 @@ export async function promptGatewayConfig(
     }),
     runtime,
   );
-  const port = Number.parseInt(portRaw, 10);
+  const port = Number.parseInt(String(portRaw), 10);
 
   let bind = guardCancel(
     await select({
@@ -129,12 +129,14 @@ export async function promptGatewayConfig(
   let tailscaleResetOnExit = false;
   if (tailscaleMode !== "off") {
     note(TAILSCALE_DOCS_LINES.join("\n"), "Tailscale");
-    tailscaleResetOnExit = guardCancel(
-      await confirm({
-        message: "Reset Tailscale serve/funnel on exit?",
-        initialValue: false,
-      }),
-      runtime,
+    tailscaleResetOnExit = Boolean(
+      guardCancel(
+        await confirm({
+          message: "Reset Tailscale serve/funnel on exit?",
+          initialValue: false,
+        }),
+        runtime,
+      ),
     );
   }
 
@@ -272,7 +274,7 @@ export async function promptGatewayConfig(
       runtime,
     );
     const requiredHeaders = requiredHeadersRaw
-      ? normalizeStringEntries(requiredHeadersRaw.split(","))
+      ? normalizeStringEntries(String(requiredHeadersRaw).split(","))
       : [];
 
     const allowUsersRaw = guardCancel(
@@ -282,7 +284,9 @@ export async function promptGatewayConfig(
       }),
       runtime,
     );
-    const allowUsers = allowUsersRaw ? normalizeStringEntries(allowUsersRaw.split(",")) : [];
+    const allowUsers = allowUsersRaw
+      ? normalizeStringEntries(String(allowUsersRaw).split(","))
+      : [];
 
     const trustedProxiesRaw = guardCancel(
       await text({
@@ -297,7 +301,7 @@ export async function promptGatewayConfig(
       }),
       runtime,
     );
-    trustedProxies = normalizeStringEntries(trustedProxiesRaw.split(","));
+    trustedProxies = normalizeStringEntries(String(trustedProxiesRaw).split(","));
 
     trustedProxyConfig = {
       userHeader: normalizeOptionalString(userHeader) ?? "",

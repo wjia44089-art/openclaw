@@ -1,4 +1,4 @@
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import {
   parseRawSessionConversationRef,
   parseThreadSessionSuffix,
@@ -125,7 +125,7 @@ function buildGenericParentOverrideCandidates(sessionKey: string | null | undefi
     return [];
   }
   const { baseSessionKey, threadId } = parseThreadSessionSuffix(raw.rawId);
-  return buildChannelKeyCandidates(threadId ? baseSessionKey : raw.rawId);
+  return buildChannelKeyCandidates(threadId ? baseSessionKey : undefined);
 }
 
 function buildFeishuParentOverrideCandidates(rawId: string | undefined): string[] {

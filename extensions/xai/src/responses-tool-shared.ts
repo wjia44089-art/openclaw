@@ -1,4 +1,4 @@
-import type { XaiWebSearchResponse } from "./web-search-response.types.js";
+import type { XaiWebSearchResponse } from "./web-search-shared.js";
 
 export const XAI_RESPONSES_ENDPOINT = "https://api.x.ai/v1/responses";
 

@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import { resolveCdpReachabilityPolicy } from "./cdp-reachability-policy.js";
 import {
   CHROME_MCP_ATTACH_READY_POLL_MS,
   CHROME_MCP_ATTACH_READY_WINDOW_MS,
@@ -63,14 +62,10 @@ export function createProfileAvailability({
   const resolveTimeouts = (timeoutMs: number | undefined) =>
     resolveCdpReachabilityTimeouts({
       profileIsLoopback: profile.cdpIsLoopback,
-      attachOnly: profile.attachOnly,
       timeoutMs,
       remoteHttpTimeoutMs: state().resolved.remoteCdpTimeoutMs,
       remoteHandshakeTimeoutMs: state().resolved.remoteCdpHandshakeTimeoutMs,
     });
-
-  const getCdpReachabilityPolicy = () =>
-    resolveCdpReachabilityPolicy(profile, state().resolved.ssrfPolicy);
 
   const isReachable = async (timeoutMs?: number) => {
     if (capabilities.usesChromeMcp) {
@@ -83,7 +78,7 @@ export function createProfileAvailability({
       profile.cdpUrl,
       httpTimeoutMs,
       wsTimeoutMs,
-      getCdpReachabilityPolicy(),
+      state().resolved.ssrfPolicy,
     );
   };
 
@@ -92,7 +87,7 @@ export function createProfileAvailability({
       return await isReachable(timeoutMs);
     }
     const { httpTimeoutMs } = resolveTimeouts(timeoutMs);
-    return await isChromeReachable(profile.cdpUrl, httpTimeoutMs, getCdpReachabilityPolicy());
+    return await isChromeReachable(profile.cdpUrl, httpTimeoutMs, state().resolved.ssrfPolicy);
   };
 
   const attachRunning = (running: NonNullable<ProfileRuntimeState["running"]>) => {

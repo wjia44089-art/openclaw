@@ -14,86 +14,73 @@ type PaletteItem = {
   description?: string;
 };
 
-function buildSlashPaletteItems(): PaletteItem[] {
-  return SLASH_COMMANDS.map((command) => ({
-    id: `slash:${command.name}`,
-    label: `/${command.name}`,
-    icon: command.icon ?? "terminal",
-    category: "search",
-    action: `/${command.name}`,
-    description: command.description,
-  }));
-}
+const SLASH_PALETTE_ITEMS: PaletteItem[] = SLASH_COMMANDS.map((command) => ({
+  id: `slash:${command.name}`,
+  label: `/${command.name}`,
+  icon: command.icon ?? "terminal",
+  category: "search",
+  action: `/${command.name}`,
+  description: command.description,
+}));
 
-function getPaletteBaseItems(): PaletteItem[] {
-  return [
-    {
-      id: "nav-overview",
-      label: "Overview",
-      icon: "barChart",
-      category: "navigation",
-      action: "nav:overview",
-    },
-    {
-      id: "nav-sessions",
-      label: "Sessions",
-      icon: "fileText",
-      category: "navigation",
-      action: "nav:sessions",
-    },
-    {
-      id: "nav-cron",
-      label: "Scheduled",
-      icon: "scrollText",
-      category: "navigation",
-      action: "nav:cron",
-    },
-    {
-      id: "nav-skills",
-      label: "Skills",
-      icon: "zap",
-      category: "navigation",
-      action: "nav:skills",
-    },
-    {
-      id: "nav-config",
-      label: "Settings",
-      icon: "settings",
-      category: "navigation",
-      action: "nav:config",
-    },
-    {
-      id: "nav-agents",
-      label: "Agents",
-      icon: "folder",
-      category: "navigation",
-      action: "nav:agents",
-    },
-    {
-      id: "skill-shell",
-      label: "Shell Command",
-      icon: "monitor",
-      category: "skills",
-      action: "/skill shell",
-      description: "Run shell",
-    },
-    {
-      id: "skill-debug",
-      label: "Debug Mode",
-      icon: "bug",
-      category: "skills",
-      action: "/verbose full",
-      description: "Toggle debug",
-    },
-  ];
-}
-
-function getPaletteItemsInternal(): PaletteItem[] {
-  return [...buildSlashPaletteItems(), ...getPaletteBaseItems()];
-}
+const PALETTE_ITEMS: PaletteItem[] = [
+  ...SLASH_PALETTE_ITEMS,
+  {
+    id: "nav-overview",
+    label: "Overview",
+    icon: "barChart",
+    category: "navigation",
+    action: "nav:overview",
+  },
+  {
+    id: "nav-sessions",
+    label: "Sessions",
+    icon: "fileText",
+    category: "navigation",
+    action: "nav:sessions",
+  },
+  {
+    id: "nav-cron",
+    label: "Scheduled",
+    icon: "scrollText",
+    category: "navigation",
+    action: "nav:cron",
+  },
+  { id: "nav-skills", label: "Skills", icon: "zap", category: "navigation", action: "nav:skills" },
+  {
+    id: "nav-config",
+    label: "Settings",
+    icon: "settings",
+    category: "navigation",
+    action: "nav:config",
+  },
+  {
+    id: "nav-agents",
+    label: "Agents",
+    icon: "folder",
+    category: "navigation",
+    action: "nav:agents",
+  },
+  {
+    id: "skill-shell",
+    label: "Shell Command",
+    icon: "monitor",
+    category: "skills",
+    action: "/skill shell",
+    description: "Run shell",
+  },
+  {
+    id: "skill-debug",
+    label: "Debug Mode",
+    icon: "bug",
+    category: "skills",
+    action: "/verbose full",
+    description: "Toggle debug",
+  },
+];
 
 export function getPaletteItems(): readonly PaletteItem[] {
-  return getPaletteItemsInternal();
+  return PALETTE_ITEMS;
 }
 
 export type CommandPaletteProps = {
@@ -108,12 +95,11 @@ export type CommandPaletteProps = {
 };
 
 function filteredItems(query: string): PaletteItem[] {
-  const items = getPaletteItemsInternal();
   if (!query) {
-    return items;
+    return PALETTE_ITEMS;
   }
   const q = normalizeLowercaseStringOrEmpty(query);
-  return items.filter(
+  return PALETTE_ITEMS.filter(
     (item) =>
       normalizeLowercaseStringOrEmpty(item.label).includes(q) ||
       normalizeLowercaseStringOrEmpty(item.description).includes(q),

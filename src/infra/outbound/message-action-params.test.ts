@@ -81,29 +81,6 @@ describe("message action media helpers", () => {
     }
   });
 
-  maybeIt("normalizes Discord event image sandbox media params", async () => {
-    const sandboxRoot = await fs.mkdtemp(path.join(os.tmpdir(), "msg-params-image-"));
-    try {
-      const args: Record<string, unknown> = {
-        image: " file:///workspace/assets/event-cover.png ",
-      };
-
-      await normalizeSandboxMediaParams({
-        args,
-        mediaPolicy: {
-          mode: "sandbox",
-          sandboxRoot: ` ${sandboxRoot} `,
-        },
-      });
-
-      expect(args).toMatchObject({
-        image: path.join(sandboxRoot, "assets", "event-cover.png"),
-      });
-    } finally {
-      await fs.rm(sandboxRoot, { recursive: true, force: true });
-    }
-  });
-
   maybeIt(
     "keeps remote HTTP mediaUrl and fileUrl aliases unchanged under sandbox normalization",
     async () => {

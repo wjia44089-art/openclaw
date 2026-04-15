@@ -1,4 +1,4 @@
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import {
   resolveMemorySlotDecisionShared,
   resolveEnableStateShared,
@@ -12,8 +12,7 @@ import {
   type NormalizePluginId,
   type NormalizedPluginsConfig as SharedNormalizedPluginsConfig,
 } from "./config-normalization-shared.js";
-import type { PluginKind } from "./plugin-kind.types.js";
-import type { PluginOrigin } from "./plugin-origin.types.js";
+import type { PluginKind, PluginOrigin } from "./types.js";
 
 export type PluginActivationSource = "disabled" | "explicit" | "auto" | "default";
 
@@ -51,9 +50,6 @@ function resolveExplicitPluginSelection(params: {
   }
   if (params.config.slots.memory === params.id) {
     return { explicitlyEnabled: true, reason: "selected memory slot" };
-  }
-  if (params.config.slots.contextEngine === params.id) {
-    return { explicitlyEnabled: true, reason: "selected context engine slot" };
   }
   if (params.origin !== "bundled" && params.config.allow.includes(params.id)) {
     return { explicitlyEnabled: true, reason: "selected in allowlist" };
@@ -107,12 +103,7 @@ export function resolvePluginActivationState(params: {
     };
   }
   const explicitlyAllowed = params.config.allow.includes(params.id);
-  if (
-    params.origin === "workspace" &&
-    !explicitlyAllowed &&
-    entry?.enabled !== true &&
-    explicitSelection.reason !== "selected context engine slot"
-  ) {
+  if (params.origin === "workspace" && !explicitlyAllowed && entry?.enabled !== true) {
     return {
       enabled: false,
       activated: false,
@@ -128,15 +119,6 @@ export function resolvePluginActivationState(params: {
       explicitlyEnabled: true,
       source: "explicit",
       reason: "selected memory slot",
-    };
-  }
-  if (params.config.slots.contextEngine === params.id) {
-    return {
-      enabled: true,
-      activated: true,
-      explicitlyEnabled: true,
-      source: "explicit",
-      reason: "selected context engine slot",
     };
   }
   if (params.config.allow.length > 0 && !explicitlyAllowed) {

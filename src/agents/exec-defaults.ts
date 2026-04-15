@@ -1,5 +1,5 @@
+import type { OpenClawConfig } from "../config/config.js";
 import type { SessionEntry } from "../config/sessions.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
 import {
   loadExecApprovals,
   type ExecAsk,
@@ -53,38 +53,16 @@ function resolveExecConfigState(params: {
   };
 }
 
-function resolveExecSandboxAvailability(params: {
-  cfg: OpenClawConfig;
-  sessionKey?: string;
-  sandboxAvailable?: boolean;
-}) {
-  return (
-    params.sandboxAvailable ??
-    (params.sessionKey
-      ? resolveSandboxRuntimeStatus({
-          cfg: params.cfg,
-          sessionKey: params.sessionKey,
-        }).sandboxed
-      : false)
-  );
-}
-
 export function canExecRequestNode(params: {
   cfg?: OpenClawConfig;
   sessionEntry?: SessionEntry;
   agentId?: string;
   sessionKey?: string;
-  sandboxAvailable?: boolean;
 }): boolean {
-  const { cfg, host } = resolveExecConfigState(params);
+  const { host } = resolveExecConfigState(params);
   return isRequestedExecTargetAllowed({
     configuredTarget: host,
     requestedTarget: "node",
-    sandboxAvailable: resolveExecSandboxAvailability({
-      cfg,
-      sessionKey: params.sessionKey,
-      sandboxAvailable: params.sandboxAvailable,
-    }),
   });
 }
 
@@ -103,11 +81,14 @@ export function resolveExecDefaults(params: {
   canRequestNode: boolean;
 } {
   const { cfg, host, agentExec, globalExec } = resolveExecConfigState(params);
-  const sandboxAvailable = resolveExecSandboxAvailability({
-    cfg,
-    sessionKey: params.sessionKey,
-    sandboxAvailable: params.sandboxAvailable,
-  });
+  const sandboxAvailable =
+    params.sandboxAvailable ??
+    (params.sessionKey
+      ? resolveSandboxRuntimeStatus({
+          cfg,
+          sessionKey: params.sessionKey,
+        }).sandboxed
+      : false);
   const resolved = resolveExecTarget({
     configuredTarget: host,
     elevatedRequested: false,
@@ -134,7 +115,6 @@ export function resolveExecDefaults(params: {
     canRequestNode: isRequestedExecTargetAllowed({
       configuredTarget: host,
       requestedTarget: "node",
-      sandboxAvailable,
     }),
   };
 }

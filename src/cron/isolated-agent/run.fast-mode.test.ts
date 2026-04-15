@@ -16,7 +16,6 @@ import {
 const runCronIsolatedAgentTurn = await loadRunCronIsolatedAgentTurn();
 
 const OPENAI_GPT4_MODEL = "openai/gpt-4";
-const EXPECTED_OPENAI_MODEL = "gpt-5.4";
 
 function mockSuccessfulModelFallback() {
   runWithModelFallbackMock.mockImplementation(async ({ provider, model, run }) => {
@@ -90,7 +89,7 @@ async function runFastModeCase(params: {
   expect(runEmbeddedPiAgentMock).toHaveBeenCalledOnce();
   expect(runEmbeddedPiAgentMock.mock.calls[0][0]).toMatchObject({
     provider: "openai",
-    model: EXPECTED_OPENAI_MODEL,
+    model: "gpt-4",
     fastMode: params.expectedFastMode,
     allowGatewaySubagentBinding: true,
   });

@@ -1,6 +1,5 @@
 import { z, type ZodTypeAny } from "zod";
-import type { PluginConfigUiHint } from "./manifest-types.js";
-import type { OpenClawPluginConfigSchema } from "./types.js";
+import type { PluginConfigUiHint, OpenClawPluginConfigSchema } from "./types.js";
 
 type Issue = { path: Array<string | number>; message: string };
 

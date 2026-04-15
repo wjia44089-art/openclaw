@@ -215,11 +215,10 @@ export function buildPersistedAuthProfileSecretsStore(
 export function applyLegacyAuthStore(store: AuthProfileStore, legacy: LegacyAuthStore): void {
   for (const [provider, cred] of Object.entries(legacy)) {
     const profileId = `${provider}:default`;
-    const credentialProvider = cred.provider ?? provider;
     if (cred.type === "api_key") {
       store.profiles[profileId] = {
         type: "api_key",
-        provider: credentialProvider,
+        provider: String(cred.provider ?? provider),
         key: cred.key,
         ...(cred.email ? { email: cred.email } : {}),
       };
@@ -228,7 +227,7 @@ export function applyLegacyAuthStore(store: AuthProfileStore, legacy: LegacyAuth
     if (cred.type === "token") {
       store.profiles[profileId] = {
         type: "token",
-        provider: credentialProvider,
+        provider: String(cred.provider ?? provider),
         token: cred.token,
         ...(typeof cred.expires === "number" ? { expires: cred.expires } : {}),
         ...(cred.email ? { email: cred.email } : {}),
@@ -237,7 +236,7 @@ export function applyLegacyAuthStore(store: AuthProfileStore, legacy: LegacyAuth
     }
     store.profiles[profileId] = {
       type: "oauth",
-      provider: credentialProvider,
+      provider: String(cred.provider ?? provider),
       access: cred.access,
       refresh: cred.refresh,
       expires: cred.expires,

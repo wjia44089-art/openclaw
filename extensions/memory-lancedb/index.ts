@@ -40,8 +40,6 @@ type MemorySearchResult = {
   score: number;
 };
 
-type LegacyBeforeAgentStartContext = { prependContext: string } | undefined;
-
 // ============================================================================
 // LanceDB Provider
 // ============================================================================
@@ -538,9 +536,9 @@ export default definePluginEntry({
 
     // Auto-recall: inject relevant memories before agent starts
     if (cfg.autoRecall) {
-      api.on("before_agent_start", async (event): Promise<LegacyBeforeAgentStartContext> => {
+      api.on("before_agent_start", async (event) => {
         if (!event.prompt || event.prompt.length < 5) {
-          return undefined;
+          return;
         }
 
         try {
@@ -548,7 +546,7 @@ export default definePluginEntry({
           const results = await db.search(vector, 3, 0.3);
 
           if (results.length === 0) {
-            return undefined;
+            return;
           }
 
           api.logger.info?.(`memory-lancedb: injecting ${results.length} memories into context`);
@@ -561,7 +559,6 @@ export default definePluginEntry({
         } catch (err) {
           api.logger.warn(`memory-lancedb: recall failed: ${String(err)}`);
         }
-        return undefined;
       });
     }
 

@@ -1,5 +1,4 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { expectExplicitVideoGenerationCapabilities } from "../../test/helpers/media-generation/provider-capability-assertions.js";
 import {
   getProviderHttpMocks,
   installProviderHttpMockCleanup,
@@ -17,10 +16,6 @@ beforeAll(async () => {
 installProviderHttpMockCleanup();
 
 describe("openai video generation provider", () => {
-  it("declares explicit mode capabilities", () => {
-    expectExplicitVideoGenerationCapabilities(buildOpenAIVideoGenerationProvider());
-  });
-
   it("uses JSON for text-only Sora requests", async () => {
     postJsonRequestMock.mockResolvedValue({
       response: {

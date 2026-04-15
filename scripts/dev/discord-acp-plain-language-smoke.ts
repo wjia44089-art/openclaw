@@ -429,14 +429,18 @@ function resolveCandidateBindings(params: {
   const normalizedTargetAgent = params.targetAgent.trim().toLowerCase();
   return params.entries
     .filter((entry) => {
-      const targetKind = (entry.targetKind || "").trim().toLowerCase();
+      const targetKind = String(entry.targetKind || "")
+        .trim()
+        .toLowerCase();
       if (targetKind !== "acp") {
         return false;
       }
       if (normalizeBoundAt(entry) < params.minBoundAt) {
         return false;
       }
-      const agentId = (entry.agentId || "").trim().toLowerCase();
+      const agentId = String(entry.agentId || "")
+        .trim()
+        .toLowerCase();
       if (normalizedTargetAgent && agentId && agentId !== normalizedTargetAgent) {
         return false;
       }
@@ -659,7 +663,7 @@ async function run(): Promise<SuccessResult | FailureResult> {
           "--json",
         ],
       });
-      sentMessageId = sent.payload?.result?.messageId || "";
+      sentMessageId = String(sent.payload?.result?.messageId || "");
       if (!sentMessageId) {
         throw new Error("openclaw message send did not return payload.result.messageId");
       }
@@ -790,8 +794,8 @@ async function run(): Promise<SuccessResult | FailureResult> {
       binding: {
         threadId,
         targetSessionKey: winningBinding.targetSessionKey,
-        targetKind: winningBinding.targetKind || "acp",
-        agentId: winningBinding.agentId || args.targetAgent,
+        targetKind: String(winningBinding.targetKind || "acp"),
+        agentId: String(winningBinding.agentId || args.targetAgent),
         boundAt: normalizeBoundAt(winningBinding),
         accountId: winningBinding.accountId,
         channelId: winningBinding.channelId,

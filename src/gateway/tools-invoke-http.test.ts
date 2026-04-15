@@ -35,8 +35,13 @@ vi.mock("../config/sessions.js", () => ({
     }
     const agents = params?.agents?.list ?? [];
     const rawDefault = agents.find((agent) => agent?.default)?.id ?? agents[0]?.id ?? "main";
-    const agentId = rawDefault.trim().toLowerCase() || "main";
-    const mainKeyRaw = (params?.session?.mainKey ?? "main").trim().toLowerCase();
+    const agentId =
+      String(rawDefault ?? "main")
+        .trim()
+        .toLowerCase() || "main";
+    const mainKeyRaw = String(params?.session?.mainKey ?? "main")
+      .trim()
+      .toLowerCase();
     const mainKey = mainKeyRaw || "main";
     return `agent:${agentId}:${mainKey}`;
   },
@@ -337,21 +342,6 @@ const invokeAgentsListAuthed = async (params: { sessionKey?: string } = {}) =>
     sessionKey: params.sessionKey,
   });
 
-const invokeAgentsListBearer = async () =>
-  await postToolsInvoke({
-    port: sharedPort,
-    headers: {
-      authorization: "Bearer secret",
-      "content-type": "application/json",
-    },
-    body: {
-      tool: "agents_list",
-      action: "json",
-      args: {},
-      sessionKey: "main",
-    },
-  });
-
 const invokeToolAuthed = async (params: {
   tool: string;
   args?: Record<string, unknown>;
@@ -468,32 +458,22 @@ describe("POST /tools/invoke", () => {
       method: "token",
     });
 
-    const res = await invokeAgentsListBearer();
+    const res = await postToolsInvoke({
+      port: sharedPort,
+      headers: {
+        authorization: "Bearer secret",
+        "content-type": "application/json",
+      },
+      body: {
+        tool: "agents_list",
+        action: "json",
+        args: {},
+        sessionKey: "main",
+      },
+    });
 
     const body = await expectOkInvokeResponse(res);
     expect(body.result).toEqual({ ok: true, result: [] });
-  });
-
-  it("threads senderIsOwner into tool creation before owner-only filtering", async () => {
-    setMainAllowedTools({ allow: ["session_status", "owner_only_test"] });
-
-    const writeRes = await invokeTool({
-      port: sharedPort,
-      headers: gatewayAuthHeaders(),
-      tool: "session_status",
-      sessionKey: "main",
-    });
-    expect(writeRes.status).toBe(200);
-    expect(lastCreateOpenClawToolsContext?.senderIsOwner).toBe(false);
-
-    const adminRes = await invokeTool({
-      port: sharedPort,
-      headers: gatewayAdminHeaders(),
-      tool: "session_status",
-      sessionKey: "main",
-    });
-    expect(adminRes.status).toBe(200);
-    expect(lastCreateOpenClawToolsContext?.senderIsOwner).toBe(true);
   });
 
   it("uses before_tool_call adjusted params for HTTP tool execution", async () => {
@@ -805,7 +785,19 @@ describe("POST /tools/invoke", () => {
       method: "token",
     });
 
-    const res = await invokeAgentsListBearer();
+    const res = await postToolsInvoke({
+      port: sharedPort,
+      headers: {
+        authorization: "Bearer secret",
+        "content-type": "application/json",
+      },
+      body: {
+        tool: "agents_list",
+        action: "json",
+        args: {},
+        sessionKey: "main",
+      },
+    });
 
     const body = await expectOkInvokeResponse(res);
     expect(body.result).toEqual({ ok: true, result: [] });

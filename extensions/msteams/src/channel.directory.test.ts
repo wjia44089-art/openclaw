@@ -7,16 +7,18 @@ import type { OpenClawConfig, RuntimeEnv } from "../runtime-api.js";
 import { msteamsDirectoryAdapter } from "./directory.js";
 import { resolveMSTeamsOutboundSessionRoute } from "./session-route.js";
 
-function requireDirectorySelf(): NonNullable<(typeof msteamsDirectoryAdapter)["self"]> {
-  if (!msteamsDirectoryAdapter.self) {
+function requireDirectorySelf(
+  directory: typeof msteamsDirectoryAdapter | null | undefined,
+): NonNullable<(typeof msteamsDirectoryAdapter)["self"]> {
+  if (!directory?.self) {
     throw new Error("expected msteams directory.self");
   }
-  return msteamsDirectoryAdapter.self;
+  return directory.self;
 }
 
 describe("msteams directory", () => {
   const runtimeEnv = createDirectoryTestRuntime() as RuntimeEnv;
-  const directorySelf = requireDirectorySelf();
+  const directorySelf = requireDirectorySelf(msteamsDirectoryAdapter);
 
   afterEach(() => {
     vi.unstubAllEnvs();

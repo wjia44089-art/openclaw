@@ -83,9 +83,7 @@ function validateBlueBubblesServerUrlInput(value: unknown): string | undefined {
   }
   try {
     const normalized = normalizeBlueBubblesServerUrl(trimmed);
-    if (!URL.canParse(normalized)) {
-      return "Invalid URL format";
-    }
+    new URL(normalized);
     return undefined;
   } catch {
     return "Invalid URL format";
@@ -111,7 +109,7 @@ function applyBlueBubblesSetupPatch(
 }
 
 function validateBlueBubblesWebhookPath(value: string): string | undefined {
-  const trimmed = value.trim();
+  const trimmed = String(value ?? "").trim();
   if (!trimmed) {
     return "Required";
   }
@@ -224,7 +222,7 @@ export const blueBubblesSetupWizard: ChannelSetupWizard = {
       currentValue: ({ cfg, accountId }) =>
         normalizeOptionalString(resolveBlueBubblesAccount({ cfg, accountId }).config.serverUrl),
       validate: ({ value }) => validateBlueBubblesServerUrlInput(value),
-      normalizeValue: ({ value }) => value.trim(),
+      normalizeValue: ({ value }) => String(value).trim(),
       applySet: async ({ cfg, accountId, value }) =>
         applyBlueBubblesSetupPatch(cfg, accountId, {
           serverUrl: value,
@@ -243,7 +241,7 @@ export const blueBubblesSetupWizard: ChannelSetupWizard = {
       shouldPrompt: ({ credentialValues }) =>
         credentialValues[CONFIGURE_CUSTOM_WEBHOOK_FLAG] === "1",
       validate: ({ value }) => validateBlueBubblesWebhookPath(value),
-      normalizeValue: ({ value }) => value.trim(),
+      normalizeValue: ({ value }) => String(value).trim(),
       applySet: async ({ cfg, accountId, value }) =>
         applyBlueBubblesSetupPatch(cfg, accountId, {
           webhookPath: value,

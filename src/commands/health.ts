@@ -1,36 +1,78 @@
 import { resolveDefaultAgentId } from "../agents/agent-scope.js";
 import { resolveChannelDefaultAccountId } from "../channels/plugins/helpers.js";
 import { getChannelPlugin, listChannelPlugins } from "../channels/plugins/index.js";
-import type { ChannelPlugin } from "../channels/plugins/types.plugin.js";
-import type { ChannelAccountSnapshot } from "../channels/plugins/types.public.js";
+import type { ChannelAccountSnapshot, ChannelPlugin } from "../channels/plugins/types.js";
 import { inspectReadOnlyChannelAccount } from "../channels/read-only-account-inspect.js";
 import { withProgress } from "../cli/progress.js";
-import { resolveStorePath } from "../config/sessions/paths.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
+import { loadConfig, readBestEffortConfig } from "../config/config.js";
+import { loadSessionStore, resolveStorePath } from "../config/sessions.js";
 import { buildGatewayConnectionDetails, callGateway } from "../gateway/call.js";
 import { info } from "../globals.js";
 import { isTruthyEnvValue } from "../infra/env.js";
 import { formatErrorMessage } from "../infra/errors.js";
-import { resolveHeartbeatSummaryForAgent } from "../infra/heartbeat-summary.js";
+import {
+  type HeartbeatSummary,
+  resolveHeartbeatSummaryForAgent,
+} from "../infra/heartbeat-summary.js";
 import { buildChannelAccountBindings, resolvePreferredAccountId } from "../routing/bindings.js";
 import { normalizeAgentId } from "../routing/session-key.js";
 import { type RuntimeEnv, writeRuntimeJson } from "../runtime.js";
 import { asNullableRecord } from "../shared/record-coerce.js";
 import { styleHealthChannelLine } from "../terminal/health-style.js";
 import { isRich } from "../terminal/theme.js";
-import type {
-  AgentHealthSummary,
-  ChannelAccountHealthSummary,
-  ChannelHealthSummary,
-  HealthSummary,
-} from "./health.types.js";
 import { logGatewayConnectionDetails } from "./status.gateway-connection.js";
-export type {
-  AgentHealthSummary,
-  ChannelAccountHealthSummary,
-  ChannelHealthSummary,
-  HealthSummary,
-} from "./health.types.js";
+
+export type ChannelAccountHealthSummary = {
+  accountId: string;
+  configured?: boolean;
+  linked?: boolean;
+  authAgeMs?: number | null;
+  probe?: unknown;
+  lastProbeAt?: number | null;
+  [key: string]: unknown;
+};
+
+export type ChannelHealthSummary = ChannelAccountHealthSummary & {
+  accounts?: Record<string, ChannelAccountHealthSummary>;
+};
+
+export type AgentHeartbeatSummary = HeartbeatSummary;
+
+export type AgentHealthSummary = {
+  agentId: string;
+  name?: string;
+  isDefault: boolean;
+  heartbeat: AgentHeartbeatSummary;
+  sessions: HealthSummary["sessions"];
+};
+
+export type HealthSummary = {
+  /**
+   * Convenience top-level flag for UIs (e.g. WebChat) that only need a binary
+   * "can talk to the gateway" signal. If this payload exists, the gateway RPC
+   * succeeded, so this is always `true`.
+   */
+  ok: true;
+  ts: number;
+  durationMs: number;
+  channels: Record<string, ChannelHealthSummary>;
+  channelOrder: string[];
+  channelLabels: Record<string, string>;
+  /** Legacy: default agent heartbeat seconds (rounded). */
+  heartbeatSeconds: number;
+  defaultAgentId: string;
+  agents: AgentHealthSummary[];
+  sessions: {
+    path: string;
+    count: number;
+    recent: Array<{
+      key: string;
+      updatedAt: number | null;
+      age: number | null;
+    }>;
+  };
+};
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
@@ -69,10 +111,10 @@ const formatDurationParts = (ms: number): string => {
   return parts.join(" ");
 };
 
-const resolveHeartbeatSummary = (cfg: OpenClawConfig, agentId: string) =>
+const resolveHeartbeatSummary = (cfg: ReturnType<typeof loadConfig>, agentId: string) =>
   resolveHeartbeatSummaryForAgent(cfg, agentId);
 
-const resolveAgentOrder = (cfg: OpenClawConfig) => {
+const resolveAgentOrder = (cfg: ReturnType<typeof loadConfig>) => {
   const defaultAgentId = resolveDefaultAgentId(cfg);
   const entries = Array.isArray(cfg.agents?.list) ? cfg.agents.list : [];
   const seen = new Set<string>();
@@ -104,8 +146,7 @@ const resolveAgentOrder = (cfg: OpenClawConfig) => {
   return { defaultAgentId, ordered };
 };
 
-const buildSessionSummary = async (storePath: string) => {
-  const { loadSessionStore } = await import("../config/sessions/store.js");
+const buildSessionSummary = (storePath: string) => {
   const store = loadSessionStore(storePath);
   const sessions = Object.entries(store)
     .filter(([key]) => key !== "global" && key !== "unknown")
@@ -379,31 +420,29 @@ export async function getHealthSnapshot(params?: {
   probe?: boolean;
 }): Promise<HealthSummary> {
   const timeoutMs = params?.timeoutMs;
-  const { loadConfig } = await import("../config/config.js");
   const cfg = loadConfig();
   const { defaultAgentId, ordered } = resolveAgentOrder(cfg);
   const channelBindings = buildChannelAccountBindings(cfg);
   const sessionCache = new Map<string, HealthSummary["sessions"]>();
-  const agents: AgentHealthSummary[] = [];
-  for (const entry of ordered) {
+  const agents: AgentHealthSummary[] = ordered.map((entry) => {
     const storePath = resolveStorePath(cfg.session?.store, { agentId: entry.id });
-    const sessions = sessionCache.get(storePath) ?? (await buildSessionSummary(storePath));
+    const sessions = sessionCache.get(storePath) ?? buildSessionSummary(storePath);
     sessionCache.set(storePath, sessions);
-    agents.push({
+    return {
       agentId: entry.id,
       name: entry.name,
       isDefault: entry.id === defaultAgentId,
       heartbeat: resolveHeartbeatSummary(cfg, entry.id),
       sessions,
-    });
-  }
+    } satisfies AgentHealthSummary;
+  });
   const defaultAgent = agents.find((agent) => agent.isDefault) ?? agents[0];
   const heartbeatSeconds = defaultAgent?.heartbeat.everyMs
     ? Math.round(defaultAgent.heartbeat.everyMs / 1000)
     : 0;
   const sessions =
     defaultAgent?.sessions ??
-    (await buildSessionSummary(resolveStorePath(cfg.session?.store, { agentId: defaultAgentId })));
+    buildSessionSummary(resolveStorePath(cfg.session?.store, { agentId: defaultAgentId }));
 
   const start = Date.now();
   const cappedTimeout = timeoutMs === undefined ? DEFAULT_TIMEOUT_MS : Math.max(50, timeoutMs);
@@ -558,7 +597,7 @@ export async function healthCommand(
   opts: { json?: boolean; timeoutMs?: number; verbose?: boolean; config?: OpenClawConfig },
   runtime: RuntimeEnv,
 ) {
-  const cfg = opts.config ?? (await readBestEffortHealthConfig());
+  const cfg = opts.config ?? (await readBestEffortConfig());
   // Always query the running gateway; do not open a direct Baileys socket here.
   const summary = await withProgress(
     {
@@ -593,17 +632,16 @@ export async function healthCommand(
     const localAgents = resolveAgentOrder(cfg);
     const defaultAgentId = summary.defaultAgentId ?? localAgents.defaultAgentId;
     const agents = Array.isArray(summary.agents) ? summary.agents : [];
-    const fallbackAgents: AgentHealthSummary[] = [];
-    for (const entry of localAgents.ordered) {
+    const fallbackAgents = localAgents.ordered.map((entry) => {
       const storePath = resolveStorePath(cfg.session?.store, { agentId: entry.id });
-      fallbackAgents.push({
+      return {
         agentId: entry.id,
         name: entry.name,
         isDefault: entry.id === localAgents.defaultAgentId,
         heartbeat: resolveHeartbeatSummary(cfg, entry.id),
-        sessions: await buildSessionSummary(storePath),
-      });
-    }
+        sessions: buildSessionSummary(storePath),
+      } satisfies AgentHealthSummary;
+    });
     const resolvedAgents = agents.length > 0 ? agents : fallbackAgents;
     const displayAgents = opts.verbose
       ? resolvedAgents
@@ -804,9 +842,4 @@ export async function healthCommand(
   if (fatal) {
     runtime.exit(1);
   }
-}
-
-async function readBestEffortHealthConfig(): Promise<OpenClawConfig> {
-  const { readBestEffortConfig } = await import("../config/config.js");
-  return await readBestEffortConfig();
 }

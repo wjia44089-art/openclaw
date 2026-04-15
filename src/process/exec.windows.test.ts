@@ -90,26 +90,6 @@ function expectCmdWrappedInvocation(params: {
   expect(params.captured[2].windowsVerbatimArguments).toBe(true);
 }
 
-async function expectShimmedWindowsCommandWithoutExitCodeSucceeds(params?: { killed?: boolean }) {
-  const platformSpy = vi.spyOn(process, "platform", "get").mockReturnValue("win32");
-  const child = createMockChild({
-    closeCode: null,
-    exitCode: null,
-  });
-  child.killed = params?.killed ?? false;
-
-  spawnMock.mockImplementation(() => child);
-
-  try {
-    const result = await runCommandWithTimeout(["npm", "--version"], { timeoutMs: 1000 });
-    expect(result.code).toBe(0);
-    expect(result.signal).toBeNull();
-    expect(result.termination).toBe("exit");
-  } finally {
-    platformSpy.mockRestore();
-  }
-}
-
 describe("windows command wrapper behavior", () => {
   beforeAll(async () => {
     ({ runCommandWithTimeout, runExec } = await import("./exec.js"));
@@ -257,11 +237,42 @@ describe("windows command wrapper behavior", () => {
   });
 
   it("treats shimmed Windows commands without a reported exit code as success when they close cleanly", async () => {
-    await expectShimmedWindowsCommandWithoutExitCodeSucceeds();
+    const platformSpy = vi.spyOn(process, "platform", "get").mockReturnValue("win32");
+    const child = createMockChild({
+      closeCode: null,
+      exitCode: null,
+    });
+
+    spawnMock.mockImplementation(() => child);
+
+    try {
+      const result = await runCommandWithTimeout(["npm", "--version"], { timeoutMs: 1000 });
+      expect(result.code).toBe(0);
+      expect(result.signal).toBeNull();
+      expect(result.termination).toBe("exit");
+    } finally {
+      platformSpy.mockRestore();
+    }
   });
 
   it("treats shimmed Windows commands without a reported exit code as success even when child.killed is true", async () => {
-    await expectShimmedWindowsCommandWithoutExitCodeSucceeds({ killed: true });
+    const platformSpy = vi.spyOn(process, "platform", "get").mockReturnValue("win32");
+    const child = createMockChild({
+      closeCode: null,
+      exitCode: null,
+    });
+    child.killed = true;
+
+    spawnMock.mockImplementation(() => child);
+
+    try {
+      const result = await runCommandWithTimeout(["npm", "--version"], { timeoutMs: 1000 });
+      expect(result.code).toBe(0);
+      expect(result.signal).toBeNull();
+      expect(result.termination).toBe("exit");
+    } finally {
+      platformSpy.mockRestore();
+    }
   });
 
   it("uses cmd.exe wrapper with windowsVerbatimArguments in runExec for .cmd shims", async () => {

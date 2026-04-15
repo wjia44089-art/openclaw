@@ -33,12 +33,6 @@ describe("delivery-queue storage", () => {
             text: "hello",
             mediaUrls: ["https://example.com/file.png"],
           },
-          session: {
-            key: "agent:main:main",
-            agentId: "agent-main",
-            requesterAccountId: "acct-1",
-            requesterSenderId: "sender-1",
-          },
         },
         tmpDir(),
       );
@@ -58,12 +52,6 @@ describe("delivery-queue storage", () => {
           sessionKey: "agent:main:main",
           text: "hello",
           mediaUrls: ["https://example.com/file.png"],
-        },
-        session: {
-          key: "agent:main:main",
-          agentId: "agent-main",
-          requesterAccountId: "acct-1",
-          requesterSenderId: "sender-1",
         },
         retryCount: 0,
       });
@@ -179,37 +167,6 @@ describe("delivery-queue storage", () => {
 
       const entry = readQueuedEntry(tmpDir(), id);
       expect(entry.gatewayClientScopes).toEqual(["operator.write"]);
-    });
-
-    it("persists session context for recovery replay", async () => {
-      const id = await enqueueTextDelivery(
-        {
-          channel: "telegram",
-          to: "2",
-          payloads: [{ text: "b" }],
-          session: {
-            key: "agent:main:main",
-            agentId: "agent-main",
-            requesterAccountId: "acct-1",
-            requesterSenderId: "sender-1",
-            requesterSenderName: "Sender One",
-            requesterSenderUsername: "sender.one",
-            requesterSenderE164: "+15551234567",
-          },
-        },
-        tmpDir(),
-      );
-
-      const entry = readQueuedEntry(tmpDir(), id);
-      expect(entry.session).toEqual({
-        key: "agent:main:main",
-        agentId: "agent-main",
-        requesterAccountId: "acct-1",
-        requesterSenderId: "sender-1",
-        requesterSenderName: "Sender One",
-        requesterSenderUsername: "sender.one",
-        requesterSenderE164: "+15551234567",
-      });
     });
 
     it("backfills lastAttemptAt for legacy retry entries during load", async () => {

@@ -34,12 +34,10 @@ const {
   ),
   resolveBundledWebFetchProvidersFromPublicArtifactsMock: vi.fn(() => buildTestWebFetchProviders()),
 }));
-const {
-  resolveManifestContractPluginIdsByCompatibilityRuntimePathMock,
-  resolveManifestContractOwnerPluginIdMock,
-  runtimeManifestActual,
-} = vi.hoisted(() => ({
+const { resolveManifestContractPluginIdsByCompatibilityRuntimePathMock } = vi.hoisted(() => ({
   resolveManifestContractPluginIdsByCompatibilityRuntimePathMock: vi.fn(() => ["brave"]),
+}));
+const { resolveManifestContractOwnerPluginIdMock, runtimeManifestActual } = vi.hoisted(() => ({
   resolveManifestContractOwnerPluginIdMock: vi.fn(),
   runtimeManifestActual: {
     resolveManifestContractOwnerPluginId: undefined as
@@ -79,6 +77,17 @@ vi.mock("./runtime-web-tools-public-artifacts.runtime.js", () => ({
     resolveBundledWebFetchProvidersFromPublicArtifactsMock,
 }));
 
+vi.mock("../plugins/manifest-registry.js", async () => {
+  const actual = await vi.importActual<typeof import("../plugins/manifest-registry.js")>(
+    "../plugins/manifest-registry.js",
+  );
+  return {
+    ...actual,
+    resolveManifestContractPluginIdsByCompatibilityRuntimePath:
+      resolveManifestContractPluginIdsByCompatibilityRuntimePathMock,
+  };
+});
+
 vi.mock("./runtime-web-tools-manifest.runtime.js", async () => {
   const actual = await vi.importActual<typeof import("./runtime-web-tools-manifest.runtime.js")>(
     "./runtime-web-tools-manifest.runtime.js",
@@ -91,8 +100,6 @@ vi.mock("./runtime-web-tools-manifest.runtime.js", async () => {
   return {
     ...actual,
     resolveManifestContractOwnerPluginId: resolveManifestContractOwnerPluginIdMock,
-    resolveManifestContractPluginIdsByCompatibilityRuntimePath:
-      resolveManifestContractPluginIdsByCompatibilityRuntimePathMock,
   };
 });
 

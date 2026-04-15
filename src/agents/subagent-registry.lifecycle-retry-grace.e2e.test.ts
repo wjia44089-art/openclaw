@@ -114,11 +114,7 @@ vi.mock("./subagent-registry.store.js", () => ({
 }));
 
 describe("subagent registry lifecycle error grace", () => {
-  let previousFastTestEnv: string | undefined;
-
   beforeEach(async () => {
-    previousFastTestEnv = process.env.OPENCLAW_TEST_FAST;
-    process.env.OPENCLAW_TEST_FAST = "1";
     vi.useFakeTimers();
     callGatewayMock.mockClear();
     onAgentEventMock.mockClear();
@@ -162,18 +158,6 @@ describe("subagent registry lifecycle error grace", () => {
     subagentAnnounceTesting.setDepsForTest({
       callGateway: callGatewayMock as typeof import("../gateway/call.js").callGateway,
       loadConfig: loadConfigMock as typeof import("../config/config.js").loadConfig,
-      loadSubagentRegistryRuntime: async () => ({
-        countActiveDescendantRuns: mod.countActiveDescendantRuns,
-        countPendingDescendantRuns: mod.countPendingDescendantRuns,
-        countPendingDescendantRunsExcludingRun: mod.countPendingDescendantRunsExcludingRun,
-        getLatestSubagentRunByChildSessionKey: mod.getLatestSubagentRunByChildSessionKey,
-        isSubagentSessionRunActive: mod.isSubagentSessionRunActive,
-        listSubagentRunsForRequester: mod.listSubagentRunsForRequester,
-        replaceSubagentRunAfterSteer: mod.replaceSubagentRunAfterSteer,
-        resolveRequesterForChildSession: mod.resolveRequesterForChildSession,
-        shouldIgnorePostCompletionAnnounceForSession:
-          mod.shouldIgnorePostCompletionAnnounceForSession,
-      }),
     });
     subagentAnnounceDeliveryTesting.setDepsForTest({
       callGateway: callGatewayMock as typeof import("../gateway/call.js").callGateway,
@@ -193,11 +177,6 @@ describe("subagent registry lifecycle error grace", () => {
     mod.__testing.setDepsForTest();
     mod.resetSubagentRegistryForTests({ persist: false });
     vi.useRealTimers();
-    if (previousFastTestEnv === undefined) {
-      delete process.env.OPENCLAW_TEST_FAST;
-    } else {
-      process.env.OPENCLAW_TEST_FAST = previousFastTestEnv;
-    }
   });
 
   const flushAsync = async () => {
@@ -228,20 +207,6 @@ describe("subagent registry lifecycle error grace", () => {
       await flushAsync();
     }
     throw new Error(`expected ${expectedCount} agent call(s), got ${getAgentCalls().length}`);
-  };
-
-  const waitForFrozenResultText = async (runId: string, expectedText: string) => {
-    for (let attempt = 0; attempt < 80; attempt += 1) {
-      const run = mod
-        .listSubagentRunsForRequester(MAIN_REQUESTER_SESSION_KEY)
-        .find((candidate) => candidate.runId === runId);
-      if (run?.frozenResultText === expectedText) {
-        return run;
-      }
-      await vi.advanceTimersByTimeAsync(1);
-      await flushAsync();
-    }
-    throw new Error(`run ${runId} frozen result did not refresh`);
   };
 
   function registerCompletionRun(runId: string, childSuffix: string, task: string) {
@@ -429,10 +394,11 @@ describe("subagent registry lifecycle error grace", () => {
       { phase: "end", endedAt: endedAt + 200 },
       { sessionKey: "agent:main:subagent:refresh" },
     );
-    const runAfterRefresh = await waitForFrozenResultText(
-      "run-refresh",
-      "All 3 subagents complete. Here's the final summary.",
-    );
+    await flushAsync();
+
+    const runAfterRefresh = mod
+      .listSubagentRunsForRequester(MAIN_REQUESTER_SESSION_KEY)
+      .find((candidate) => candidate.runId === "run-refresh");
     expect(runAfterRefresh?.frozenResultText).toBe(
       "All 3 subagents complete. Here's the final summary.",
     );

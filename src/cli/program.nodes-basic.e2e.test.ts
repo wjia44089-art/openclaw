@@ -1,11 +1,10 @@
 import { Command } from "commander";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { registerNodesCli } from "./nodes-cli.js";
 import { createIosNodeListResponse } from "./program.nodes-test-helpers.js";
 import { callGateway, installBaseProgramMocks, runtime } from "./program.test-mocks.js";
 
 installBaseProgramMocks();
-
-let registerNodesCli: typeof import("./nodes-cli.js").registerNodesCli;
 
 function formatRuntimeLogCallArg(value: unknown): string {
   if (typeof value === "string") {
@@ -56,9 +55,8 @@ describe("cli program (nodes basics)", () => {
     });
   }
 
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
-    ({ registerNodesCli } = await import("./nodes-cli.js"));
     program = createProgram();
   });
 
@@ -238,7 +236,7 @@ describe("cli program (nodes basics)", () => {
       requestId: "r1",
       node: { nodeId: "n1", token: "t1" },
     });
-    await runProgram(["nodes", "approve", "r1"]);
+    await expect(runProgram(["nodes", "approve", "r1"])).rejects.toThrow("exit");
     expect(callGateway).toHaveBeenCalledWith(
       expect.objectContaining({
         method: "node.pair.approve",
@@ -255,16 +253,18 @@ describe("cli program (nodes basics)", () => {
       payload: { result: "ok" },
     });
 
-    await runProgram([
-      "nodes",
-      "invoke",
-      "--node",
-      "ios-node",
-      "--command",
-      "canvas.eval",
-      "--params",
-      '{"javaScript":"1+1"}',
-    ]);
+    await expect(
+      runProgram([
+        "nodes",
+        "invoke",
+        "--node",
+        "ios-node",
+        "--command",
+        "canvas.eval",
+        "--params",
+        '{"javaScript":"1+1"}',
+      ]),
+    ).rejects.toThrow("exit");
 
     expect(callGateway).toHaveBeenCalledWith(
       expect.objectContaining({ method: "node.list", params: {} }),

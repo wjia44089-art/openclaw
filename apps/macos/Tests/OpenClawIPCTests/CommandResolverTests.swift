@@ -17,6 +17,7 @@ import Testing
 
     private func makeProjectRootWithPnpm() throws -> (tmp: URL, pnpmPath: URL) {
         let tmp = try makeTempDirForTests()
+        CommandResolver.setProjectRoot(tmp.path)
         let pnpmPath = tmp.appendingPathComponent("node_modules/.bin/pnpm")
         try makeExecutableForTests(at: pnpmPath)
         return (tmp, pnpmPath)
@@ -26,17 +27,12 @@ import Testing
         let defaults = self.makeLocalDefaults()
 
         let tmp = try makeTempDirForTests()
+        CommandResolver.setProjectRoot(tmp.path)
 
         let openclawPath = tmp.appendingPathComponent("node_modules/.bin/openclaw")
         try makeExecutableForTests(at: openclawPath)
 
-        let searchPaths = [tmp.appendingPathComponent("node_modules/.bin").path]
-        let cmd = CommandResolver.openclawCommand(
-            subcommand: "gateway",
-            defaults: defaults,
-            configRoot: [:],
-            searchPaths: searchPaths,
-            projectRoot: tmp)
+        let cmd = CommandResolver.openclawCommand(subcommand: "gateway", defaults: defaults, configRoot: [:])
         #expect(cmd.prefix(2).elementsEqual([openclawPath.path, "gateway"]))
     }
 
@@ -44,6 +40,7 @@ import Testing
         let defaults = self.makeLocalDefaults()
 
         let tmp = try makeTempDirForTests()
+        CommandResolver.setProjectRoot(tmp.path)
 
         let nodePath = tmp.appendingPathComponent("node_modules/.bin/node")
         let scriptPath = tmp.appendingPathComponent("bin/openclaw.js")
@@ -56,8 +53,7 @@ import Testing
             subcommand: "rpc",
             defaults: defaults,
             configRoot: [:],
-            searchPaths: [tmp.appendingPathComponent("node_modules/.bin").path],
-            projectRoot: tmp)
+            searchPaths: [tmp.appendingPathComponent("node_modules/.bin").path])
 
         #expect(cmd.count >= 3)
         if cmd.count >= 3 {
@@ -71,6 +67,7 @@ import Testing
         let defaults = self.makeLocalDefaults()
 
         let tmp = try makeTempDirForTests()
+        CommandResolver.setProjectRoot(tmp.path)
 
         let binDir = tmp.appendingPathComponent("bin")
         let openclawPath = binDir.appendingPathComponent("openclaw")
@@ -82,8 +79,7 @@ import Testing
             subcommand: "rpc",
             defaults: defaults,
             configRoot: [:],
-            searchPaths: [binDir.path],
-            projectRoot: tmp)
+            searchPaths: [binDir.path])
 
         #expect(cmd.prefix(2).elementsEqual([openclawPath.path, "rpc"]))
     }
@@ -92,6 +88,7 @@ import Testing
         let defaults = self.makeLocalDefaults()
 
         let tmp = try makeTempDirForTests()
+        CommandResolver.setProjectRoot(tmp.path)
 
         let binDir = tmp.appendingPathComponent("bin")
         let openclawPath = binDir.appendingPathComponent("openclaw")
@@ -101,8 +98,7 @@ import Testing
             subcommand: "gateway",
             defaults: defaults,
             configRoot: [:],
-            searchPaths: [binDir.path],
-            projectRoot: tmp)
+            searchPaths: [binDir.path])
 
         #expect(cmd.prefix(2).elementsEqual([openclawPath.path, "gateway"]))
     }
@@ -137,11 +133,9 @@ import Testing
 
     @Test func `preferred paths start with project node bins`() throws {
         let tmp = try makeTempDirForTests()
+        CommandResolver.setProjectRoot(tmp.path)
 
-        let first = CommandResolver.preferredPaths(
-            home: FileManager().homeDirectoryForCurrentUser,
-            current: [],
-            projectRoot: tmp).first
+        let first = CommandResolver.preferredPaths().first
         #expect(first == tmp.appendingPathComponent("node_modules/.bin").path)
     }
 
@@ -188,6 +182,7 @@ import Testing
         defaults.set("openclaw@example.com:2222", forKey: remoteTargetKey)
 
         let tmp = try makeTempDirForTests()
+        CommandResolver.setProjectRoot(tmp.path)
 
         let openclawPath = tmp.appendingPathComponent("node_modules/.bin/openclaw")
         try makeExecutableForTests(at: openclawPath)
@@ -195,9 +190,7 @@ import Testing
         let cmd = CommandResolver.openclawCommand(
             subcommand: "daemon",
             defaults: defaults,
-            configRoot: ["gateway": ["mode": "local"]],
-            searchPaths: [tmp.appendingPathComponent("node_modules/.bin").path],
-            projectRoot: tmp)
+            configRoot: ["gateway": ["mode": "local"]])
 
         #expect(cmd.first == openclawPath.path)
         #expect(cmd.count >= 2)

@@ -14,7 +14,7 @@ import {
   setMemorySearchImpl,
   setMemoryWorkspaceDir,
   type MemoryReadParams,
-} from "./memory-tool-manager-mock.js";
+} from "../../../test/helpers/memory-tool-manager-mock.js";
 import { createMemoryCoreTestHarness } from "./test-helpers.js";
 import {
   asOpenClawConfig,

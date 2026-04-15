@@ -18,7 +18,7 @@ export type AssistantReplySnapshot = {
 };
 
 export type AgentWaitResult = {
-  status: "ok" | "timeout" | "error" | "pending";
+  status: "ok" | "timeout" | "error";
   error?: string;
   startedAt?: number;
   endedAt?: number;
@@ -122,7 +122,7 @@ export async function waitForAgentRun(params: {
 }): Promise<AgentWaitResult> {
   const timeoutMs = Math.max(1, Math.floor(params.timeoutMs));
   try {
-    const wait = await (params.callGateway ?? runWaitDeps.callGateway)({
+    const wait = await (params.callGateway ?? runWaitDeps.callGateway)<RawAgentWaitResponse>({
       method: "agent.wait",
       params: {
         runId: params.runId,
@@ -132,9 +132,6 @@ export async function waitForAgentRun(params: {
     });
     if (wait?.status === "timeout") {
       return normalizeAgentWaitResult("timeout", wait);
-    }
-    if (wait?.status === "pending") {
-      return normalizeAgentWaitResult("pending", wait);
     }
     if (wait?.status === "error") {
       return normalizeAgentWaitResult("error", wait);

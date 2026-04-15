@@ -6,10 +6,8 @@ import { onAgentEvent } from "../infra/agent-events.js";
 import { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
 import { scopedHeartbeatWakeOptions } from "../routing/session-key.js";
-import { normalizeAssistantPhase } from "../shared/chat-message-content.js";
 import { normalizeOptionalString } from "../shared/string-coerce.js";
 import { recordTaskRunProgressByRunId } from "../tasks/task-executor.js";
-import type { DeliveryContext } from "../utils/delivery-context.types.js";
 
 const DEFAULT_STREAM_FLUSH_MS = 2_500;
 const DEFAULT_NO_OUTPUT_NOTICE_MS = 60_000;
@@ -75,7 +73,6 @@ export function startAcpSpawnParentStreamRelay(params: {
   childSessionKey: string;
   agentId: string;
   logPath?: string;
-  deliveryContext?: DeliveryContext;
   surfaceUpdates?: boolean;
   streamFlushMs?: number;
   noOutputNoticeMs?: number;
@@ -199,7 +196,6 @@ export function startAcpSpawnParentStreamRelay(params: {
     enqueueSystemEvent(cleaned, {
       sessionKey: parentSessionKey,
       contextKey,
-      deliveryContext: params.deliveryContext,
       trusted: false,
     });
     wake();
@@ -311,9 +307,6 @@ export function startAcpSpawnParentStreamRelay(params: {
 
     if (event.stream === "assistant") {
       const data = event.data;
-      const assistantPhase = normalizeAssistantPhase(
-        (data as { phase?: unknown } | undefined)?.phase,
-      );
       const deltaCandidate =
         (data as { delta?: unknown } | undefined)?.delta ??
         (data as { text?: unknown } | undefined)?.text;
@@ -321,15 +314,7 @@ export function startAcpSpawnParentStreamRelay(params: {
       if (!delta || !delta.trim()) {
         return;
       }
-      logEvent("assistant_delta", {
-        delta,
-        ...(assistantPhase ? { phase: assistantPhase } : {}),
-      });
-
-      if (assistantPhase === "commentary") {
-        lastProgressAt = Date.now();
-        return;
-      }
+      logEvent("assistant_delta", { delta });
 
       if (stallNotified) {
         stallNotified = false;

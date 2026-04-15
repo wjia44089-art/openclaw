@@ -1,27 +1,27 @@
 import fs from "node:fs";
 import path from "node:path";
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../../agents/agent-scope.js";
+import { getChannelPluginCatalogEntry } from "../../channels/plugins/catalog.js";
 import type { ChannelPluginCatalogEntry } from "../../channels/plugins/catalog.js";
 import { resolveBundledInstallPlanForCatalogEntry } from "../../cli/plugin-install-plan.js";
+import type { OpenClawConfig } from "../../config/config.js";
 import { applyPluginAutoEnable } from "../../config/plugin-auto-enable.js";
-import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import {
   findBundledPluginSourceInMap,
   resolveBundledPluginSources,
 } from "../../plugins/bundled-sources.js";
-import { resolveDiscoverableScopedChannelPluginIds } from "../../plugins/channel-plugin-ids.js";
 import { clearPluginDiscoveryCache } from "../../plugins/discovery.js";
 import { enablePluginInConfig } from "../../plugins/enable.js";
 import { installPluginFromNpmSpec } from "../../plugins/install.js";
 import { buildNpmResolutionInstallFields, recordPluginInstall } from "../../plugins/installs.js";
 import { loadOpenClawPlugins } from "../../plugins/loader.js";
 import { createPluginLoaderLogger } from "../../plugins/logger.js";
+import { loadPluginManifestRegistry } from "../../plugins/manifest-registry.js";
 import type { PluginRegistry } from "../../plugins/registry.js";
 import { getActivePluginChannelRegistry } from "../../plugins/runtime.js";
 import type { RuntimeEnv } from "../../runtime.js";
 import type { WizardPrompter } from "../../wizard/prompts.js";
-import { getTrustedChannelPluginCatalogEntry } from "./trusted-catalog.js";
 
 type InstallChoice = "npm" | "local" | "skip";
 
@@ -274,8 +274,7 @@ function resolveScopedChannelPluginId(params: {
     return explicitPluginId;
   }
   return (
-    getTrustedChannelPluginCatalogEntry(params.channel, {
-      cfg: params.cfg,
+    getChannelPluginCatalogEntry(params.channel, {
       workspaceDir: params.workspaceDir,
     })?.pluginId ?? resolveUniqueManifestScopedChannelPluginId(params)
   );
@@ -286,14 +285,13 @@ function resolveUniqueManifestScopedChannelPluginId(params: {
   channel: string;
   workspaceDir?: string;
 }): string | undefined {
-  const matches = resolveDiscoverableScopedChannelPluginIds({
+  const matches = loadPluginManifestRegistry({
     config: params.cfg,
-    channelIds: [params.channel],
     workspaceDir: params.workspaceDir,
-    env: process.env,
     cache: false,
-  });
-  return matches.length === 1 ? matches[0] : undefined;
+    env: process.env,
+  }).plugins.filter((plugin) => plugin.channels.includes(params.channel));
+  return matches.length === 1 ? matches[0]?.id : undefined;
 }
 
 export function reloadChannelSetupPluginRegistryForChannel(params: {

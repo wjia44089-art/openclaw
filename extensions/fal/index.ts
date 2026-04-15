@@ -9,7 +9,7 @@ const PROVIDER_ID = "fal";
 export default definePluginEntry({
   id: PROVIDER_ID,
   name: "fal Provider",
-  description: "Bundled fal image and video generation provider",
+  description: "Bundled fal image generation provider",
   register(api) {
     api.registerProvider({
       id: PROVIDER_ID,
@@ -21,7 +21,7 @@ export default definePluginEntry({
           providerId: PROVIDER_ID,
           methodId: "api-key",
           label: "fal API key",
-          hint: "Image and video generation API key",
+          hint: "Image generation API key",
           optionKey: "falApiKey",
           flagName: "--fal-api-key",
           envVar: "FAL_KEY",
@@ -32,10 +32,10 @@ export default definePluginEntry({
           wizard: {
             choiceId: "fal-api-key",
             choiceLabel: "fal API key",
-            choiceHint: "Image and video generation API key",
+            choiceHint: "Image generation API key",
             groupId: "fal",
             groupLabel: "fal",
-            groupHint: "Image and video generation",
+            groupHint: "Image generation",
             onboardingScopes: ["image-generation"],
           },
         }),

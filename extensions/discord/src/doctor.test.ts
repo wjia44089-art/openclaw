@@ -8,7 +8,7 @@ import {
 } from "./doctor.js";
 
 describe("discord doctor", () => {
-  it("normalizes legacy discord streaming aliases for runtime config", () => {
+  it("normalizes legacy discord streaming aliases into the nested streaming shape", () => {
     const normalize = discordDoctor.normalizeCompatibilityConfig;
     expect(normalize).toBeDefined();
     if (!normalize) {
@@ -38,43 +38,39 @@ describe("discord doctor", () => {
       } as never,
     });
 
-    expect(result.config.channels?.discord).toEqual({
-      streaming: {
-        mode: "block",
-        chunkMode: "newline",
-        block: {
-          enabled: true,
-        },
-        preview: {
-          chunk: {
-            minChars: 120,
-          },
-        },
+    expect(result.config.channels?.discord?.streaming).toEqual({
+      mode: "block",
+      chunkMode: "newline",
+      block: {
+        enabled: true,
       },
-      accounts: {
-        work: {
-          streaming: {
-            mode: "off",
-            block: {
-              coalesce: {
-                idleMs: 250,
-              },
-            },
-          },
+      preview: {
+        chunk: {
+          minChars: 120,
         },
       },
     });
-    expect(result.changes).toEqual([
-      "Moved channels.discord.streamMode → channels.discord.streaming.mode (block).",
-      "Moved channels.discord.chunkMode → channels.discord.streaming.chunkMode.",
-      "Moved channels.discord.blockStreaming → channels.discord.streaming.block.enabled.",
-      "Moved channels.discord.draftChunk → channels.discord.streaming.preview.chunk.",
-      "Moved channels.discord.accounts.work.streaming (boolean) → channels.discord.accounts.work.streaming.mode (off).",
-      "Moved channels.discord.accounts.work.blockStreamingCoalesce → channels.discord.accounts.work.streaming.block.coalesce.",
-    ]);
+    expect(result.config.channels?.discord?.accounts?.work?.streaming).toEqual({
+      mode: "off",
+      block: {
+        coalesce: {
+          idleMs: 250,
+        },
+      },
+    });
+    expect(result.changes).toEqual(
+      expect.arrayContaining([
+        "Moved channels.discord.streamMode → channels.discord.streaming.mode (block).",
+        "Moved channels.discord.chunkMode → channels.discord.streaming.chunkMode.",
+        "Moved channels.discord.blockStreaming → channels.discord.streaming.block.enabled.",
+        "Moved channels.discord.draftChunk → channels.discord.streaming.preview.chunk.",
+        "Moved channels.discord.accounts.work.streaming (boolean) → channels.discord.accounts.work.streaming.mode (off).",
+        "Moved channels.discord.accounts.work.blockStreamingCoalesce → channels.discord.accounts.work.streaming.block.coalesce.",
+      ]),
+    );
   });
 
-  it("moves account voice.tts.edge into providers.microsoft", () => {
+  it("does not duplicate streaming.mode change messages when streamMode wins over boolean streaming", () => {
     const normalize = discordDoctor.normalizeCompatibilityConfig;
     expect(normalize).toBeDefined();
     if (!normalize) {
@@ -85,34 +81,19 @@ describe("discord doctor", () => {
       cfg: {
         channels: {
           discord: {
-            accounts: {
-              main: {
-                voice: {
-                  tts: {
-                    edge: {
-                      voice: "en-US-JennyNeural",
-                    },
-                  },
-                },
-              },
-            },
+            streamMode: "block",
+            streaming: false,
           },
         },
       } as never,
     });
 
-    expect(result.changes).toContain(
-      "Moved channels.discord.accounts.main.voice.tts.edge → channels.discord.accounts.main.voice.tts.providers.microsoft.",
-    );
-    const mainTts = result.config.channels?.discord?.accounts?.main?.voice?.tts as
-      | Record<string, unknown>
-      | undefined;
-    expect(mainTts?.providers).toEqual({
-      microsoft: {
-        voice: "en-US-JennyNeural",
-      },
+    expect(result.config.channels?.discord?.streaming).toEqual({
+      mode: "block",
     });
-    expect(mainTts?.edge).toBeUndefined();
+    expect(
+      result.changes.filter((change) => change.includes("channels.discord.streaming.mode")),
+    ).toEqual(["Moved channels.discord.streamMode → channels.discord.streaming.mode (block)."]);
   });
 
   it("finds numeric id entries across discord scopes", () => {

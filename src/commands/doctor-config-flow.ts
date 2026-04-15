@@ -1,12 +1,9 @@
 import { formatCliCommand } from "../cli/command-format.js";
+import type { OpenClawConfig } from "../config/config.js";
+import { CONFIG_PATH } from "../config/config.js";
 import { findLegacyConfigIssues } from "../config/legacy.js";
-import { CONFIG_PATH } from "../config/paths.js";
 import { applyPluginAutoEnable } from "../config/plugin-auto-enable.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
-import {
-  collectRelevantDoctorPluginIds,
-  listPluginDoctorLegacyConfigRules,
-} from "../plugins/doctor-contract-registry.js";
+import { listPluginDoctorLegacyConfigRules } from "../plugins/doctor-contract-registry.js";
 import { note } from "../terminal/note.js";
 import { noteOpencodeProviderOverrides } from "./doctor-config-analysis.js";
 import { runDoctorConfigPreflight } from "./doctor-config-preflight.js";
@@ -61,9 +58,7 @@ export async function loadAndMaybeMigrateDoctorConfig(params: {
   const pluginLegacyIssues = findLegacyConfigIssues(
     snapshot.parsed,
     snapshot.parsed,
-    listPluginDoctorLegacyConfigRules({
-      pluginIds: collectRelevantDoctorPluginIds(snapshot.parsed),
-    }),
+    listPluginDoctorLegacyConfigRules(),
   );
   const seenLegacyIssues = new Set(
     snapshot.legacyIssues.map((issue) => `${issue.path}:${issue.message}`),

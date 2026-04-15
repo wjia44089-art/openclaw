@@ -80,6 +80,7 @@ const installRegistry = async () => {
           },
           capabilities: { chatTypes: ["direct", "channel", "thread"] },
           messaging: {
+            resolveSessionConversation: resolveSessionConversationStub,
             resolveSessionTarget: resolveSessionTargetStub,
           },
           config: {
@@ -102,30 +103,6 @@ const installRegistry = async () => {
             preferSessionLookupForAnnounceTarget: true,
           },
           capabilities: { chatTypes: ["direct", "group"] },
-          messaging: {
-            resolveSessionConversation: resolveSessionConversationStub,
-            resolveSessionTarget: resolveSessionTargetStub,
-          },
-          config: {
-            listAccountIds: () => ["default"],
-            resolveAccount: () => ({}),
-          },
-        },
-      },
-      {
-        pluginId: "slack",
-        source: "test",
-        plugin: {
-          id: "slack",
-          meta: {
-            id: "slack",
-            label: "Slack",
-            selectionLabel: "Slack",
-            docsPath: "/channels/slack",
-            blurb: "Slack test stub.",
-            preferSessionLookupForAnnounceTarget: true,
-          },
-          capabilities: { chatTypes: ["direct", "channel", "thread"] },
           messaging: {
             resolveSessionConversation: resolveSessionConversationStub,
             resolveSessionTarget: resolveSessionTargetStub,
@@ -168,7 +145,7 @@ function expectWorkerTranscriptPath(
 ) {
   const session = getFirstListedSession(result);
   expect(session).toMatchObject({ key: "agent:worker:main" });
-  const transcriptPath = session?.transcriptPath ?? "";
+  const transcriptPath = String(session?.transcriptPath ?? "");
   expect(path.normalize(transcriptPath)).toContain(path.normalize(params.containsPath));
   expect(transcriptPath).toMatch(new RegExp(`${params.sessionId}\\.jsonl$`));
 }
@@ -311,7 +288,6 @@ describe("resolveAnnounceTarget", () => {
             channel: "whatsapp",
             to: "123@g.us",
             accountId: "work",
-            threadId: 99,
           },
         },
       ],
@@ -325,7 +301,6 @@ describe("resolveAnnounceTarget", () => {
       channel: "whatsapp",
       to: "123@g.us",
       accountId: "work",
-      threadId: "99",
     });
     expect(callGatewayMock).toHaveBeenCalledTimes(1);
     const first = callGatewayMock.mock.calls[0]?.[0] as { method?: string } | undefined;
@@ -343,7 +318,6 @@ describe("resolveAnnounceTarget", () => {
             accountId: "work",
           },
           lastTo: "123@g.us",
-          lastThreadId: 271,
         },
       ],
     });
@@ -356,60 +330,6 @@ describe("resolveAnnounceTarget", () => {
       channel: "whatsapp",
       to: "123@g.us",
       accountId: "work",
-      threadId: "271",
-    });
-  });
-
-  it("keeps threadId from sessions.list delivery context for announce delivery", async () => {
-    callGatewayMock.mockResolvedValueOnce({
-      sessions: [
-        {
-          key: "agent:main:whatsapp:group:123@g.us",
-          deliveryContext: {
-            channel: "whatsapp",
-            to: "123@g.us",
-            accountId: "work",
-            threadId: "thread-77",
-          },
-        },
-      ],
-    });
-
-    const target = await resolveAnnounceTarget({
-      sessionKey: "agent:main:whatsapp:group:123@g.us",
-      displayKey: "agent:main:whatsapp:group:123@g.us",
-    });
-    expect(target).toEqual({
-      channel: "whatsapp",
-      to: "123@g.us",
-      accountId: "work",
-      threadId: "thread-77",
-    });
-  });
-
-  it("preserves threaded Slack session keys when sessions.list lacks stored thread metadata", async () => {
-    callGatewayMock.mockResolvedValueOnce({
-      sessions: [
-        {
-          key: "agent:main:slack:channel:C123:thread:1710000000.000100",
-          deliveryContext: {
-            channel: "slack",
-            to: "channel:C123",
-            accountId: "workspace",
-          },
-        },
-      ],
-    });
-
-    const target = await resolveAnnounceTarget({
-      sessionKey: "agent:main:slack:channel:C123:thread:1710000000.000100",
-      displayKey: "agent:main:slack:channel:C123:thread:1710000000.000100",
-    });
-    expect(target).toEqual({
-      channel: "slack",
-      to: "channel:C123",
-      accountId: "workspace",
-      threadId: "1710000000.000100",
     });
   });
 });

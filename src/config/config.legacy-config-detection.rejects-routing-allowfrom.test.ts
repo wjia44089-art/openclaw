@@ -2,13 +2,9 @@ import { describe, expect, it } from "vitest";
 import { validateConfigObject } from "./validation.js";
 import {
   DiscordConfigSchema,
-  IMessageConfigSchema,
   MSTeamsConfigSchema,
-  SignalConfigSchema,
   SlackConfigSchema,
-  TelegramConfigSchema,
 } from "./zod-schema.providers-core.js";
-import { WhatsAppConfigSchema } from "./zod-schema.providers-whatsapp.js";
 
 function expectSchemaConfigValue(params: {
   schema: { safeParse: (value: unknown) => { success: true; data: unknown } | { success: false } };
@@ -24,25 +20,38 @@ function expectSchemaConfigValue(params: {
   expect(params.readValue(res.data)).toBe(params.expectedValue);
 }
 
-function expectSchemaValidationIssue(params: {
-  schema: {
-    safeParse: (
-      value: unknown,
-    ) =>
-      | { success: true; data: unknown }
-      | { success: false; error: { issues: Array<{ path: PropertyKey[]; message: string }> } };
-  };
+function expectProviderValidationIssuePath(params: {
+  provider: string;
   config: unknown;
   expectedPath: string;
-  expectedMessage: string;
 }) {
-  const res = params.schema.safeParse(params.config);
-  expect(res.success).toBe(false);
-  if (!res.success) {
-    const issue = res.error.issues[0];
-    expect(issue?.path.join(".")).toBe(params.expectedPath);
-    expect(issue?.message).toContain(params.expectedMessage);
+  const res = validateConfigObject({
+    channels: {
+      [params.provider]: params.config,
+    },
+  });
+  expect(res.ok, params.provider).toBe(false);
+  if (!res.ok) {
+    expect(res.issues[0]?.path, params.provider).toBe(params.expectedPath);
   }
+}
+
+function expectProviderConfigValue(params: {
+  provider: string;
+  config: unknown;
+  readValue: (config: unknown) => unknown;
+  expectedValue: unknown;
+}) {
+  const res = validateConfigObject({
+    channels: {
+      [params.provider]: params.config,
+    },
+  });
+  expect(res.ok, params.provider).toBe(true);
+  if (!res.ok) {
+    throw new Error(`expected ${params.provider} config to be valid`);
+  }
+  expect(params.readValue(res.config)).toBe(params.expectedValue);
 }
 
 describe("legacy config detection", () => {
@@ -136,98 +145,118 @@ describe("legacy config detection", () => {
   it.each([
     {
       name: "telegram",
-      schema: TelegramConfigSchema,
       allowFrom: ["123456789"],
-      expectedMessage: 'channels.telegram.dmPolicy="open"',
+      expectedIssuePath: "channels.telegram.allowFrom",
     },
     {
       name: "whatsapp",
-      schema: WhatsAppConfigSchema,
       allowFrom: ["+15555550123"],
-      expectedMessage: 'channels.whatsapp.dmPolicy="open"',
+      expectedIssuePath: "channels.whatsapp.allowFrom",
     },
     {
       name: "signal",
-      schema: SignalConfigSchema,
       allowFrom: ["+15555550123"],
-      expectedMessage: 'channels.signal.dmPolicy="open"',
+      expectedIssuePath: "channels.signal.allowFrom",
     },
     {
       name: "imessage",
-      schema: IMessageConfigSchema,
       allowFrom: ["+15555550123"],
-      expectedMessage: 'channels.imessage.dmPolicy="open"',
+      expectedIssuePath: "channels.imessage.allowFrom",
     },
   ] as const)(
     'enforces dmPolicy="open" allowFrom wildcard for $name',
-    ({ schema, allowFrom, expectedMessage }) => {
-      expectSchemaValidationIssue({
-        schema,
+    ({ name, allowFrom, expectedIssuePath }) => {
+      expectProviderValidationIssuePath({
+        provider: name,
         config: { dmPolicy: "open", allowFrom },
-        expectedPath: "allowFrom",
-        expectedMessage,
+        expectedPath: expectedIssuePath,
+      });
+    },
+    180_000,
+  );
+
+  it.each(["telegram", "whatsapp", "signal"] as const)(
+    'accepts dmPolicy="open" with wildcard for %s',
+    (provider) => {
+      expectProviderConfigValue({
+        provider,
+        config: { dmPolicy: "open", allowFrom: ["*"] },
+        readValue: (config) =>
+          (
+            config as {
+              channels?: Record<string, { dmPolicy?: string } | undefined>;
+            }
+          ).channels?.[provider]?.dmPolicy,
+        expectedValue: "open",
       });
     },
   );
 
-  it.each([
-    { name: "telegram", schema: TelegramConfigSchema },
-    { name: "whatsapp", schema: WhatsAppConfigSchema },
-    { name: "signal", schema: SignalConfigSchema },
-  ] as const)('accepts dmPolicy="open" with wildcard for $name', ({ schema }) => {
-    expectSchemaConfigValue({
-      schema,
-      config: { dmPolicy: "open", allowFrom: ["*"] },
-      readValue: (config) => (config as { dmPolicy?: string }).dmPolicy,
-      expectedValue: "open",
-    });
-  });
-
-  it.each([
-    { name: "telegram", schema: TelegramConfigSchema },
-    { name: "whatsapp", schema: WhatsAppConfigSchema },
-    { name: "signal", schema: SignalConfigSchema },
-  ] as const)("defaults dm/group policy for configured provider $name", ({ schema }) => {
-    expectSchemaConfigValue({
-      schema,
-      config: {},
-      readValue: (config) => (config as { dmPolicy?: string }).dmPolicy,
-      expectedValue: "pairing",
-    });
-    expectSchemaConfigValue({
-      schema,
-      config: {},
-      readValue: (config) => (config as { groupPolicy?: string }).groupPolicy,
-      expectedValue: "allowlist",
-    });
-  });
+  it.each(["telegram", "whatsapp", "signal"] as const)(
+    "defaults dm/group policy for configured provider %s",
+    (provider) => {
+      expectProviderConfigValue({
+        provider,
+        config: {},
+        readValue: (config) =>
+          (
+            config as {
+              channels?: Record<string, { dmPolicy?: string } | undefined>;
+            }
+          ).channels?.[provider]?.dmPolicy,
+        expectedValue: "pairing",
+      });
+      expectProviderConfigValue({
+        provider,
+        config: {},
+        readValue: (config) =>
+          (
+            config as {
+              channels?: Record<string, { groupPolicy?: string } | undefined>;
+            }
+          ).channels?.[provider]?.groupPolicy,
+        expectedValue: "allowlist",
+      });
+    },
+  );
 
   it("accepts historyLimit overrides per provider and account", async () => {
-    expectSchemaConfigValue({
-      schema: WhatsAppConfigSchema,
+    expectProviderConfigValue({
+      provider: "whatsapp",
       config: { historyLimit: 9, accounts: { work: { historyLimit: 4 } } },
-      readValue: (config) => (config as { historyLimit?: number }).historyLimit,
+      readValue: (config) =>
+        (config as { channels?: { whatsapp?: { historyLimit?: number } } }).channels?.whatsapp
+          ?.historyLimit,
       expectedValue: 9,
     });
-    expectSchemaConfigValue({
-      schema: WhatsAppConfigSchema,
+    expectProviderConfigValue({
+      provider: "whatsapp",
       config: { historyLimit: 9, accounts: { work: { historyLimit: 4 } } },
       readValue: (config) =>
-        (config as { accounts?: { work?: { historyLimit?: number } } }).accounts?.work
-          ?.historyLimit,
+        (
+          config as {
+            channels?: { whatsapp?: { accounts?: { work?: { historyLimit?: number } } } };
+          }
+        ).channels?.whatsapp?.accounts?.work?.historyLimit,
       expectedValue: 4,
     });
-    expectSchemaConfigValue({
-      schema: TelegramConfigSchema,
-      config: { historyLimit: 8, accounts: { ops: { historyLimit: 3 } } },
-      readValue: (config) => (config as { historyLimit?: number }).historyLimit,
-      expectedValue: 8,
-    });
-    expectSchemaConfigValue({
-      schema: TelegramConfigSchema,
+    expectProviderConfigValue({
+      provider: "telegram",
       config: { historyLimit: 8, accounts: { ops: { historyLimit: 3 } } },
       readValue: (config) =>
-        (config as { accounts?: { ops?: { historyLimit?: number } } }).accounts?.ops?.historyLimit,
+        (config as { channels?: { telegram?: { historyLimit?: number } } }).channels?.telegram
+          ?.historyLimit,
+      expectedValue: 8,
+    });
+    expectProviderConfigValue({
+      provider: "telegram",
+      config: { historyLimit: 8, accounts: { ops: { historyLimit: 3 } } },
+      readValue: (config) =>
+        (
+          config as {
+            channels?: { telegram?: { accounts?: { ops?: { historyLimit?: number } } } };
+          }
+        ).channels?.telegram?.accounts?.ops?.historyLimit,
       expectedValue: 3,
     });
     expectSchemaConfigValue({
@@ -243,16 +272,20 @@ describe("legacy config detection", () => {
         (config as { accounts?: { ops?: { historyLimit?: number } } }).accounts?.ops?.historyLimit,
       expectedValue: 2,
     });
-    expectSchemaConfigValue({
-      schema: SignalConfigSchema,
+    expectProviderConfigValue({
+      provider: "signal",
       config: { historyLimit: 6 },
-      readValue: (config) => (config as { historyLimit?: number }).historyLimit,
+      readValue: (config) =>
+        (config as { channels?: { signal?: { historyLimit?: number } } }).channels?.signal
+          ?.historyLimit,
       expectedValue: 6,
     });
-    expectSchemaConfigValue({
-      schema: IMessageConfigSchema,
+    expectProviderConfigValue({
+      provider: "imessage",
       config: { historyLimit: 5 },
-      readValue: (config) => (config as { historyLimit?: number }).historyLimit,
+      readValue: (config) =>
+        (config as { channels?: { imessage?: { historyLimit?: number } } }).channels?.imessage
+          ?.historyLimit,
       expectedValue: 5,
     });
     expectSchemaConfigValue({

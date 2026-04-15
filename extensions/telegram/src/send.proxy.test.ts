@@ -59,7 +59,7 @@ vi.mock("grammy", () => ({
   GrammyError: class GrammyError extends Error {
     description = "";
   },
-  InputFile: function InputFile() {},
+  InputFile: class {},
 }));
 
 let deleteMessageTelegram: typeof import("./send.js").deleteMessageTelegram;

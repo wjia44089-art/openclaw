@@ -1,12 +1,13 @@
 import fsPromises from "node:fs/promises";
 import path from "node:path";
 import type {
+  SandboxContext,
   SandboxFsBridge,
   SandboxFsStat,
   SandboxResolvedPath,
 } from "openclaw/plugin-sdk/sandbox";
 import { createWritableRenameTargetResolver } from "openclaw/plugin-sdk/sandbox";
-import type { OpenShellFsBridgeContext, OpenShellSandboxBackend } from "./backend.types.js";
+import type { OpenShellSandboxBackend } from "./backend.js";
 import { movePathWithCopyFallback } from "./mirror.js";
 
 type ResolvedMountPath = SandboxResolvedPath & {
@@ -16,7 +17,7 @@ type ResolvedMountPath = SandboxResolvedPath & {
 };
 
 export function createOpenShellFsBridge(params: {
-  sandbox: OpenShellFsBridgeContext;
+  sandbox: SandboxContext;
   backend: OpenShellSandboxBackend;
 }): SandboxFsBridge {
   return new OpenShellFsBridge(params.sandbox, params.backend);
@@ -29,7 +30,7 @@ class OpenShellFsBridge implements SandboxFsBridge {
   );
 
   constructor(
-    private readonly sandbox: OpenShellFsBridgeContext,
+    private readonly sandbox: SandboxContext,
     private readonly backend: OpenShellSandboxBackend,
   ) {}
 

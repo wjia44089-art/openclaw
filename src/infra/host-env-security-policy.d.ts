@@ -1,9 +1,6 @@
 export type HostEnvSecurityPolicy = Readonly<{
   blockedEverywhereKeys: readonly string[];
   blockedOverrideOnlyKeys: readonly string[];
-  allowedInheritedOverrideOnlyKeys: readonly string[];
-  blockedInheritedKeys: readonly string[];
-  blockedInheritedPrefixes: readonly string[];
   blockedPrefixes: readonly string[];
   blockedOverridePrefixes: readonly string[];
   blockedKeys: readonly string[];

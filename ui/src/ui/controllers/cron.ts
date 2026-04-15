@@ -223,27 +223,13 @@ export async function loadCronModelSuggestions(state: CronModelSuggestionsState)
   }
 }
 
-async function withCronBusy(
-  state: CronState,
-  run: (client: GatewayBrowserClient) => Promise<void>,
-) {
-  const client = state.client;
-  if (!client || !state.connected || state.cronBusy) {
-    return;
-  }
-  state.cronBusy = true;
-  state.cronError = null;
-  try {
-    await run(client);
-  } catch (err) {
-    state.cronError = String(err);
-  } finally {
-    state.cronBusy = false;
-  }
+export async function loadCronJobs(state: CronState) {
+  return await loadCronJobsPage(state, { append: false });
 }
 
 function normalizeCronPageMeta(params: {
   totalRaw: unknown;
+  limitRaw: unknown;
   offsetRaw: unknown;
   nextOffsetRaw: unknown;
   hasMoreRaw: unknown;
@@ -253,6 +239,10 @@ function normalizeCronPageMeta(params: {
     typeof params.totalRaw === "number" && Number.isFinite(params.totalRaw)
       ? Math.max(0, Math.floor(params.totalRaw))
       : params.pageCount;
+  const limit =
+    typeof params.limitRaw === "number" && Number.isFinite(params.limitRaw)
+      ? Math.max(1, Math.floor(params.limitRaw))
+      : Math.max(1, params.pageCount);
   const offset =
     typeof params.offsetRaw === "number" && Number.isFinite(params.offsetRaw)
       ? Math.max(0, Math.floor(params.offsetRaw))
@@ -267,7 +257,7 @@ function normalizeCronPageMeta(params: {
       : hasMore
         ? offset + params.pageCount
         : null;
-  return { total, hasMore, nextOffset };
+  return { total, limit, offset, hasMore, nextOffset };
 }
 
 export async function loadCronJobsPage(state: CronState, opts?: { append?: boolean }) {
@@ -278,10 +268,10 @@ export async function loadCronJobsPage(state: CronState, opts?: { append?: boole
     return;
   }
   const append = opts?.append === true;
-  if (append && !state.cronJobsHasMore) {
-    return;
-  }
   if (append) {
+    if (!state.cronJobsHasMore) {
+      return;
+    }
     state.cronJobsLoadingMore = true;
   } else {
     state.cronLoading = true;
@@ -302,6 +292,7 @@ export async function loadCronJobsPage(state: CronState, opts?: { append?: boole
     state.cronJobs = append ? [...state.cronJobs, ...jobs] : jobs;
     const meta = normalizeCronPageMeta({
       totalRaw: res.total,
+      limitRaw: res.limit,
       offsetRaw: res.offset,
       nextOffsetRaw: res.nextOffset,
       hasMoreRaw: res.hasMore,
@@ -327,6 +318,14 @@ export async function loadCronJobsPage(state: CronState, opts?: { append?: boole
   }
 }
 
+export async function loadMoreCronJobs(state: CronState) {
+  await loadCronJobsPage(state, { append: true });
+}
+
+export async function reloadCronJobs(state: CronState) {
+  await loadCronJobsPage(state, { append: false });
+}
+
 export function updateCronJobsFilter(
   state: CronState,
   patch: Partial<
@@ -344,12 +343,21 @@ export function updateCronJobsFilter(
   if (typeof patch.cronJobsQuery === "string") {
     state.cronJobsQuery = patch.cronJobsQuery;
   }
-  state.cronJobsEnabledFilter = patch.cronJobsEnabledFilter ?? state.cronJobsEnabledFilter;
-  state.cronJobsScheduleKindFilter =
-    patch.cronJobsScheduleKindFilter ?? state.cronJobsScheduleKindFilter;
-  state.cronJobsLastStatusFilter = patch.cronJobsLastStatusFilter ?? state.cronJobsLastStatusFilter;
-  state.cronJobsSortBy = patch.cronJobsSortBy ?? state.cronJobsSortBy;
-  state.cronJobsSortDir = patch.cronJobsSortDir ?? state.cronJobsSortDir;
+  if (patch.cronJobsEnabledFilter) {
+    state.cronJobsEnabledFilter = patch.cronJobsEnabledFilter;
+  }
+  if (patch.cronJobsScheduleKindFilter) {
+    state.cronJobsScheduleKindFilter = patch.cronJobsScheduleKindFilter;
+  }
+  if (patch.cronJobsLastStatusFilter) {
+    state.cronJobsLastStatusFilter = patch.cronJobsLastStatusFilter;
+  }
+  if (patch.cronJobsSortBy) {
+    state.cronJobsSortBy = patch.cronJobsSortBy;
+  }
+  if (patch.cronJobsSortDir) {
+    state.cronJobsSortDir = patch.cronJobsSortDir;
+  }
 }
 
 export function getVisibleCronJobs(
@@ -374,13 +382,6 @@ export function getVisibleCronJobs(
 
 function clearCronEditState(state: CronState) {
   state.cronEditingJobId = null;
-}
-
-function clearCronRunsPage(state: CronState) {
-  state.cronRuns = [];
-  state.cronRunsTotal = 0;
-  state.cronRunsHasMore = false;
-  state.cronRunsNextOffset = null;
 }
 
 function resetCronFormToDefaults(state: CronState) {
@@ -626,7 +627,12 @@ function buildFailureAlert(form: CronFormState) {
 }
 
 export async function addCronJob(state: CronState) {
-  await withCronBusy(state, async (client) => {
+  if (!state.client || !state.connected || state.cronBusy) {
+    return;
+  }
+  state.cronBusy = true;
+  state.cronError = null;
+  try {
     const form = normalizeCronFormState(state.cronForm);
     if (form !== state.cronForm) {
       state.cronForm = form;
@@ -692,48 +698,86 @@ export async function addCronJob(state: CronState) {
       throw new Error(t("cron.errors.nameRequiredShort"));
     }
     if (state.cronEditingJobId) {
-      await client.request("cron.update", {
+      await state.client.request("cron.update", {
         id: state.cronEditingJobId,
         patch: job,
       });
       clearCronEditState(state);
     } else {
-      await client.request("cron.add", job);
+      await state.client.request("cron.add", job);
       resetCronFormToDefaults(state);
     }
-    await loadCronJobsPage(state);
+    await loadCronJobs(state);
     await loadCronStatus(state);
-  });
+  } catch (err) {
+    state.cronError = String(err);
+  } finally {
+    state.cronBusy = false;
+  }
 }
 
 export async function toggleCronJob(state: CronState, job: CronJob, enabled: boolean) {
-  await withCronBusy(state, async (client) => {
-    await client.request("cron.update", { id: job.id, patch: { enabled } });
-    await loadCronJobsPage(state);
+  if (!state.client || !state.connected || state.cronBusy) {
+    return;
+  }
+  state.cronBusy = true;
+  state.cronError = null;
+  try {
+    await state.client.request("cron.update", { id: job.id, patch: { enabled } });
+    await loadCronJobs(state);
     await loadCronStatus(state);
-  });
+  } catch (err) {
+    state.cronError = String(err);
+  } finally {
+    state.cronBusy = false;
+  }
 }
 
 export async function runCronJob(state: CronState, job: CronJob, mode: "force" | "due" = "force") {
-  await withCronBusy(state, async (client) => {
-    await client.request("cron.run", { id: job.id, mode });
-    await loadCronRuns(state, state.cronRunsScope === "all" ? null : job.id);
-  });
+  if (!state.client || !state.connected || state.cronBusy) {
+    return;
+  }
+  state.cronBusy = true;
+  state.cronError = null;
+  try {
+    await state.client.request("cron.run", { id: job.id, mode });
+    if (state.cronRunsScope === "all") {
+      await loadCronRuns(state, null);
+    } else {
+      await loadCronRuns(state, job.id);
+    }
+  } catch (err) {
+    state.cronError = String(err);
+  } finally {
+    state.cronBusy = false;
+  }
 }
 
 export async function removeCronJob(state: CronState, job: CronJob) {
-  await withCronBusy(state, async (client) => {
-    await client.request("cron.remove", { id: job.id });
+  if (!state.client || !state.connected || state.cronBusy) {
+    return;
+  }
+  state.cronBusy = true;
+  state.cronError = null;
+  try {
+    await state.client.request("cron.remove", { id: job.id });
     if (state.cronEditingJobId === job.id) {
       clearCronEditState(state);
     }
     if (state.cronRunsJobId === job.id) {
       state.cronRunsJobId = null;
-      clearCronRunsPage(state);
+      state.cronRuns = [];
+      state.cronRunsTotal = 0;
+      state.cronRunsHasMore = false;
+      state.cronRunsNextOffset = null;
     }
-    await loadCronJobsPage(state);
+    await loadCronJobs(state);
     await loadCronStatus(state);
-  });
+  } catch (err) {
+    state.cronError = String(err);
+  } finally {
+    state.cronBusy = false;
+  }
 }
 
 export async function loadCronRuns(
@@ -747,7 +791,10 @@ export async function loadCronRuns(
   const scope = state.cronRunsScope;
   const activeJobId = jobId ?? state.cronRunsJobId;
   if (scope === "job" && !activeJobId) {
-    clearCronRunsPage(state);
+    state.cronRuns = [];
+    state.cronRunsTotal = 0;
+    state.cronRunsHasMore = false;
+    state.cronRunsNextOffset = null;
     return;
   }
   const append = opts?.append === true;
@@ -781,6 +828,7 @@ export async function loadCronRuns(
     }
     const meta = normalizeCronPageMeta({
       totalRaw: res.total,
+      limitRaw: res.limit,
       offsetRaw: res.offset,
       nextOffsetRaw: res.nextOffset,
       hasMoreRaw: res.hasMore,
@@ -819,7 +867,9 @@ export function updateCronRunsFilter(
     >
   >,
 ) {
-  state.cronRunsScope = patch.cronRunsScope ?? state.cronRunsScope;
+  if (patch.cronRunsScope) {
+    state.cronRunsScope = patch.cronRunsScope;
+  }
   if (Array.isArray(patch.cronRunsStatuses)) {
     state.cronRunsStatuses = patch.cronRunsStatuses;
     state.cronRunsStatusFilter =
@@ -836,7 +886,9 @@ export function updateCronRunsFilter(
   if (typeof patch.cronRunsQuery === "string") {
     state.cronRunsQuery = patch.cronRunsQuery;
   }
-  state.cronRunsSortDir = patch.cronRunsSortDir ?? state.cronRunsSortDir;
+  if (patch.cronRunsSortDir) {
+    state.cronRunsSortDir = patch.cronRunsSortDir;
+  }
 }
 
 export function startCronEdit(state: CronState, job: CronJob) {

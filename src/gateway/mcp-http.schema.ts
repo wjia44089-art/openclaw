@@ -53,7 +53,11 @@ function flattenUnionSchema(raw: Record<string, unknown>): Record<string, unknow
   }
   const required =
     requiredSets.length > 0
-      ? [...(requiredSets[0] ?? [])].filter((key) => requiredSets.every((set) => set.has(key)))
+      ? [
+          ...requiredSets.reduce(
+            (left, right) => new Set([...left].filter((key) => right.has(key))),
+          ),
+        ]
       : [];
   const { anyOf: _anyOf, oneOf: _oneOf, ...rest } = raw;
   return { ...rest, type: "object", properties: mergedProps, required };

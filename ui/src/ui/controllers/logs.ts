@@ -33,7 +33,10 @@ function parseMaybeJsonString(value: unknown) {
   }
   try {
     const parsed = JSON.parse(trimmed) as unknown;
-    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+    return parsed as Record<string, unknown>;
   } catch {
     return null;
   }
@@ -64,33 +67,35 @@ export function parseLogLine(line: string): LogEntry {
     const contextCandidate =
       typeof obj["0"] === "string" ? obj["0"] : typeof meta?.name === "string" ? meta?.name : null;
     const contextObj = parseMaybeJsonString(contextCandidate);
-    let subsystem =
-      typeof contextObj?.subsystem === "string"
-        ? contextObj.subsystem
-        : typeof contextObj?.module === "string"
-          ? contextObj.module
-          : null;
+    let subsystem: string | null = null;
+    if (contextObj) {
+      if (typeof contextObj.subsystem === "string") {
+        subsystem = contextObj.subsystem;
+      } else if (typeof contextObj.module === "string") {
+        subsystem = contextObj.module;
+      }
+    }
     if (!subsystem && contextCandidate && contextCandidate.length < 120) {
       subsystem = contextCandidate;
     }
 
-    const message =
-      typeof obj["1"] === "string"
-        ? obj["1"]
-        : typeof obj["2"] === "string"
-          ? obj["2"]
-          : !contextObj && typeof obj["0"] === "string"
-            ? obj["0"]
-            : typeof obj.message === "string"
-              ? obj.message
-              : line;
+    let message: string | null = null;
+    if (typeof obj["1"] === "string") {
+      message = obj["1"];
+    } else if (typeof obj["2"] === "string") {
+      message = obj["2"];
+    } else if (!contextObj && typeof obj["0"] === "string") {
+      message = obj["0"];
+    } else if (typeof obj.message === "string") {
+      message = obj.message;
+    }
 
     return {
       raw: line,
       time,
       level,
       subsystem,
-      message,
+      message: message ?? line,
       meta: meta ?? undefined,
     };
   } catch {
@@ -99,11 +104,13 @@ export function parseLogLine(line: string): LogEntry {
 }
 
 export async function loadLogs(state: LogsState, opts?: { reset?: boolean; quiet?: boolean }) {
-  const quiet = opts?.quiet === true;
-  if (!state.client || !state.connected || (state.logsLoading && !quiet)) {
+  if (!state.client || !state.connected) {
     return;
   }
-  if (!quiet) {
+  if (state.logsLoading && !opts?.quiet) {
+    return;
+  }
+  if (!opts?.quiet) {
     state.logsLoading = true;
   }
   state.logsError = null;
@@ -116,6 +123,7 @@ export async function loadLogs(state: LogsState, opts?: { reset?: boolean; quiet
     const payload = res as {
       file?: string;
       cursor?: number;
+      size?: number;
       lines?: unknown;
       truncated?: boolean;
       reset?: boolean;
@@ -124,12 +132,16 @@ export async function loadLogs(state: LogsState, opts?: { reset?: boolean; quiet
       ? payload.lines.filter((line) => typeof line === "string")
       : [];
     const entries = lines.map(parseLogLine);
-    const shouldReset = opts?.reset || payload.reset || state.logsCursor == null;
+    const shouldReset = Boolean(opts?.reset || payload.reset || state.logsCursor == null);
     state.logsEntries = shouldReset
       ? entries
       : [...state.logsEntries, ...entries].slice(-LOG_BUFFER_LIMIT);
-    state.logsCursor = typeof payload.cursor === "number" ? payload.cursor : state.logsCursor;
-    state.logsFile = typeof payload.file === "string" ? payload.file : state.logsFile;
+    if (typeof payload.cursor === "number") {
+      state.logsCursor = payload.cursor;
+    }
+    if (typeof payload.file === "string") {
+      state.logsFile = payload.file;
+    }
     state.logsTruncated = Boolean(payload.truncated);
     state.logsLastFetchAt = Date.now();
   } catch (err) {
@@ -140,7 +152,7 @@ export async function loadLogs(state: LogsState, opts?: { reset?: boolean; quiet
       state.logsError = String(err);
     }
   } finally {
-    if (!quiet) {
+    if (!opts?.quiet) {
       state.logsLoading = false;
     }
   }

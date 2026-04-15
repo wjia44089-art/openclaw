@@ -20,39 +20,10 @@ Style:
 - record evidence
 - end with a concise protocol report`;
 
-const qaScenarioConfigSchema = z.record(z.string(), z.unknown()).superRefine((config, ctx) => {
-  for (const [key, value] of Object.entries(config)) {
-    if (!key.endsWith("Any")) {
-      continue;
-    }
-    if (!Array.isArray(value)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: [key],
-        message: `${key} must be an array of strings`,
-      });
-      continue;
-    }
-    for (const [index, entry] of value.entries()) {
-      if (typeof entry !== "string") {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [key, index],
-          message: `${key} entries must be strings`,
-        });
-      }
-    }
-  }
-});
-
 const qaScenarioExecutionSchema = z.object({
   kind: z.literal("flow").default("flow"),
   summary: z.string().trim().min(1).optional(),
-  config: qaScenarioConfigSchema.optional(),
-});
-
-const qaScenarioGatewayRuntimeSchema = z.object({
-  forwardHostHome: z.boolean().optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
 });
 
 const qaFlowCallActionSchema = z.object({
@@ -139,9 +110,6 @@ const qaSeedScenarioSchema = z.object({
   surface: z.string().trim().min(1),
   objective: z.string().trim().min(1),
   successCriteria: z.array(z.string().trim().min(1)).min(1),
-  plugins: z.array(z.string().trim().min(1)).optional(),
-  gatewayConfigPatch: z.record(z.string(), z.unknown()).optional(),
-  gatewayRuntime: qaScenarioGatewayRuntimeSchema.optional(),
   docsRefs: z.array(z.string().trim().min(1)).optional(),
   codeRefs: z.array(z.string().trim().min(1)).optional(),
   execution: qaScenarioExecutionSchema.optional(),
@@ -213,10 +181,6 @@ function resolveRepoPath(relativePath: string, kind: "file" | "directory" = "fil
   return null;
 }
 
-export function hasQaScenarioPack(): boolean {
-  return resolveRepoPath(QA_SCENARIO_PACK_INDEX_PATH, "file") !== null;
-}
-
 function readTextFile(relativePath: string): string {
   const resolved = resolveRepoPath(relativePath, "file");
   if (!resolved) {
@@ -256,22 +220,7 @@ function extractQaScenarioFlow(content: string, relativePath: string) {
   if (!match?.[1]) {
     throw new Error(`qa scenario file missing \`\`\`yaml qa-flow fence in ${relativePath}`);
   }
-  return parseQaYamlWithContext(qaFlowSchema, YAML.parse(match[1]) as unknown, relativePath);
-}
-
-function formatZodIssuePath(path: PropertyKey[]) {
-  return path.length ? path.map(String).join(".") : "<root>";
-}
-
-function parseQaYamlWithContext<T>(schema: z.ZodType<T>, value: unknown, label: string): T {
-  const parsed = schema.safeParse(value);
-  if (parsed.success) {
-    return parsed.data;
-  }
-  const issues = parsed.error.issues
-    .map((issue) => `${formatZodIssuePath(issue.path)}: ${issue.message}`)
-    .join("; ");
-  throw new Error(`${label}: ${issues}`);
+  return qaFlowSchema.parse(YAML.parse(match[1]) as unknown);
 }
 
 export function readQaScenarioPackMarkdown(): string {
@@ -285,34 +234,18 @@ export function readQaScenarioPackMarkdown(): string {
 export function readQaScenarioPack(): QaScenarioPack {
   const packMarkdown = readTextFile(QA_SCENARIO_PACK_INDEX_PATH).trim();
   if (!packMarkdown) {
-    // The QA scenario pack is optional in npm distributions.  Return an empty
-    // pack so completion cache updates and other consumers don't crash when
-    // the qa/scenarios/ directory is not shipped with the package.
-    return {
-      version: 1,
-      agent: { identityMarkdown: DEFAULT_QA_AGENT_IDENTITY_MARKDOWN },
-      kickoffTask: "QA scenarios not available in this distribution.",
-      scenarios: [],
-    };
+    throw new Error(`qa scenario pack not found: ${QA_SCENARIO_PACK_INDEX_PATH}`);
   }
-  const parsedPack = parseQaYamlWithContext(
-    qaScenarioPackSchema,
+  const parsedPack = qaScenarioPackSchema.parse(
     YAML.parse(extractQaPackYaml(packMarkdown)) as unknown,
-    QA_SCENARIO_PACK_INDEX_PATH,
   );
   const scenarios = listQaScenarioMarkdownPaths().map((relativePath) =>
     (() => {
       const content = readTextFile(relativePath);
-      const parsedScenario = parseQaYamlWithContext(
-        qaSeedScenarioSchema,
+      const parsedScenario = qaSeedScenarioSchema.parse(
         YAML.parse(extractQaScenarioYaml(content, relativePath)) as unknown,
-        relativePath,
       );
-      const execution = parseQaYamlWithContext(
-        qaScenarioExecutionSchema,
-        parsedScenario.execution ?? {},
-        relativePath,
-      );
+      const execution = qaScenarioExecutionSchema.parse(parsedScenario.execution ?? {});
       const flow = extractQaScenarioFlow(content, relativePath);
       return {
         ...parsedScenario,
@@ -359,9 +292,5 @@ export function readQaScenarioById(id: string): QaSeedScenario {
 }
 
 export function readQaScenarioExecutionConfig(id: string): Record<string, unknown> | undefined {
-  return readQaScenarioPack().scenarios.find((candidate) => candidate.id === id)?.execution?.config;
-}
-
-export function validateQaScenarioExecutionConfig(config: Record<string, unknown>) {
-  return qaScenarioConfigSchema.parse(config);
+  return readQaScenarioById(id).execution?.config;
 }

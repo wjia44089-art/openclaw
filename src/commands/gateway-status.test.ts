@@ -4,8 +4,8 @@ import type { GatewayBonjourBeacon } from "../infra/bonjour-discovery.js";
 import type { GatewayTlsRuntime } from "../infra/tls/gateway.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { withEnvAsync } from "../test-utils/env.js";
-import { gatewayStatusCommand } from "./gateway-status.js";
-import { createSecretRefGatewayConfig } from "./gateway-status/test-support.js";
+
+let gatewayStatusCommand: typeof import("./gateway-status.js").gatewayStatusCommand;
 
 const mocks = vi.hoisted(() => {
   const sshStop = vi.fn(async () => {});
@@ -240,8 +240,10 @@ function findUnresolvedSecretRefWarning(runtimeLogs: string[]) {
 }
 
 describe("gateway-status command", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    vi.resetModules();
     vi.clearAllMocks();
+    ({ gatewayStatusCommand } = await import("./gateway-status.js"));
   });
 
   it("prints human output by default", async () => {
@@ -549,7 +551,24 @@ describe("gateway-status command", () => {
         exists: true,
         valid: true,
         config: {
-          ...createSecretRefGatewayConfig({ gatewayMode: "remote" }),
+          secrets: {
+            defaults: {
+              env: "default",
+            },
+          },
+          gateway: {
+            mode: "remote",
+            auth: {
+              mode: "token",
+              token: { source: "env", provider: "default", id: "OPENCLAW_GATEWAY_TOKEN" },
+              password: { source: "env", provider: "default", id: "OPENCLAW_GATEWAY_PASSWORD" },
+            },
+            remote: {
+              url: "wss://remote.example:18789",
+              token: { source: "env", provider: "default", id: "REMOTE_GATEWAY_TOKEN" },
+              password: { source: "env", provider: "default", id: "REMOTE_GATEWAY_PASSWORD" },
+            },
+          },
           discovery: {
             wideArea: { enabled: true },
           },

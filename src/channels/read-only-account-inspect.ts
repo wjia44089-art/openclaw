@@ -1,6 +1,6 @@
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { getChannelPlugin } from "./plugins/registry.js";
-import type { ChannelId } from "./plugins/types.public.js";
+import type { ChannelId } from "./plugins/types.js";
 
 export type ReadOnlyInspectedAccount = Record<string, unknown>;
 

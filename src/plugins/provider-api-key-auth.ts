@@ -1,5 +1,5 @@
 import { upsertAuthProfile } from "../agents/auth-profiles/profiles.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import type { SecretInput } from "../config/types.secrets.js";
 import { createLazyRuntimeSurface } from "../shared/lazy-runtime.js";
 import { normalizeOptionalString } from "../shared/string-coerce.js";
@@ -141,12 +141,7 @@ export function createProviderApiKeyAuthMethod(
             normalizeOptionalString(profileId.split(":", 1)[0]) || params.providerId,
             credentialInput,
             params.metadata,
-            capturedMode
-              ? {
-                  secretInputMode: capturedMode,
-                  config: ctx.config,
-                }
-              : undefined,
+            capturedMode ? { secretInputMode: capturedMode } : undefined,
           ),
         })),
         ...(params.applyConfig ? { configPatch: params.applyConfig(ctx.config) } : {}),

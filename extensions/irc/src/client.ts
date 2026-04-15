@@ -300,7 +300,7 @@ export async function connectIrcClient(options: IrcClientOptions): Promise<IrcCl
               : line.params[0] != null
                 ? line.params[0]
                 : currentNick;
-          currentNick = next.trim();
+          currentNick = String(next).trim();
         }
         continue;
       }

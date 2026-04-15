@@ -7,7 +7,8 @@ function hasFinding(
   checkId:
     | "sandbox.browser_container.hash_label_missing"
     | "sandbox.browser_container.hash_epoch_stale"
-    | "sandbox.browser_container.non_loopback_publish",
+    | "sandbox.browser_container.non_loopback_publish"
+    | "sandbox.browser_cdp_bridge_unrestricted",
   severity: "warn" | "critical",
   findings: Array<{ checkId: string; severity: string; detail: string }>,
 ) {
@@ -104,7 +105,7 @@ describe("security audit sandbox browser findings", () => {
     );
   });
 
-  it("does not warn about cdpSourceRange since runtime auto-derives it", () => {
+  it("warns when bridge network omits cdpSourceRange", () => {
     const findings = collectSandboxDangerousConfigFindings({
       agents: {
         defaults: {
@@ -115,8 +116,29 @@ describe("security audit sandbox browser findings", () => {
         },
       },
     } satisfies OpenClawConfig);
-    expect(findings.some((f) => f.checkId === "sandbox.browser_cdp_bridge_unrestricted")).toBe(
-      false,
+    const finding = findings.find(
+      (entry) => entry.checkId === "sandbox.browser_cdp_bridge_unrestricted",
     );
+    expect(finding?.severity).toBe("warn");
+    expect(finding?.detail).toContain("agents.defaults.sandbox.browser");
+  });
+
+  it("does not warn for dedicated default browser network", () => {
+    expect(
+      hasFinding(
+        "sandbox.browser_cdp_bridge_unrestricted",
+        "warn",
+        collectSandboxDangerousConfigFindings({
+          agents: {
+            defaults: {
+              sandbox: {
+                mode: "all",
+                browser: { enabled: true },
+              },
+            },
+          },
+        } satisfies OpenClawConfig),
+      ),
+    ).toBe(false);
   });
 });

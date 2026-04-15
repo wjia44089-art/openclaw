@@ -5,7 +5,7 @@ import type {
   ChannelConfigRuntimeParseResult,
   ChannelConfigSchema,
   ChannelConfigUiHint,
-} from "./types.config.js";
+} from "./types.plugin.js";
 
 type ZodSchemaWithToJsonSchema = ZodTypeAny & {
   toJSONSchema?: (params?: Record<string, unknown>) => unknown;

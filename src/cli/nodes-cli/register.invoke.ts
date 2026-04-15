@@ -36,16 +36,16 @@ export function registerNodesInvokeCommands(nodes: Command) {
               `command "${command}" is reserved for shell execution; use the exec tool with host=node instead`,
             );
           }
-          const params = JSON.parse(opts.params ?? "{}") as unknown;
+          const params = JSON.parse(String(opts.params ?? "{}")) as unknown;
           const timeoutMs = opts.invokeTimeout
-            ? Number.parseInt(opts.invokeTimeout, 10)
+            ? Number.parseInt(String(opts.invokeTimeout), 10)
             : undefined;
 
           const invokeParams: Record<string, unknown> = {
             nodeId,
             command,
             params,
-            idempotencyKey: opts.idempotencyKey ?? randomIdempotencyKey(),
+            idempotencyKey: String(opts.idempotencyKey ?? randomIdempotencyKey()),
           };
           if (typeof timeoutMs === "number" && Number.isFinite(timeoutMs)) {
             invokeParams.timeoutMs = timeoutMs;

@@ -1,4 +1,4 @@
-import type { OpenClawConfig } from "../../../config/types.openclaw.js";
+import type { OpenClawConfig } from "../../../config/config.js";
 import { sanitizeForLog } from "../../../terminal/ansi.js";
 import {
   collectBundledPluginLoadPathWarnings,

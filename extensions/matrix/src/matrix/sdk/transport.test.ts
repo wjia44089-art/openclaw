@@ -136,9 +136,9 @@ describe("performMatrixRequest", () => {
       });
     });
     (globalThis as Record<string, unknown>)[TEST_UNDICI_RUNTIME_DEPS_KEY] = {
-      Agent: function MockAgent() {},
-      EnvHttpProxyAgent: function MockEnvHttpProxyAgent() {},
-      ProxyAgent: function MockProxyAgent() {},
+      Agent: class MockAgent {},
+      EnvHttpProxyAgent: class MockEnvHttpProxyAgent {},
+      ProxyAgent: class MockProxyAgent {},
       fetch: runtimeFetch,
     };
 

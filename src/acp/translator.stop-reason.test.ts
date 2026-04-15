@@ -330,10 +330,7 @@ describe("acp translator stop reason mapping", () => {
       await Promise.resolve();
       agent.handleGatewayDisconnect("1006: first disconnect");
       agent.handleGatewayReconnect();
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        if (resolveAgentWait) {
-          break;
-        }
+      for (let attempt = 0; attempt < 5 && !resolveAgentWait; attempt += 1) {
         await Promise.resolve();
       }
       expect(resolveAgentWait).toBeDefined();

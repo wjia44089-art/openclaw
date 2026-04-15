@@ -6,7 +6,7 @@ import {
 } from "../agents/agent-scope.js";
 import { upsertAuthProfile } from "../agents/auth-profiles.js";
 import { resolveDefaultAgentWorkspaceDir } from "../agents/workspace.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import type { RuntimeEnv } from "../runtime.js";
 import type { WizardPrompter } from "../wizard/prompts.js";
 import { enablePluginInConfig } from "./enable.js";
@@ -78,30 +78,9 @@ function restoreConfiguredPrimaryModel(
   };
 }
 
-type ProviderAuthChoiceRuntime = typeof import("./provider-auth-choice.runtime.js");
-
-const defaultProviderAuthChoiceDeps = {
-  loadPluginProviderRuntime: async (): Promise<ProviderAuthChoiceRuntime> =>
-    import("./provider-auth-choice.runtime.js"),
-};
-
-let providerAuthChoiceDeps = defaultProviderAuthChoiceDeps;
-
 async function loadPluginProviderRuntime() {
-  return await providerAuthChoiceDeps.loadPluginProviderRuntime();
+  return import("./provider-auth-choice.runtime.js");
 }
-
-export const __testing = {
-  resetDepsForTest(): void {
-    providerAuthChoiceDeps = defaultProviderAuthChoiceDeps;
-  },
-  setDepsForTest(deps: Partial<typeof defaultProviderAuthChoiceDeps>): void {
-    providerAuthChoiceDeps = {
-      ...defaultProviderAuthChoiceDeps,
-      ...deps,
-    };
-  },
-} as const;
 
 export async function runProviderPluginAuthMethod(params: {
   config: OpenClawConfig;

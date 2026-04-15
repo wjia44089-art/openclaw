@@ -78,7 +78,6 @@ vi.mock("node:fs", async () => {
         return await actual.promises.mkdir(p, { recursive: true });
       }
       ensureDir(p);
-      return undefined;
     },
     readFile: async (p: string) => {
       if (!isFixtureInMock(p)) {
@@ -165,7 +164,6 @@ vi.mock("node:fs/promises", async () => {
         return await actual.mkdir(p, { recursive: true });
       }
       ensureDir(p);
-      return undefined;
     },
     writeFile: async (p: string, data: string, _enc?: unknown) => {
       if (!isFixturePath(p)) {

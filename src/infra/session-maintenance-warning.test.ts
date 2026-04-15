@@ -52,7 +52,7 @@ describe("deliverSessionMaintenanceWarning", () => {
       normalizeMessageChannel: mocks.normalizeMessageChannel,
       isDeliverableMessageChannel: mocks.isDeliverableMessageChannel,
     }));
-    vi.doMock("../utils/delivery-context.shared.js", () => ({
+    vi.doMock("../utils/delivery-context.js", () => ({
       deliveryContextFromSession: mocks.deliveryContextFromSession,
     }));
     vi.doMock("./outbound/deliver-runtime.js", () => ({

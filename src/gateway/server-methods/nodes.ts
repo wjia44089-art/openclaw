@@ -518,15 +518,6 @@ export async function waitForNodeReconnect(params: {
   return Boolean(params.context.nodeRegistry.get(params.nodeId));
 }
 
-/**
- * Remove cached wake/nudge state for a node that has disconnected.
- * Called from the WS close handler to prevent unbounded growth.
- */
-export function clearNodeWakeState(nodeId: string): void {
-  nodeWakeById.delete(nodeId);
-  nodeWakeNudgeById.delete(nodeId);
-}
-
 export const nodeHandlers: GatewayRequestHandlers = {
   "node.pair.request": async ({ params, respond, context }) => {
     if (!validateNodePairRequestParams(params)) {
@@ -727,7 +718,7 @@ export const nodeHandlers: GatewayRequestHandlers = {
       return;
     }
     const { nodeId } = params as { nodeId: string };
-    const id = normalizeOptionalString(nodeId) ?? "";
+    const id = normalizeOptionalString(String(nodeId ?? "")) ?? "";
     if (!id) {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "nodeId required"));
       return;
@@ -805,7 +796,7 @@ export const nodeHandlers: GatewayRequestHandlers = {
       return;
     }
     const nodeId = client?.connect?.device?.id ?? client?.connect?.client?.id;
-    const trimmedNodeId = normalizeOptionalString(nodeId) ?? "";
+    const trimmedNodeId = normalizeOptionalString(String(nodeId ?? "")) ?? "";
     if (!trimmedNodeId) {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "nodeId required"));
       return;
@@ -836,14 +827,16 @@ export const nodeHandlers: GatewayRequestHandlers = {
       return;
     }
     const nodeId = client?.connect?.device?.id ?? client?.connect?.client?.id;
-    const trimmedNodeId = normalizeOptionalString(nodeId) ?? "";
+    const trimmedNodeId = normalizeOptionalString(String(nodeId ?? "")) ?? "";
     if (!trimmedNodeId) {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "nodeId required"));
       return;
     }
     const ackIds = Array.from(
       new Set(
-        (params.ids ?? []).map((value) => normalizeOptionalString(value) ?? "").filter(Boolean),
+        (params.ids ?? [])
+          .map((value) => normalizeOptionalString(String(value ?? "")) ?? "")
+          .filter(Boolean),
       ),
     );
     const remaining = ackPendingNodeActions(trimmedNodeId, ackIds);
@@ -873,8 +866,8 @@ export const nodeHandlers: GatewayRequestHandlers = {
       timeoutMs?: number;
       idempotencyKey: string;
     };
-    const nodeId = normalizeOptionalString(p.nodeId) ?? "";
-    const command = normalizeOptionalString(p.command) ?? "";
+    const nodeId = normalizeOptionalString(String(p.nodeId ?? "")) ?? "";
+    const command = normalizeOptionalString(String(p.command ?? "")) ?? "";
     if (!nodeId || !command) {
       respond(
         false,

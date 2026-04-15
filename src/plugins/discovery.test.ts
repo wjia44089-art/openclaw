@@ -665,7 +665,6 @@ describe("discoverOpenClawPlugins", () => {
           packageName: "@openclaw/missing-entry-pack",
           extensions: ["./missing.ts"],
         });
-        return true;
       },
     },
     {
@@ -689,7 +688,6 @@ describe("discoverOpenClawPlugins", () => {
           packageName: "@openclaw/pack",
           extensions: ["./linked/escape.ts"],
         });
-        return true;
       },
     },
     {
@@ -720,7 +718,6 @@ describe("discoverOpenClawPlugins", () => {
           packageName: "@openclaw/pack",
           extensions: ["./escape.ts"],
         });
-        return true;
       },
     },
   ] as const)("$name", async ({ setup, expectedDiagnostic, expectedId }) => {

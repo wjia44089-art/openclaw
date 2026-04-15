@@ -1,4 +1,4 @@
-import type { OpenClawConfig } from "../../../config/types.openclaw.js";
+import type { OpenClawConfig } from "../../../config/config.js";
 import { isValidEnvSecretRefId } from "../../../config/types.secrets.js";
 import type { RuntimeEnv } from "../../../runtime.js";
 import { resolveDefaultSecretProviderAlias } from "../../../secrets/ref-contract.js";
@@ -55,7 +55,7 @@ export function applyNonInteractiveGatewayConfig(params: {
   const explicitGatewayToken = normalizeGatewayTokenInput(opts.gatewayToken);
   const envGatewayToken = normalizeGatewayTokenInput(process.env.OPENCLAW_GATEWAY_TOKEN);
   let gatewayToken = explicitGatewayToken || envGatewayToken || undefined;
-  const gatewayTokenRefEnv = normalizeOptionalString(opts.gatewayTokenRefEnv ?? "") ?? "";
+  const gatewayTokenRefEnv = normalizeOptionalString(String(opts.gatewayTokenRefEnv ?? "")) ?? "";
 
   if (authMode === "token") {
     if (gatewayTokenRefEnv) {

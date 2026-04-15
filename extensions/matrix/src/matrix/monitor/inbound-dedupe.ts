@@ -188,10 +188,7 @@ export async function createMatrixInboundEventDeduper(params: {
       clearTimeout(persistTimer);
       persistTimer = null;
     }
-    for (;;) {
-      if (!dirty && !persistPromise) {
-        break;
-      }
+    while (dirty || persistPromise) {
       if (dirty && !persistPromise) {
         persistPromise = persist().finally(() => {
           persistPromise = null;

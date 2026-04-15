@@ -26,12 +26,9 @@ export function createRuntimeAgent(): PluginRuntime["agent"] {
     resolveThinkingDefault,
     resolveAgentTimeoutMs,
     ensureAgentWorkspace,
-  } satisfies Omit<PluginRuntime["agent"], "runEmbeddedAgent" | "runEmbeddedPiAgent" | "session"> &
-    Partial<Pick<PluginRuntime["agent"], "runEmbeddedAgent" | "runEmbeddedPiAgent" | "session">>;
+  } satisfies Omit<PluginRuntime["agent"], "runEmbeddedPiAgent" | "session"> &
+    Partial<Pick<PluginRuntime["agent"], "runEmbeddedPiAgent" | "session">>;
 
-  defineCachedValue(agentRuntime, "runEmbeddedAgent", () =>
-    createLazyRuntimeMethod(loadEmbeddedPiRuntime, (runtime) => runtime.runEmbeddedAgent),
-  );
   defineCachedValue(agentRuntime, "runEmbeddedPiAgent", () =>
     createLazyRuntimeMethod(loadEmbeddedPiRuntime, (runtime) => runtime.runEmbeddedPiAgent),
   );

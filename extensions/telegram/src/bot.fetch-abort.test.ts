@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { getTelegramNetworkErrorOrigin } from "./network-errors.js";
 
-const { botCtorSpy, telegramBotDepsForTest, telegramBotRuntimeForTest } =
+const { botCtorSpy, telegramBotDepsForTest } =
   await import("./bot.create-telegram-bot.test-harness.js");
+const { telegramBotRuntimeForTest } = await import("./bot.create-telegram-bot.test-harness.js");
 const { createTelegramBot: createTelegramBotBase, setTelegramBotRuntimeForTest } =
   await import("./bot.js");
 setTelegramBotRuntimeForTest(

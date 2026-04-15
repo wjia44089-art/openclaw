@@ -92,7 +92,7 @@ function registerPairCommand(params?: {
   pluginConfig?: Record<string, unknown>;
 }): OpenClawPluginCommandDefinition {
   let command: OpenClawPluginCommandDefinition | undefined;
-  void registerDevicePair.register(
+  registerDevicePair.register(
     createApi({
       ...params,
       registerCommand: (nextCommand) => {
@@ -722,8 +722,7 @@ describe("device-pair /pair approve", () => {
     });
     vi.mocked(approveDevicePairing).mockResolvedValueOnce({
       status: "forbidden",
-      reason: "caller-missing-scope",
-      scope: "operator.admin",
+      missingScope: "operator.admin",
     });
 
     const command = registerPairCommand();

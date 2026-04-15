@@ -5,9 +5,7 @@ import {
   comparableChannelTargetsMatch,
   comparableChannelTargetsShareRoute,
   parseExplicitTargetForChannel,
-  parseExplicitTargetForLoadedChannel,
   resolveComparableTargetForChannel,
-  resolveComparableTargetForLoadedChannel,
 } from "./target-parsing.js";
 
 function parseTelegramTargetForTest(raw: string): {
@@ -117,26 +115,11 @@ describe("parseExplicitTargetForChannel", () => {
       to: "TEAM-ROOM",
       chatType: "direct",
     });
-    expect(parseExplicitTargetForLoadedChannel("demo-target", "team-room")).toEqual({
-      to: "TEAM-ROOM",
-      chatType: "direct",
-    });
   });
 
   it("builds comparable targets from plugin-owned grammar", () => {
     expect(
       resolveComparableTargetForChannel({
-        channel: "telegram",
-        rawTarget: "telegram:group:-100123:topic:77",
-      }),
-    ).toEqual({
-      rawTo: "telegram:group:-100123:topic:77",
-      to: "-100123",
-      threadId: 77,
-      chatType: "group",
-    });
-    expect(
-      resolveComparableTargetForLoadedChannel({
         channel: "telegram",
         rawTarget: "telegram:group:-100123:topic:77",
       }),

@@ -1,9 +1,6 @@
 import { getChannelPlugin } from "../../channels/plugins/index.js";
-import type {
-  ChannelId,
-  ChannelStructuredComponents,
-} from "../../channels/plugins/types.public.js";
-import type { OpenClawConfig } from "../../config/types.openclaw.js";
+import type { ChannelId, ChannelStructuredComponents } from "../../channels/plugins/types.js";
+import type { OpenClawConfig } from "../../config/config.js";
 
 export type CrossContextComponentsBuilder = (message: string) => ChannelStructuredComponents;
 

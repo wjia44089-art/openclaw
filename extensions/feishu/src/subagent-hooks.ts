@@ -270,32 +270,16 @@ type FeishuSubagentEndedEvent = {
   targetSessionKey: string;
 };
 
-type FeishuSubagentSpawningResult =
-  | { status: "ok"; threadBindingReady?: boolean }
-  | { status: "error"; error: string }
-  | undefined;
-
-type FeishuSubagentDeliveryTargetResult =
-  | {
-      origin: {
-        channel: "feishu";
-        accountId?: string;
-        to?: string;
-        threadId?: string | number;
-      };
-    }
-  | undefined;
-
 export async function handleFeishuSubagentSpawning(
   event: FeishuSubagentSpawningEvent,
   ctx: FeishuSubagentContext,
-): Promise<FeishuSubagentSpawningResult> {
+) {
   if (!event.threadRequested) {
-    return undefined;
+    return;
   }
   const requesterChannel = normalizeOptionalLowercaseString(event.requester?.channel);
   if (requesterChannel !== "feishu") {
-    return undefined;
+    return;
   }
 
   const manager = getFeishuThreadBindingManager(event.requester?.accountId);
@@ -357,15 +341,13 @@ export async function handleFeishuSubagentSpawning(
   }
 }
 
-export function handleFeishuSubagentDeliveryTarget(
-  event: FeishuSubagentDeliveryTargetEvent,
-): FeishuSubagentDeliveryTargetResult {
+export function handleFeishuSubagentDeliveryTarget(event: FeishuSubagentDeliveryTargetEvent) {
   if (!event.expectsCompletionMessage) {
-    return undefined;
+    return;
   }
   const requesterChannel = normalizeOptionalLowercaseString(event.requesterOrigin?.channel);
   if (requesterChannel !== "feishu") {
-    return undefined;
+    return;
   }
 
   const binding = resolveMatchingChildBinding({
@@ -378,7 +360,7 @@ export function handleFeishuSubagentDeliveryTarget(
     },
   });
   if (!binding) {
-    return undefined;
+    return;
   }
 
   return {

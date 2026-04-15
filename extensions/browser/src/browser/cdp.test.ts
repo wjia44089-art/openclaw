@@ -1,28 +1,12 @@
 import { createServer } from "node:http";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { type WebSocket, WebSocketServer } from "ws";
 import { SsrFBlockedError } from "../infra/net/ssrf.js";
 import { rawDataToString } from "../infra/ws.js";
 import { isWebSocketUrl } from "./cdp.helpers.js";
 import { createTargetViaCdp, evaluateJavaScript, normalizeCdpWsUrl, snapshotAria } from "./cdp.js";
 import { parseHttpUrl } from "./config.js";
-import { BrowserCdpEndpointBlockedError } from "./errors.js";
 import { InvalidBrowserNavigationUrlError } from "./navigation-guard.js";
-
-vi.mock("openclaw/plugin-sdk/browser-security-runtime", async () => {
-  const actual = await vi.importActual<
-    typeof import("openclaw/plugin-sdk/browser-security-runtime")
-  >("openclaw/plugin-sdk/browser-security-runtime");
-  const lookupFn = async (_hostname: string, options?: { all?: boolean }) => {
-    const result = { address: "93.184.216.34", family: 4 };
-    return options?.all === true ? [result] : result;
-  };
-  return {
-    ...actual,
-    resolvePinnedHostnameWithPolicy: (hostname: string, params: object = {}) =>
-      actual.resolvePinnedHostnameWithPolicy(hostname, { ...params, lookupFn: lookupFn as never }),
-  };
-});
 
 describe("cdp", () => {
   let httpServer: ReturnType<typeof createServer> | null = null;
@@ -72,7 +56,6 @@ describe("cdp", () => {
   };
 
   afterEach(async () => {
-    vi.unstubAllEnvs();
     await new Promise<void>((resolve) => {
       if (!httpServer) {
         return resolve();
@@ -202,22 +185,6 @@ describe("cdp", () => {
     }
   });
 
-  it("blocks hostname navigation targets when strict SSRF policy is configured", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
-    try {
-      await expect(
-        createTargetViaCdp({
-          cdpUrl: "http://127.0.0.1:9222",
-          url: "https://example.com",
-          ssrfPolicy: { dangerouslyAllowPrivateNetwork: false },
-        }),
-      ).rejects.toBeInstanceOf(InvalidBrowserNavigationUrlError);
-      expect(fetchSpy).not.toHaveBeenCalled();
-    } finally {
-      fetchSpy.mockRestore();
-    }
-  });
-
   it("blocks unsupported non-network navigation URLs", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     try {
@@ -268,39 +235,39 @@ describe("cdp", () => {
     await expect(
       createTargetViaCdp({
         cdpUrl: `http://127.0.0.1:${httpPort}`,
-        url: "https://93.184.216.34",
+        url: "https://example.com",
         ssrfPolicy: {
           dangerouslyAllowPrivateNetwork: false,
           allowedHostnames: ["127.0.0.1"],
         },
       }),
-    ).rejects.toBeInstanceOf(BrowserCdpEndpointBlockedError);
+    ).rejects.toBeInstanceOf(SsrFBlockedError);
   });
 
   it("blocks the initial /json/version fetch when the cdpUrl host is outside strict SSRF policy", async () => {
     await expect(
       createTargetViaCdp({
         cdpUrl: "http://169.254.169.254:9222",
-        url: "https://93.184.216.34",
+        url: "https://example.com",
         ssrfPolicy: {
           dangerouslyAllowPrivateNetwork: false,
           allowedHostnames: ["127.0.0.1"],
         },
       }),
-    ).rejects.toBeInstanceOf(BrowserCdpEndpointBlockedError);
+    ).rejects.toBeInstanceOf(SsrFBlockedError);
   });
 
   it("blocks direct websocket cdp urls outside strict SSRF policy", async () => {
     await expect(
       createTargetViaCdp({
         cdpUrl: "ws://169.254.169.254:9222/devtools/browser/PIVOT",
-        url: "https://93.184.216.34",
+        url: "https://example.com",
         ssrfPolicy: {
           dangerouslyAllowPrivateNetwork: false,
           allowedHostnames: ["127.0.0.1"],
         },
       }),
-    ).rejects.toBeInstanceOf(BrowserCdpEndpointBlockedError);
+    ).rejects.toBeInstanceOf(SsrFBlockedError);
   });
 
   it("evaluates javascript via CDP", async () => {
@@ -502,18 +469,4 @@ describe("parseHttpUrl with WebSocket protocols", () => {
     expect(() => parseHttpUrl("ftp://example.com", "test")).toThrow("must be http(s) or ws(s)");
     expect(() => parseHttpUrl("file:///etc/passwd", "test")).toThrow("must be http(s) or ws(s)");
   });
-});
-const proxyEnvKeys = [
-  "ALL_PROXY",
-  "all_proxy",
-  "HTTP_PROXY",
-  "http_proxy",
-  "HTTPS_PROXY",
-  "https_proxy",
-] as const;
-
-beforeEach(() => {
-  for (const key of proxyEnvKeys) {
-    vi.stubEnv(key, "");
-  }
 });

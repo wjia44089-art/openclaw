@@ -10,7 +10,6 @@ import {
   resolveProbeBudgetMs,
   resolveTargets,
 } from "./helpers.js";
-import { createSecretRefGatewayConfig } from "./test-support.js";
 
 describe("extractConfigSummary", () => {
   it("marks SecretRef-backed gateway auth credentials as configured", () => {
@@ -20,7 +19,25 @@ describe("extractConfigSummary", () => {
       valid: true,
       issues: [],
       legacyIssues: [],
-      config: createSecretRefGatewayConfig(),
+      config: {
+        secrets: {
+          defaults: {
+            env: "default",
+          },
+        },
+        gateway: {
+          auth: {
+            mode: "token",
+            token: { source: "env", provider: "default", id: "OPENCLAW_GATEWAY_TOKEN" },
+            password: { source: "env", provider: "default", id: "OPENCLAW_GATEWAY_PASSWORD" },
+          },
+          remote: {
+            url: "wss://remote.example:18789",
+            token: { source: "env", provider: "default", id: "REMOTE_GATEWAY_TOKEN" },
+            password: { source: "env", provider: "default", id: "REMOTE_GATEWAY_PASSWORD" },
+          },
+        },
+      },
     });
 
     expect(summary.gateway.authTokenConfigured).toBe(true);

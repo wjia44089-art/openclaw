@@ -6,11 +6,6 @@ import {
   resolveManifestContractPluginIds,
   type PluginManifestRecord,
 } from "./manifest-registry.js";
-import {
-  createPluginIdScopeSet,
-  normalizePluginIdScope,
-  serializePluginIdScope,
-} from "./plugin-scope.js";
 
 export type WebProviderContract = "webSearchProviders" | "webFetchProviders";
 export type WebProviderConfigKey = "webSearch" | "webFetch";
@@ -82,8 +77,8 @@ export function resolveManifestDeclaredWebProviderCandidatePluginIds(params: {
       onlyPluginIds: params.onlyPluginIds,
     }),
   );
-  const scopedPluginIds = normalizePluginIdScope(params.onlyPluginIds);
-  const onlyPluginIdSet = createPluginIdScopeSet(scopedPluginIds);
+  const onlyPluginIdSet =
+    params.onlyPluginIds && params.onlyPluginIds.length > 0 ? new Set(params.onlyPluginIds) : null;
   const ids = loadPluginManifestRegistry({
     config: params.config,
     workspaceDir: params.workspaceDir,
@@ -98,10 +93,7 @@ export function resolveManifestDeclaredWebProviderCandidatePluginIds(params: {
     )
     .map((plugin) => plugin.id)
     .toSorted((left, right) => left.localeCompare(right));
-  if (ids.length > 0) {
-    return ids;
-  }
-  return scopedPluginIds?.length === 0 ? [] : undefined;
+  return ids.length > 0 ? ids : undefined;
 }
 
 function resolveBundledWebProviderCompatPluginIds(params: {
@@ -168,12 +160,13 @@ export function buildWebProviderSnapshotCacheKey(params: {
     typeof params.envKey === "string"
       ? params.envKey
       : Object.entries(params.envKey).toSorted(([left], [right]) => left.localeCompare(right));
-  const onlyPluginIds = normalizePluginIdScope(params.onlyPluginIds);
   return JSON.stringify({
     workspaceDir: params.workspaceDir ?? "",
     bundledAllowlistCompat: params.bundledAllowlistCompat === true,
     origin: params.origin ?? "",
-    onlyPluginIds: serializePluginIdScope(onlyPluginIds),
+    onlyPluginIds: [...new Set(params.onlyPluginIds ?? [])].toSorted((left, right) =>
+      left.localeCompare(right),
+    ),
     env: envKey,
   });
 }
@@ -188,7 +181,8 @@ export function mapRegistryProviders<
     providers: Array<TProvider & { pluginId: string }>,
   ) => Array<TProvider & { pluginId: string }>;
 }): Array<TProvider & { pluginId: string }> {
-  const onlyPluginIdSet = createPluginIdScopeSet(normalizePluginIdScope(params.onlyPluginIds));
+  const onlyPluginIdSet =
+    params.onlyPluginIds && params.onlyPluginIds.length > 0 ? new Set(params.onlyPluginIds) : null;
   return params.sortProviders(
     params.entries
       .filter((entry) => !onlyPluginIdSet || onlyPluginIdSet.has(entry.pluginId))

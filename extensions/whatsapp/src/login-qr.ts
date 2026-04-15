@@ -1,16 +1,23 @@
 import { randomUUID } from "node:crypto";
+import { DisconnectReason } from "@whiskeysockets/baileys";
 import { loadConfig } from "openclaw/plugin-sdk/config-runtime";
 import { danger, info, success } from "openclaw/plugin-sdk/runtime-env";
 import { defaultRuntime, type RuntimeEnv } from "openclaw/plugin-sdk/runtime-env";
 import { logInfo } from "openclaw/plugin-sdk/text-runtime";
 import { resolveWhatsAppAccount } from "./accounts.js";
-import {
-  closeWaSocket,
-  waitForWhatsAppLoginResult,
-  WHATSAPP_LOGGED_OUT_QR_MESSAGE,
-} from "./connection-controller.js";
 import { renderQrPngBase64 } from "./qr-image.js";
-import { createWaSocket, readWebSelfId, webAuthExists } from "./session.js";
+import {
+  createWaSocket,
+  formatError,
+  getStatusCode,
+  logoutWeb,
+  readWebSelfId,
+  waitForCredsSaveQueueWithTimeout,
+  waitForWaConnection,
+  webAuthExists,
+} from "./session.js";
+
+const LOGGED_OUT_STATUS = DisconnectReason?.loggedOut ?? 401;
 
 type WaSocket = Awaited<ReturnType<typeof createWaSocket>>;
 
@@ -27,15 +34,19 @@ type ActiveLogin = {
   error?: string;
   errorStatus?: number;
   waitPromise: Promise<void>;
+  restartAttempted: boolean;
   verbose: boolean;
-  runtime: RuntimeEnv;
 };
 
 const ACTIVE_LOGIN_TTL_MS = 3 * 60_000;
 const activeLogins = new Map<string, ActiveLogin>();
 
 function closeSocket(sock: WaSocket) {
-  closeWaSocket(sock);
+  try {
+    sock.ws?.close();
+  } catch {
+    // ignore
+  }
 }
 
 async function resetActiveLogin(accountId: string, reason?: string) {
@@ -54,43 +65,48 @@ function isLoginFresh(login: ActiveLogin) {
 }
 
 function attachLoginWaiter(accountId: string, login: ActiveLogin) {
-  login.waitPromise = waitForWhatsAppLoginResult({
-    sock: login.sock,
-    authDir: login.authDir,
-    isLegacyAuthDir: login.isLegacyAuthDir,
-    verbose: login.verbose,
-    runtime: login.runtime,
-    onSocketReplaced: (sock) => {
+  login.waitPromise = waitForWaConnection(login.sock)
+    .then(() => {
       const current = activeLogins.get(accountId);
       if (current?.id === login.id) {
-        current.sock = sock;
-        current.connected = false;
-        current.error = undefined;
-        current.errorStatus = undefined;
-      }
-    },
-  })
-    .then((result) => {
-      const current = activeLogins.get(accountId);
-      if (current?.id !== login.id) {
-        return;
-      }
-      if (result.outcome === "connected") {
-        current.sock = result.sock;
         current.connected = true;
-        return;
       }
-      current.error = result.message;
-      current.errorStatus = result.statusCode;
     })
     .catch((err) => {
       const current = activeLogins.get(accountId);
       if (current?.id !== login.id) {
         return;
       }
-      current.error = err instanceof Error ? err.message : String(err);
-      current.errorStatus = undefined;
+      current.error = formatError(err);
+      current.errorStatus = getStatusCode(err);
     });
+}
+
+async function restartLoginSocket(login: ActiveLogin, runtime: RuntimeEnv) {
+  if (login.restartAttempted) {
+    return false;
+  }
+  login.restartAttempted = true;
+  runtime.log(
+    info("WhatsApp asked for a restart after pairing (code 515); waiting for creds to save…"),
+  );
+  closeSocket(login.sock);
+  await waitForCredsSaveQueueWithTimeout(login.authDir);
+  try {
+    const sock = await createWaSocket(false, login.verbose, {
+      authDir: login.authDir,
+    });
+    login.sock = sock;
+    login.connected = false;
+    login.error = undefined;
+    login.errorStatus = undefined;
+    attachLoginWaiter(login.accountId, login);
+    return true;
+  } catch (err) {
+    login.error = formatError(err);
+    login.errorStatus = getStatusCode(err);
+    return false;
+  }
 }
 
 export async function startWebLoginWithQr(
@@ -173,8 +189,8 @@ export async function startWebLoginWithQr(
     startedAt: Date.now(),
     connected: false,
     waitPromise: Promise.resolve(),
+    restartAttempted: false,
     verbose: Boolean(opts.verbose),
-    runtime,
   };
   activeLogins.set(account.accountId, login);
   if (pendingQr && !login.qr) {
@@ -247,11 +263,23 @@ export async function waitForWebLogin(
     }
 
     if (login.error) {
-      if (login.errorStatus === 401) {
-        const message = WHATSAPP_LOGGED_OUT_QR_MESSAGE;
+      if (login.errorStatus === LOGGED_OUT_STATUS) {
+        await logoutWeb({
+          authDir: login.authDir,
+          isLegacyAuthDir: login.isLegacyAuthDir,
+          runtime,
+        });
+        const message =
+          "WhatsApp reported the session is logged out. Cleared cached web session; please scan a new QR.";
         await resetActiveLogin(account.accountId, message);
         runtime.log(danger(message));
         return { connected: false, message };
+      }
+      if (login.errorStatus === 515) {
+        const restarted = await restartLoginSocket(login, runtime);
+        if (restarted && isLoginFresh(login)) {
+          continue;
+        }
       }
       const message = `WhatsApp login failed: ${login.error}`;
       await resetActiveLogin(account.accountId, message);

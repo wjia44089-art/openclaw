@@ -21,3 +21,5 @@ export async function resolveMatrixApproval(params: {
     clientDisplayName: `Matrix approval (${params.senderId?.trim() || "unknown"})`,
   });
 }
+
+export const resolveMatrixExecApproval = resolveMatrixApproval;

@@ -3,6 +3,7 @@ import { loadConfig } from "../../config/config.js";
 import { callGateway } from "../../gateway/call.js";
 import { normalizeDeliveryContext } from "../../utils/delivery-context.js";
 import type { GatewayMessageChannel } from "../../utils/message-channel.js";
+import { isSpawnAcpAcceptedResult, spawnAcpDirect } from "../acp-spawn.js";
 import { optionalStringEnum } from "../schema/typebox.js";
 import type { SpawnedToolContext } from "../spawned-context.js";
 import { registerSubagentRun } from "../subagent-registry.js";
@@ -33,15 +34,6 @@ const UNSUPPORTED_SESSIONS_SPAWN_PARAM_KEYS = [
   "replyTo",
   "reply_to",
 ] as const;
-
-type AcpSpawnModule = typeof import("../acp-spawn.js");
-
-let acpSpawnModulePromise: Promise<AcpSpawnModule> | undefined;
-
-async function loadAcpSpawnModule(): Promise<AcpSpawnModule> {
-  acpSpawnModulePromise ??= import("../acp-spawn.js");
-  return await acpSpawnModulePromise;
-}
 
 function summarizeError(err: unknown): string {
   if (err instanceof Error) {
@@ -173,7 +165,6 @@ export function createSessionsSpawnTool(
       const mode = params.mode === "run" || params.mode === "session" ? params.mode : undefined;
       const cleanup =
         params.cleanup === "keep" || params.cleanup === "delete" ? params.cleanup : "keep";
-      const expectsCompletionMessage = params.expectsCompletionMessage !== false;
       const sandbox = params.sandbox === "require" ? "require" : "inherit";
       const streamTo = params.streamTo === "parent" ? "parent" : undefined;
       const lightContext = params.lightContext === true;
@@ -216,7 +207,6 @@ export function createSessionsSpawnTool(
       }
 
       if (runtime === "acp") {
-        const { isSpawnAcpAcceptedResult, spawnAcpDirect } = await loadAcpSpawnModule();
         if (Array.isArray(attachments) && attachments.length > 0) {
           return jsonResult({
             status: "error",
@@ -290,7 +280,7 @@ export function createSessionsSpawnTool(
               cleanup: trackedCleanup,
               label: label || undefined,
               runTimeoutSeconds,
-              expectsCompletionMessage,
+              expectsCompletionMessage: true,
               spawnMode: trackedSpawnMode,
             });
           } catch (err) {
@@ -321,7 +311,7 @@ export function createSessionsSpawnTool(
           cleanup,
           sandbox,
           lightContext,
-          expectsCompletionMessage,
+          expectsCompletionMessage: true,
           attachments,
           attachMountPath:
             params.attachAs && typeof params.attachAs === "object"

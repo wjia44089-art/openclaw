@@ -71,10 +71,7 @@ function installPollingStallWatchdogHarness(
 
   return {
     async waitForWatchdog() {
-      for (let attempt = 0; attempt < 20; attempt += 1) {
-        if (watchdog) {
-          break;
-        }
+      for (let attempt = 0; attempt < 20 && !watchdog; attempt += 1) {
         await Promise.resolve();
       }
       expect(watchdog).toBeTypeOf("function");

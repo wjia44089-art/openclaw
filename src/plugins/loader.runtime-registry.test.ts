@@ -58,12 +58,6 @@ describe("getCompatibleActivePluginRegistry", () => {
     expect(
       __testing.getCompatibleActivePluginRegistry({
         ...loadOptions,
-        onlyPluginIds: [],
-      }),
-    ).toBeUndefined();
-    expect(
-      __testing.getCompatibleActivePluginRegistry({
-        ...loadOptions,
         runtimeOptions: undefined,
       }),
     ).toBe(registry);
@@ -188,25 +182,6 @@ describe("resolveRuntimePluginRegistry", () => {
     setActivePluginRegistry(registry, "startup-registry");
 
     expect(resolveRuntimePluginRegistry()).toBe(registry);
-  });
-
-  it("does not treat an explicit empty plugin scope as the active runtime", () => {
-    const registry = createEmptyPluginRegistry();
-    const loadOptions = {
-      config: {
-        plugins: {
-          allow: ["demo"],
-          load: { paths: ["/tmp/demo.js"] },
-        },
-      },
-      workspaceDir: "/tmp/workspace-a",
-    };
-    const { cacheKey } = __testing.resolvePluginLoadCacheContext(loadOptions);
-    setActivePluginRegistry(registry, cacheKey);
-
-    const scopedEmpty = resolveRuntimePluginRegistry({ ...loadOptions, onlyPluginIds: [] });
-    expect(scopedEmpty).not.toBe(registry);
-    expect(scopedEmpty?.plugins).toEqual([]);
   });
 });
 

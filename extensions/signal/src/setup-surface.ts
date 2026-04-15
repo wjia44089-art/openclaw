@@ -42,7 +42,7 @@ export const signalSetupWizard: ChannelSetupWizard = {
   }),
   prepare: async ({ cfg, accountId, credentialValues, runtime, prompter, options }) => {
     if (!options?.allowSignalInstall) {
-      return undefined;
+      return;
     }
     const currentCliPath =
       (typeof credentialValues.cliPath === "string" ? credentialValues.cliPath : undefined) ??
@@ -56,7 +56,7 @@ export const signalSetupWizard: ChannelSetupWizard = {
       initialValue: !cliDetected,
     });
     if (!wantsInstall) {
-      return undefined;
+      return;
     }
     try {
       const result = await installSignalCli(runtime);
@@ -74,7 +74,6 @@ export const signalSetupWizard: ChannelSetupWizard = {
     } catch (error) {
       await prompter.note(`signal-cli install failed: ${String(error)}`, "Signal");
     }
-    return undefined;
   },
   credentials: [],
   textInputs: [

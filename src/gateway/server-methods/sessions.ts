@@ -179,7 +179,6 @@ function emitSessionsChanged(
             thinkingLevel: sessionRow.thinkingLevel,
             fastMode: sessionRow.fastMode,
             verboseLevel: sessionRow.verboseLevel,
-            traceLevel: sessionRow.traceLevel,
             reasoningLevel: sessionRow.reasoningLevel,
             elevatedLevel: sessionRow.elevatedLevel,
             sendPolicy: sessionRow.sendPolicy,
@@ -635,7 +634,7 @@ export const sessionsHandlers: GatewayRequestHandlers = {
     const p = params;
     const keysRaw = Array.isArray(p.keys) ? p.keys : [];
     const keys = keysRaw
-      .map((key) => normalizeOptionalString(key ?? ""))
+      .map((key) => normalizeOptionalString(String(key ?? "")))
       .filter((key): key is string => Boolean(key))
       .slice(0, 64);
     const limit =

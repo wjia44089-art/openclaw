@@ -56,12 +56,11 @@ class MockGatewayClient {
 }
 
 vi.mock("@agentclientprotocol/sdk", () => ({
-  AgentSideConnection: function AgentSideConnection(
-    factory: (conn: unknown) => unknown,
-    stream: unknown,
-  ) {
-    mockState.agentSideConnectionCtor(factory, stream);
-    factory({});
+  AgentSideConnection: class {
+    constructor(factory: (conn: unknown) => unknown, stream: unknown) {
+      mockState.agentSideConnectionCtor(factory, stream);
+      factory({});
+    }
   },
   ndJsonStream: vi.fn(() => ({ type: "mock-stream" })),
 }));

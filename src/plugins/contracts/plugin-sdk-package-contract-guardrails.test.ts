@@ -311,7 +311,6 @@ describe("plugin-sdk package contract guardrails", () => {
     for (const dep of [
       "@matrix-org/matrix-sdk-crypto-wasm",
       "@matrix-org/matrix-sdk-crypto-nodejs",
-      "fake-indexeddb",
       "matrix-js-sdk",
     ]) {
       expect(rootRuntimeDeps.get(dep)).toBe(matrixRuntimeDeps.get(dep));

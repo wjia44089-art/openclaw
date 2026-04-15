@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { normalizeChatType } from "./chat-type.js";
 
-const readLazyString = (value: unknown): string => String(value);
-
 describe("normalizeChatType", () => {
   it.each([
     { name: "normalizes direct", value: "direct", expected: "direct" },
@@ -63,8 +61,8 @@ describe("WA_WEB_AUTH_DIR", () => {
     const webEntry = await import("./web/index.js");
 
     expect(resolveWebChannelAuthDir).not.toHaveBeenCalled();
-    expect(readLazyString(channelWeb.WA_WEB_AUTH_DIR)).toBe("/tmp/openclaw-whatsapp-auth");
-    expect(readLazyString(webEntry.WA_WEB_AUTH_DIR)).toBe("/tmp/openclaw-whatsapp-auth");
+    expect(String(channelWeb.WA_WEB_AUTH_DIR)).toBe("/tmp/openclaw-whatsapp-auth");
+    expect(String(webEntry.WA_WEB_AUTH_DIR)).toBe("/tmp/openclaw-whatsapp-auth");
     expect(resolveWebChannelAuthDir).toHaveBeenCalledTimes(1);
   });
 });

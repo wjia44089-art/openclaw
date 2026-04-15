@@ -30,9 +30,8 @@ export const handleWhoamiCommand: CommandHandler = async (params, allowTextComma
   if (params.ctx.MessageThreadId != null) {
     lines.push(`Thread: ${params.ctx.MessageThreadId}`);
   }
-  const allowFromSender = params.command.senderId ?? "";
-  if (allowFromSender) {
-    lines.push(`AllowFrom: ${allowFromSender}`);
+  if (senderId) {
+    lines.push(`AllowFrom: ${senderId}`);
   }
   return { shouldContinue: false, reply: { text: lines.join("\n") } };
 };

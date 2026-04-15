@@ -29,59 +29,22 @@ function writeFixtureFile(fixtureRoot: string, relativePath: string, value: stri
   fs.writeFileSync(fullPath, value, "utf8");
 }
 
-function writeJitiFixture(fixtureRoot: string) {
-  writeFixtureFile(
-    fixtureRoot,
-    "node_modules/jiti/index.js",
-    `module.exports = require(${JSON.stringify(JITI_ENTRY_PATH)});\n`,
-  );
-}
-
-function writeOpenClawPackageFixture(fixtureRoot: string) {
-  writeFixtureFile(
-    fixtureRoot,
-    "package.json",
-    JSON.stringify(
-      {
-        name: "openclaw",
-        type: "module",
-        exports: {
-          "./plugin-sdk": "./dist/plugin-sdk/index.js",
-        },
-      },
-      null,
-      2,
-    ) + "\n",
-  );
-  writeFixtureFile(fixtureRoot, "dist/plugin-sdk/index.js", "export {};\n");
-}
-
 afterEach(() => {
   for (const dir of tempDirs.splice(0, tempDirs.length)) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 
-it("loads the source-checkout runtime wrapper through native ESM import", async () => {
-  const fixtureRoot = makeFixtureRoot(".tmp-matrix-source-runtime-");
-  const wrapperSource = fs.readFileSync(
-    path.join(REPO_ROOT, "extensions", "matrix", "src", "plugin-entry.runtime.js"),
-    "utf8",
+it("loads the plugin-entry runtime wrapper through native ESM import", async () => {
+  const wrapperPath = path.join(
+    process.cwd(),
+    "extensions",
+    "matrix",
+    "src",
+    "plugin-entry.runtime.js",
   );
-
-  writeOpenClawPackageFixture(fixtureRoot);
-  writeJitiFixture(fixtureRoot);
-  writeFixtureFile(fixtureRoot, "extensions/matrix/src/plugin-entry.runtime.js", wrapperSource);
-  writeFixtureFile(
-    fixtureRoot,
-    "extensions/matrix/plugin-entry.handlers.runtime.js",
-    PACKAGED_RUNTIME_STUB,
-  );
-
-  const wrapperUrl = pathToFileURL(
-    path.join(fixtureRoot, "extensions", "matrix", "src", "plugin-entry.runtime.js"),
-  );
-  const mod = await import(`${wrapperUrl.href}?t=${Date.now()}`);
+  const wrapperUrl = pathToFileURL(wrapperPath);
+  const mod = await import(wrapperUrl.href);
 
   expect(mod).toMatchObject({
     ensureMatrixCryptoRuntime: expect.any(Function),
@@ -98,8 +61,27 @@ it("loads the packaged runtime wrapper without recursing through the stable root
     "utf8",
   );
 
-  writeOpenClawPackageFixture(fixtureRoot);
-  writeJitiFixture(fixtureRoot);
+  writeFixtureFile(
+    fixtureRoot,
+    "package.json",
+    JSON.stringify(
+      {
+        name: "openclaw",
+        type: "module",
+        exports: {
+          "./plugin-sdk": "./dist/plugin-sdk/index.js",
+        },
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+  writeFixtureFile(fixtureRoot, "dist/plugin-sdk/index.js", "export {};\n");
+  writeFixtureFile(
+    fixtureRoot,
+    "node_modules/jiti/index.js",
+    `module.exports = require(${JSON.stringify(JITI_ENTRY_PATH)});\n`,
+  );
   writeFixtureFile(fixtureRoot, "dist/plugin-entry.runtime-C88YIa_v.js", wrapperSource);
   writeFixtureFile(
     fixtureRoot,

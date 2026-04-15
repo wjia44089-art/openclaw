@@ -10,7 +10,6 @@ actor TalkModeRuntime {
 
     enum PlaybackPlan: Equatable {
         case elevenLabsThenSystemVoice(apiKey: String, voiceId: String)
-        case mlxThenSystemVoice
         case systemVoiceOnly
     }
 
@@ -18,8 +17,6 @@ actor TalkModeRuntime {
     private let ttsLogger = Logger(subsystem: "ai.openclaw", category: "talk.tts")
     private static let defaultModelIdFallback = "eleven_v3"
     private static let defaultTalkProvider = "elevenlabs"
-    private static let mlxTalkProvider = "mlx"
-    private static let systemTalkProvider = "system"
     private static let defaultSilenceTimeoutMs = TalkDefaults.silenceTimeoutMs
 
     private final class RMSMeter: @unchecked Sendable {
@@ -68,7 +65,6 @@ actor TalkModeRuntime {
     private var modelOverrideActive = false
     private var defaultOutputFormat: String?
     private var interruptOnSpeech: Bool = true
-    private var activeTalkProvider = TalkModeRuntime.defaultTalkProvider
     private var lastInterruptedAtSeconds: Double?
     private var voiceAliases: [String: String] = [:]
     private var lastSpokenText: String?
@@ -128,9 +124,8 @@ actor TalkModeRuntime {
     private func start() async {
         let gen = self.lifecycleGeneration
         guard voiceWakeSupported else { return }
-
-        guard await PermissionManager.ensureVoiceWakePermissions(interactive: true) else {
-            self.logger.error("talk runtime not starting: permissions missing")
+        guard PermissionManager.voiceWakePermissionsGranted() else {
+            self.logger.debug("talk runtime not starting: permissions missing")
             return
         }
         await self.reloadConfig()
@@ -467,7 +462,7 @@ actor TalkModeRuntime {
     private func playAssistant(text: String) async {
         guard let input = await self.preparePlaybackInput(text: text) else { return }
 
-        switch Self.playbackPlan(provider: input.provider, apiKey: input.apiKey, voiceId: input.voiceId) {
+        switch Self.playbackPlan(apiKey: input.apiKey, voiceId: input.voiceId) {
         case let .elevenLabsThenSystemVoice(apiKey, voiceId):
             do {
                 try await self.playElevenLabs(input: input, apiKey: apiKey, voiceId: voiceId)
@@ -475,23 +470,6 @@ actor TalkModeRuntime {
                 self.ttsLogger
                     .error(
                         "talk TTS failed: \(error.localizedDescription, privacy: .public); " +
-                            "falling back to system voice")
-                do {
-                    try await self.playSystemVoice(input: input)
-                } catch {
-                    self.ttsLogger.error("talk system voice failed: \(error.localizedDescription, privacy: .public)")
-                }
-            }
-        case .mlxThenSystemVoice:
-            do {
-                try await self.playMLX(input: input)
-            } catch TalkMLXSpeechSynthesizer.SynthesizeError.canceled {
-                self.ttsLogger.info("talk mlx canceled")
-                return
-            } catch {
-                self.ttsLogger
-                    .error(
-                        "talk MLX failed: \(error.localizedDescription, privacy: .public); " +
                             "falling back to system voice")
                 do {
                     try await self.playSystemVoice(input: input)
@@ -513,30 +491,19 @@ actor TalkModeRuntime {
         }
     }
 
-    static func playbackPlan(provider: String, apiKey: String?, voiceId: String?) -> PlaybackPlan {
-        switch provider {
-        case self.defaultTalkProvider:
-            guard let apiKey, !apiKey.isEmpty, let voiceId else {
-                return .systemVoiceOnly
-            }
-            return .elevenLabsThenSystemVoice(apiKey: apiKey, voiceId: voiceId)
-        case self.mlxTalkProvider:
-            return .mlxThenSystemVoice
-        case self.systemTalkProvider:
-            return .systemVoiceOnly
-        default:
+    static func playbackPlan(apiKey: String?, voiceId: String?) -> PlaybackPlan {
+        guard let apiKey, !apiKey.isEmpty, let voiceId else {
             return .systemVoiceOnly
         }
+        return .elevenLabsThenSystemVoice(apiKey: apiKey, voiceId: voiceId)
     }
 
     private struct TalkPlaybackInput {
         let generation: Int
-        let provider: String
         let cleanedText: String
         let directive: TalkDirective?
         let apiKey: String?
         let voiceId: String?
-        let voicePreset: String?
         let language: String?
         let synthTimeoutSeconds: Double
     }
@@ -585,20 +552,18 @@ actor TalkModeRuntime {
             resolvedVoice ??
             self.currentVoiceId ??
             self.defaultVoiceId
-        let voicePreset = preferredVoice
-        let provider = self.activeTalkProvider
 
         let language = ElevenLabsTTSClient.validatedLanguage(directive?.language)
 
-        let voiceId: String? = if provider == Self.defaultTalkProvider, let apiKey, !apiKey.isEmpty {
+        let voiceId: String? = if let apiKey, !apiKey.isEmpty {
             await self.resolveVoiceId(preferred: preferredVoice, apiKey: apiKey)
         } else {
             nil
         }
 
-        if provider == Self.defaultTalkProvider, apiKey?.isEmpty != false {
+        if apiKey?.isEmpty != false {
             self.ttsLogger.warning("talk missing ELEVENLABS_API_KEY; falling back to system voice")
-        } else if provider == Self.defaultTalkProvider, voiceId == nil {
+        } else if voiceId == nil {
             self.ttsLogger.warning("talk missing voiceId; falling back to system voice")
         } else if let voiceId {
             self.ttsLogger
@@ -614,21 +579,15 @@ actor TalkModeRuntime {
 
         return TalkPlaybackInput(
             generation: gen,
-            provider: provider,
             cleanedText: cleaned,
             directive: directive,
             apiKey: apiKey,
             voiceId: voiceId,
-            voicePreset: voicePreset,
             language: language,
             synthTimeoutSeconds: synthTimeoutSeconds)
     }
 
-    private func playElevenLabs(
-        input: TalkPlaybackInput,
-        apiKey: String,
-        voiceId: String) async throws
-    {
+    private func playElevenLabs(input: TalkPlaybackInput, apiKey: String, voiceId: String) async throws {
         let desiredOutputFormat = input.directive?.outputFormat ?? self.defaultOutputFormat ?? "pcm_44100"
         let outputFormat = ElevenLabsTTSClient.validatedOutputFormat(desiredOutputFormat)
         if outputFormat == nil, !desiredOutputFormat.isEmpty {
@@ -737,39 +696,6 @@ actor TalkModeRuntime {
         self.ttsLogger.info("talk system voice done")
     }
 
-    private func playMLX(input: TalkPlaybackInput) async throws {
-        self.ttsLogger.info("talk mlx start chars=\(input.cleanedText.count, privacy: .public)")
-        if self.interruptOnSpeech {
-            guard await self.prepareForPlayback(generation: input.generation) else { return }
-        }
-        await MainActor.run { TalkModeController.shared.updatePhase(.speaking) }
-        self.phase = .speaking
-        let modelRepo = input.directive?.modelId ?? self.currentModelId
-        let audioData: Data
-        do {
-            audioData = try await AsyncTimeout.withTimeout(
-                seconds: input.synthTimeoutSeconds,
-                onTimeout: {
-                    TalkMLXSpeechSynthesizer.SynthesizeError.timedOut
-                },
-                operation: { [self] in
-                    try await self.synthesizeMLXVoice(
-                        text: input.cleanedText,
-                        modelRepo: modelRepo,
-                        language: input.language,
-                        voicePreset: input.voicePreset)
-                })
-        } catch TalkMLXSpeechSynthesizer.SynthesizeError.timedOut {
-            self.stopMLXVoice()
-            throw TalkMLXSpeechSynthesizer.SynthesizeError.timedOut
-        }
-        let result = await self.playTalkAudio(data: audioData)
-        if !result.finished, result.interruptedAt == nil {
-            throw TalkMLXSpeechSynthesizer.SynthesizeError.audioPlaybackFailed
-        }
-        self.ttsLogger.info("talk mlx done")
-    }
-
     private func prepareForPlayback(generation: Int) async -> Bool {
         await self.startRecognition()
         return self.isCurrent(generation)
@@ -824,13 +750,10 @@ actor TalkModeRuntime {
 
     func stopSpeaking(reason: TalkStopReason) async {
         let usePCM = self.lastPlaybackWasPCM
-        let remoteInterruptedAt = usePCM ? await self.stopPCM() : await self.stopMP3()
+        let interruptedAt = usePCM ? await self.stopPCM() : await self.stopMP3()
         _ = usePCM ? await self.stopMP3() : await self.stopPCM()
-        let localInterruptedAt = await self.stopTalkAudio()
         await TalkSystemSpeechSynthesizer.shared.stop()
-        self.stopMLXVoice()
         guard self.phase == .speaking else { return }
-        let interruptedAt = remoteInterruptedAt ?? localInterruptedAt
         if reason == .speech, let interruptedAt {
             self.lastInterruptedAtSeconds = interruptedAt
         }
@@ -872,33 +795,6 @@ extension TalkModeRuntime {
         StreamingAudioPlayer.shared.stop()
     }
 
-    @MainActor
-    private func playTalkAudio(data: Data) async -> TalkPlaybackResult {
-        await TalkAudioPlayer.shared.play(data: data)
-    }
-
-    @MainActor
-    private func stopTalkAudio() -> Double? {
-        TalkAudioPlayer.shared.stop()
-    }
-
-    private func synthesizeMLXVoice(
-        text: String,
-        modelRepo: String?,
-        language: String?,
-        voicePreset: String?) async throws -> Data
-    {
-        try await TalkMLXSpeechSynthesizer.shared.synthesize(
-            text: text,
-            modelRepo: modelRepo,
-            language: language,
-            voicePreset: voicePreset)
-    }
-
-    private func stopMLXVoice() {
-        TalkMLXSpeechSynthesizer.shared.stop()
-    }
-
     // MARK: - Config
 
     private func reloadConfig() async {
@@ -914,7 +810,6 @@ extension TalkModeRuntime {
         }
         self.defaultOutputFormat = cfg.outputFormat
         self.interruptOnSpeech = cfg.interruptOnSpeech
-        self.activeTalkProvider = cfg.activeProvider
         self.silenceWindow = TimeInterval(cfg.silenceTimeoutMs) / 1000
         self.apiKey = cfg.apiKey
         let hasApiKey = (cfg.apiKey?.isEmpty == false)
@@ -922,8 +817,7 @@ extension TalkModeRuntime {
         let modelLabel = (cfg.modelId?.isEmpty == false) ? cfg.modelId! : "none"
         self.logger
             .info(
-                "talk config provider=\(cfg.activeProvider, privacy: .public) " +
-                    "talk config voiceId=\(voiceLabel, privacy: .public) " +
+                "talk config voiceId=\(voiceLabel, privacy: .public) " +
                     "modelId=\(modelLabel, privacy: .public) " +
                     "apiKey=\(hasApiKey, privacy: .public) " +
                     "interrupt=\(cfg.interruptOnSpeech, privacy: .public) " +
@@ -965,17 +859,11 @@ extension TalkModeRuntime {
             await MainActor.run {
                 AppStateStore.shared.seamColorHex = parsed.seamColorHex
             }
-            if parsed.activeProvider == Self.defaultTalkProvider {
-                self.ttsLogger.info("talk config provider from talk.resolved")
-            } else if parsed.activeProvider == Self.mlxTalkProvider ||
-                parsed.activeProvider == Self.systemTalkProvider
-            {
-                self.ttsLogger.info(
-                    "talk provider \(parsed.activeProvider, privacy: .public) active")
-            } else {
+            if parsed.activeProvider != Self.defaultTalkProvider {
                 self.ttsLogger
-                    .info(
-                        "talk provider \(parsed.activeProvider, privacy: .public) unsupported; using system voice")
+                    .info("talk provider \(parsed.activeProvider, privacy: .public) unsupported; using system voice")
+            } else if parsed.normalizedPayload {
+                self.ttsLogger.info("talk config provider from talk.resolved")
             }
             return parsed
         } catch {

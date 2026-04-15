@@ -1,6 +1,5 @@
 import { getChannelPlugin, resolveChannelApprovalCapability } from "../channels/plugins/index.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
-import { isImplicitSameChatApprovalAuthorization } from "../plugin-sdk/approval-auth-helpers.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { normalizeMessageChannel } from "../utils/message-channel.js";
 
 export type ApprovalCommandAuthorization = {
@@ -31,9 +30,6 @@ export function resolveApprovalCommandAuthorization(params: {
   if (!resolved) {
     return { authorized: true, explicit: false };
   }
-  // Keep `resolved` by reference; cloning before this check would drop the
-  // non-enumerable implicit-fallback marker.
-  const implicitSameChatAuthorization = isImplicitSameChatApprovalAuthorization(resolved);
   const availability = approvalCapability?.getActionAvailabilityState?.({
     cfg: params.cfg,
     accountId: params.accountId,
@@ -43,8 +39,6 @@ export function resolveApprovalCommandAuthorization(params: {
   return {
     authorized: resolved.authorized,
     reason: resolved.reason,
-    explicit: resolved.authorized
-      ? !implicitSameChatAuthorization && availability?.kind !== "disabled"
-      : true,
+    explicit: resolved.authorized ? availability?.kind !== "disabled" : true,
   };
 }

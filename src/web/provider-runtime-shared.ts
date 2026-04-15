@@ -1,4 +1,4 @@
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { normalizeSecretInputString, resolveSecretInputRef } from "../config/types.secrets.js";
 import { normalizeSecretInput } from "../utils/normalize-secret-input.js";
 
@@ -134,10 +134,9 @@ export function resolveWebProviderDefinition<
   });
   const providerId =
     params.providerId ??
-    (params.runtimeMetadata ? params.runtimeMetadata.selectedProvider : autoProviderId);
-  if (!providerId) {
-    return null;
-  }
+    params.runtimeMetadata?.selectedProvider ??
+    params.runtimeMetadata?.providerConfigured ??
+    autoProviderId;
   const provider =
     providers.find((entry) => entry.id === providerId) ??
     providers.find(

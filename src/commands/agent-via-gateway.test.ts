@@ -4,12 +4,14 @@ import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import type { RuntimeEnv } from "../runtime.js";
-import { agentCliCommand } from "./agent-via-gateway.js";
+import type { agentCliCommand as AgentCliCommand } from "./agent-via-gateway.js";
 import type { agentCommand as AgentCommand } from "./agent.js";
 
 const loadConfig = vi.hoisted(() => vi.fn());
 const callGateway = vi.hoisted(() => vi.fn());
 const agentCommand = vi.hoisted(() => vi.fn());
+
+let agentCliCommand: typeof AgentCliCommand;
 
 const runtime: RuntimeEnv = {
   log: vi.fn(),
@@ -69,15 +71,16 @@ function mockLocalAgentReply(text = "local") {
   });
 }
 
-vi.mock("../config/config.js", () => ({ loadConfig }));
-vi.mock("../gateway/call.js", () => ({
-  callGateway,
-  randomIdempotencyKey: () => "idem-1",
-}));
-vi.mock("./agent.js", () => ({ agentCommand }));
-
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
+  vi.resetModules();
+  vi.doMock("../config/config.js", () => ({ loadConfig }));
+  vi.doMock("../gateway/call.js", () => ({
+    callGateway,
+    randomIdempotencyKey: () => "idem-1",
+  }));
+  vi.doMock("./agent.js", () => ({ agentCommand }));
+  ({ agentCliCommand } = await import("./agent-via-gateway.js"));
 });
 
 describe("agentCliCommand", () => {

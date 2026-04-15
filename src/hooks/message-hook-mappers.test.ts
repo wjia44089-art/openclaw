@@ -132,7 +132,7 @@ describe("message hook mappers", () => {
   });
 
   it("maps canonical inbound context to plugin/internal received payloads", () => {
-    const canonical = deriveInboundMessageHookContext(makeInboundCtx({ TopicName: "Deployments" }));
+    const canonical = deriveInboundMessageHookContext(makeInboundCtx());
 
     expect(toPluginMessageContext(canonical)).toEqual({
       channelId: "demo-chat",
@@ -147,7 +147,6 @@ describe("message hook mappers", () => {
         messageId: "msg-1",
         senderName: "User One",
         threadId: 42,
-        topicName: "Deployments",
       }),
     });
     expect(toInternalMessageReceivedContext(canonical)).toEqual({
@@ -161,7 +160,6 @@ describe("message hook mappers", () => {
       metadata: expect.objectContaining({
         senderUsername: "userone",
         senderE164: "+15551234567",
-        topicName: "Deployments",
       }),
     });
   });

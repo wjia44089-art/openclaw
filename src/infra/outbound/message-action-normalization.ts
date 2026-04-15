@@ -1,7 +1,7 @@
 import type {
   ChannelMessageActionName,
   ChannelThreadingToolContext,
-} from "../../channels/plugins/types.public.js";
+} from "../../channels/plugins/types.js";
 import { normalizeOptionalString } from "../../shared/string-coerce.js";
 import {
   isDeliverableMessageChannel,

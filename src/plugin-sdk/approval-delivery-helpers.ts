@@ -205,7 +205,7 @@ export function createChannelApprovalCapability(params: {
   render?: ChannelApprovalCapability["render"];
   native?: ChannelApprovalCapability["native"];
   /** @deprecated Pass delivery/nativeRuntime/render/native directly. */
-  approvals?: Partial<ChannelApprovalCapabilitySurfaces>;
+  approvals?: ChannelApprovalCapabilitySurfaces;
 }): ChannelApprovalCapability {
   const surfaces: ChannelApprovalCapabilitySurfaces = {
     delivery: params.delivery ?? params.approvals?.delivery,

@@ -171,7 +171,8 @@ export function applyGroupGating(params: ApplyGroupGatingParams) {
       commandAuthorized: false,
     },
   });
-  const effectiveWasMentioned = mentionDecision.effectiveWasMentioned || shouldBypassMention;
+  const effectiveWasMentioned =
+    mentionDecision.effectiveWasMentioned || Boolean(shouldBypassMention);
   params.msg.wasMentioned = effectiveWasMentioned;
   if (!shouldBypassMention && requireMention && mentionDecision.shouldSkip) {
     return skipGroupMessageAndStoreHistory(

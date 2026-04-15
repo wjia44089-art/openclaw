@@ -1,9 +1,7 @@
 import {
-  isWhatsAppGroupJid,
   resolveReactionMessageId,
   handleWhatsAppAction,
   normalizeWhatsAppTarget,
-  readStringOrNumberParam,
   readStringParam,
   type OpenClawConfig,
 } from "./channel-react-action.runtime.js";
@@ -15,7 +13,6 @@ export async function handleWhatsAppReactAction(params: {
   params: Record<string, unknown>;
   cfg: OpenClawConfig;
   accountId?: string | null;
-  requesterSenderId?: string | null;
   toolContext?: {
     currentChannelId?: string | null;
     currentChannelProvider?: string | null;
@@ -52,20 +49,8 @@ export async function handleWhatsAppReactAction(params: {
     readStringParam(params.params, "messageId", { required: true });
   }
   const messageId = String(messageIdRaw);
-  const explicitMessageId = readStringOrNumberParam(params.params, "messageId");
   const emoji = readStringParam(params.params, "emoji", { allowEmpty: true });
   const remove = typeof params.params.remove === "boolean" ? params.params.remove : undefined;
-  const explicitParticipant = readStringParam(params.params, "participant");
-  const inferredParticipant =
-    explicitParticipant ||
-    explicitMessageId != null ||
-    !isWhatsAppSource ||
-    isCrossChat ||
-    !isWhatsAppGroupJid(explicitTarget ?? params.toolContext?.currentChannelId ?? "")
-      ? undefined
-      : typeof params.requesterSenderId === "string" && params.requesterSenderId.trim().length > 0
-        ? params.requesterSenderId.trim()
-        : undefined;
   return await handleWhatsAppAction(
     {
       action: "react",
@@ -75,7 +60,7 @@ export async function handleWhatsAppReactAction(params: {
       messageId,
       emoji,
       remove,
-      participant: explicitParticipant ?? inferredParticipant,
+      participant: readStringParam(params.params, "participant"),
       accountId: params.accountId ?? undefined,
       fromMe: typeof params.params.fromMe === "boolean" ? params.params.fromMe : undefined,
     },

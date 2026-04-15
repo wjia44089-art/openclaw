@@ -51,15 +51,7 @@ const mergeOrigin = (
   return Object.keys(merged).length > 0 ? merged : undefined;
 };
 
-export function deriveSessionOrigin(
-  ctx: MsgContext,
-  opts?: { skipSystemEventOrigin?: boolean },
-): SessionOrigin | undefined {
-  const isSystemEventProvider =
-    ctx.Provider === "heartbeat" || ctx.Provider === "cron-event" || ctx.Provider === "exec-event";
-  if (opts?.skipSystemEventOrigin && isSystemEventProvider) {
-    return undefined;
-  }
+export function deriveSessionOrigin(ctx: MsgContext): SessionOrigin | undefined {
   const label = normalizeOptionalString(resolveConversationLabel(ctx));
   const providerRaw =
     (typeof ctx.OriginatingChannel === "string" && ctx.OriginatingChannel) ||
@@ -134,16 +126,14 @@ export function deriveGroupSessionPatch(params: {
   const subject = params.ctx.GroupSubject?.trim();
   const space = params.ctx.GroupSpace?.trim();
   const explicitChannel = params.ctx.GroupChannel?.trim();
-  const subjectLooksChannel = Boolean(subject?.startsWith("#"));
-  const normalizedChannel =
-    subjectLooksChannel && resolution.chatType !== "channel" ? normalizeChannelId(channel) : null;
+  const normalizedChannel = normalizeChannelId(channel);
   const isChannelProvider = Boolean(
     normalizedChannel &&
     getChannelPlugin(normalizedChannel)?.capabilities.chatTypes.includes("channel"),
   );
   const nextGroupChannel =
     explicitChannel ??
-    (subjectLooksChannel && subject && (resolution.chatType === "channel" || isChannelProvider)
+    ((resolution.chatType === "channel" || isChannelProvider) && subject && subject.startsWith("#")
       ? subject
       : undefined);
   const nextSubject = nextGroupChannel ? undefined : subject;
@@ -183,12 +173,9 @@ export function deriveSessionMetaPatch(params: {
   sessionKey: string;
   existing?: SessionEntry;
   groupResolution?: GroupKeyResolution | null;
-  skipSystemEventOrigin?: boolean;
 }): Partial<SessionEntry> | null {
   const groupPatch = deriveGroupSessionPatch(params);
-  const origin = deriveSessionOrigin(params.ctx, {
-    skipSystemEventOrigin: params.skipSystemEventOrigin,
-  });
+  const origin = deriveSessionOrigin(params.ctx);
   if (!groupPatch && !origin) {
     return null;
   }

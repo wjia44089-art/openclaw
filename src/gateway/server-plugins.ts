@@ -1,16 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { normalizeModelRef, parseModelRef } from "../agents/model-selection.js";
+import type { loadConfig } from "../config/config.js";
 import { applyPluginAutoEnable } from "../config/plugin-auto-enable.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { resolveGatewayStartupPluginIds } from "../plugins/channel-plugin-ids.js";
 import { normalizePluginsConfig } from "../plugins/config-state.js";
 import { loadOpenClawPlugins } from "../plugins/loader.js";
 import { createEmptyPluginRegistry } from "../plugins/registry-empty.js";
 import { setActivePluginRegistry } from "../plugins/runtime.js";
 import { getPluginRuntimeGatewayRequestScope } from "../plugins/runtime/gateway-request-scope.js";
-import { createPluginRuntimeLoaderLogger } from "../plugins/runtime/load-context.js";
 import type { PluginRuntime } from "../plugins/runtime/types.js";
-import type { PluginLogger } from "../plugins/types.js";
 import { resolveGlobalSingleton } from "../shared/global-singleton.js";
 import { ADMIN_SCOPE, WRITE_SCOPE } from "./method-scopes.js";
 import { GATEWAY_CLIENT_IDS, GATEWAY_CLIENT_MODES } from "./protocol/client-info.js";
@@ -104,7 +102,7 @@ function normalizeAllowedModelRef(raw: string): string | null {
   return `${normalized.provider}/${normalized.model}`;
 }
 
-export function setPluginSubagentOverridePolicies(cfg: OpenClawConfig): void {
+export function setPluginSubagentOverridePolicies(cfg: ReturnType<typeof loadConfig>): void {
   const pluginSubagentPolicyState = getPluginSubagentPolicyState();
   const normalized = normalizePluginsConfig(cfg.plugins);
   const policies: PluginSubagentPolicyState["policies"] = {};
@@ -338,11 +336,7 @@ export function createGatewaySubagentRuntime(): PluginRuntime["subagent"] {
           ...(allowOverride && params.model && { model: params.model }),
           ...(params.extraSystemPrompt && { extraSystemPrompt: params.extraSystemPrompt }),
           ...(params.lane && { lane: params.lane }),
-          // The gateway `agent` schema requires `idempotencyKey: NonEmptyString`,
-          // so fall back to a generated UUID when the caller omits it. Without
-          // this, plugin subagent runs (for example memory-core dreaming
-          // narrative) silently fail schema validation at the gateway.
-          idempotencyKey: params.idempotencyKey || randomUUID(),
+          ...(params.idempotencyKey && { idempotencyKey: params.idempotencyKey }),
         },
         {
           allowSyntheticModelOverride,
@@ -386,22 +380,9 @@ export function createGatewaySubagentRuntime(): PluginRuntime["subagent"] {
 
 // ── Plugin loading ──────────────────────────────────────────────────
 
-function createGatewayPluginRegistrationLogger(params?: {
-  suppressInfoLogs?: boolean;
-}): PluginLogger {
-  const logger = createPluginRuntimeLoaderLogger();
-  if (params?.suppressInfoLogs !== true) {
-    return logger;
-  }
-  return {
-    ...logger,
-    info: (_message: string) => undefined,
-  };
-}
-
 export function loadGatewayPlugins(params: {
-  cfg: OpenClawConfig;
-  activationSourceConfig?: OpenClawConfig;
+  cfg: ReturnType<typeof loadConfig>;
+  activationSourceConfig?: ReturnType<typeof loadConfig>;
   autoEnabledReasons?: Readonly<Record<string, string[]>>;
   workspaceDir: string;
   log: {
@@ -414,7 +395,6 @@ export function loadGatewayPlugins(params: {
   baseMethods: string[];
   pluginIds?: string[];
   preferSetupRuntimeForChannelPlugins?: boolean;
-  suppressPluginInfoLogs?: boolean;
 }) {
   const activationAutoEnabled =
     params.activationSourceConfig !== undefined
@@ -464,9 +444,12 @@ export function loadGatewayPlugins(params: {
     autoEnabledReasons: autoEnabled.autoEnabledReasons,
     workspaceDir: params.workspaceDir,
     onlyPluginIds: pluginIds,
-    logger: createGatewayPluginRegistrationLogger({
-      suppressInfoLogs: params.suppressPluginInfoLogs,
-    }),
+    logger: {
+      info: (msg) => params.log.info(msg),
+      warn: (msg) => params.log.warn(msg),
+      error: (msg) => params.log.error(msg),
+      debug: (msg) => params.log.debug(msg),
+    },
     coreGatewayHandlers: params.coreGatewayHandlers,
     runtimeOptions: {
       allowGatewaySubagentBinding: true,

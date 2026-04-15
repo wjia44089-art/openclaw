@@ -108,10 +108,12 @@ export function buildTasksText(params: { sessionKey: string; agentId: string }):
 }
 
 export async function buildTasksReply(params: HandleCommandsParams): Promise<ReplyPayload> {
-  const agentId = resolveSessionAgentId({
-    sessionKey: params.sessionKey,
-    config: params.cfg,
-  });
+  const agentId =
+    params.agentId ??
+    resolveSessionAgentId({
+      sessionKey: params.sessionKey,
+      config: params.cfg,
+    });
   return {
     text: buildTasksText({
       sessionKey: params.sessionKey,

@@ -18,7 +18,7 @@ import {
 } from "./shared.js";
 
 export function handleSubagentsInfoAction(ctx: SubagentsCommandContext): CommandHandlerResult {
-  const { params, requesterKey, runs, restTokens } = ctx;
+  const { params, runs, restTokens } = ctx;
   const target = restTokens[0];
   if (!target) {
     return stopWithText("ℹ️ Usage: /subagents info <id|#>");
@@ -44,7 +44,7 @@ export function handleSubagentsInfoAction(ctx: SubagentsCommandContext): Command
     : "n/a";
   const linkedTask = findTaskByRunIdForOwner({
     runId: run.runId,
-    callerOwnerKey: requesterKey,
+    callerOwnerKey: params.sessionKey,
   });
   const taskText = sanitizeTaskStatusText(run.task) || "n/a";
   const progressText = sanitizeTaskStatusText(linkedTask?.progressSummary);

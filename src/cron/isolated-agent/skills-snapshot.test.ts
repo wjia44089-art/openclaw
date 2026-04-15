@@ -2,21 +2,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   buildWorkspaceSkillSnapshotMock,
-  canExecRequestNodeMock,
   getRemoteSkillEligibilityMock,
   getSkillsSnapshotVersionMock,
   resolveAgentSkillsFilterMock,
 } = vi.hoisted(() => ({
   buildWorkspaceSkillSnapshotMock: vi.fn(),
-  canExecRequestNodeMock: vi.fn().mockReturnValue(false),
   getRemoteSkillEligibilityMock: vi.fn(),
   getSkillsSnapshotVersionMock: vi.fn(),
   resolveAgentSkillsFilterMock: vi.fn(),
 }));
 
-vi.mock("./skills-snapshot.runtime.js", () => ({
+vi.mock("./run.runtime.js", () => ({
   buildWorkspaceSkillSnapshot: buildWorkspaceSkillSnapshotMock,
-  canExecRequestNode: canExecRequestNodeMock,
   getRemoteSkillEligibility: getRemoteSkillEligibilityMock,
   getSkillsSnapshotVersion: getSkillsSnapshotVersionMock,
   resolveAgentSkillsFilter: resolveAgentSkillsFilterMock,
@@ -37,10 +34,10 @@ describe("resolveCronSkillsSnapshot", () => {
     buildWorkspaceSkillSnapshotMock.mockReturnValue({ prompt: "fresh", skills: [] });
   });
 
-  it("refreshes when the cached skill filter changes", async () => {
+  it("refreshes when the cached skill filter changes", () => {
     resolveAgentSkillsFilterMock.mockReturnValue(["docs-search", "github"]);
 
-    const result = await resolveCronSkillsSnapshot({
+    const result = resolveCronSkillsSnapshot({
       workspaceDir: "/tmp/workspace",
       config: {} as never,
       agentId: "writer",
@@ -61,10 +58,10 @@ describe("resolveCronSkillsSnapshot", () => {
     expect(result).toEqual({ prompt: "fresh", skills: [] });
   });
 
-  it("refreshes when the process version resets to 0 but the cached snapshot is stale", async () => {
+  it("refreshes when the process version resets to 0 but the cached snapshot is stale", () => {
     getSkillsSnapshotVersionMock.mockReturnValue(0);
 
-    await resolveCronSkillsSnapshot({
+    resolveCronSkillsSnapshot({
       workspaceDir: "/tmp/workspace",
       config: {} as never,
       agentId: "writer",

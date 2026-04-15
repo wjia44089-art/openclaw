@@ -80,9 +80,10 @@ describe("bundled plugin public surface loader", () => {
     );
     vi.doMock("node:module", async () => {
       const actual = await vi.importActual<typeof import("node:module")>("node:module");
-      return Object.assign({}, actual, {
+      return {
+        ...actual,
         createRequire: vi.fn(() => requireLoader),
-      });
+      };
     });
 
     const publicSurfaceLoader = await importFreshModule<

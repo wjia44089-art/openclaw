@@ -4,11 +4,7 @@ import {
   resolveBootstrapProfileScopesForRole,
   type DeviceBootstrapProfile,
 } from "../shared/device-bootstrap-profile.js";
-import {
-  resolveMissingRequestedScope,
-  resolveScopeOutsideRequestedRoles,
-  roleScopesAllow,
-} from "../shared/operator-scope-compat.js";
+import { resolveMissingRequestedScope, roleScopesAllow } from "../shared/operator-scope-compat.js";
 import {
   createAsyncLock,
   pruneExpiredPending,
@@ -84,33 +80,14 @@ export type PairedDevice = {
   approvedAtMs: number;
 };
 
-export type PairedDeviceMetadataPatch = Pick<
-  PairedDevice,
-  "displayName" | "clientId" | "clientMode" | "remoteIp"
->;
-
 export type DevicePairingList = {
   pending: DevicePairingPendingRequest[];
   paired: PairedDevice[];
 };
 
-export type DevicePairingForbiddenReason =
-  | "caller-scopes-required"
-  | "caller-missing-scope"
-  | "scope-outside-requested-roles"
-  | "bootstrap-role-not-allowed"
-  | "bootstrap-scope-not-allowed";
-
-export type DevicePairingForbiddenResult = {
-  status: "forbidden";
-  reason: DevicePairingForbiddenReason;
-  scope?: string;
-  role?: string;
-};
-
 export type ApproveDevicePairingResult =
   | { status: "approved"; requestId: string; device: PairedDevice }
-  | DevicePairingForbiddenResult
+  | { status: "forbidden"; missingScope: string }
   | null;
 
 type DevicePairingStateFile = {
@@ -123,22 +100,6 @@ const OPERATOR_ROLE = "operator";
 const OPERATOR_SCOPE_PREFIX = "operator.";
 
 const withLock = createAsyncLock();
-
-export function formatDevicePairingForbiddenMessage(result: DevicePairingForbiddenResult): string {
-  switch (result.reason) {
-    case "caller-scopes-required":
-      return `missing scope: ${result.scope ?? "callerScopes-required"}`;
-    case "caller-missing-scope":
-      return `missing scope: ${result.scope ?? "unknown"}`;
-    case "scope-outside-requested-roles":
-      return `invalid scope for requested roles: ${result.scope ?? "unknown"}`;
-    case "bootstrap-role-not-allowed":
-      return `bootstrap profile does not allow role: ${result.role ?? "unknown"}`;
-    case "bootstrap-scope-not-allowed":
-      return `bootstrap profile does not allow scope: ${result.scope ?? "unknown"}`;
-  }
-  throw new Error("Unsupported device pairing forbidden reason");
-}
 
 async function loadState(baseDir?: string): Promise<DevicePairingStateFile> {
   const { pendingPath, pairedPath } = resolvePairingPaths(baseDir, "devices");
@@ -228,9 +189,16 @@ export function listEffectivePairedDeviceRoles(
     const approvedRoles = new Set(listApprovedPairedDeviceRoles(device));
     return activeTokenRoles.filter((role) => approvedRoles.has(role));
   }
-  // Token entries are authoritative. Tokenless legacy records fail closed so
-  // sticky historical role fields cannot retain access after token migration.
-  return [];
+  // Only fall back to legacy role fields when the tokens map is absent
+  // or has no entries at all (empty object from a fresh pairing record).
+  // When token entries exist but are all revoked, the revocation is
+  // authoritative — do not re-grant roles from sticky historical fields.
+  if (device.tokens && Object.keys(device.tokens).length > 0) {
+    return [];
+  }
+  // Legacy fallback: when no token map exists yet, treat the approved pairing
+  // roles as effective until token issuance has happened.
+  return listApprovedPairedDeviceRoles(device);
 }
 
 export function hasEffectivePairedDeviceRole(
@@ -322,10 +290,7 @@ function refreshPendingDevicePairingRequest(
     // If either request is interactive, keep the pending request visible for approval.
     silent: Boolean(existing.silent && incoming.silent),
     isRepair: existing.isRepair || isRepair,
-    // Preserve the original creation timestamp so that reconnects cannot bump this
-    // request's queue position. Using Date.now() here would let an attacker silently
-    // refresh recency and win the implicit --latest approval race.
-    ts: existing.ts,
+    ts: Date.now(),
   };
 }
 
@@ -557,28 +522,18 @@ export async function approveDevicePairing(
       return null;
     }
     const requestedRoles = mergeRoles(pending.roles, pending.role) ?? [];
-    const requestedScopes = normalizeDeviceAuthScopes(pending.scopes);
-    const roleMismatchScope = resolveScopeOutsideRequestedRoles({
-      requestedRoles,
-      requestedScopes,
-    });
-    if (roleMismatchScope) {
-      return {
-        status: "forbidden",
-        reason: "scope-outside-requested-roles",
-        scope: roleMismatchScope,
-      };
-    }
-    const requestedOperatorScopes = requestedScopes.filter((scope) =>
+    const requestedOperatorScopes = normalizeDeviceAuthScopes(pending.scopes).filter((scope) =>
       scope.startsWith(OPERATOR_SCOPE_PREFIX),
     );
     if (requestedOperatorScopes.length > 0) {
       if (!options?.callerScopes) {
         return {
           status: "forbidden",
-          reason: "caller-scopes-required",
-          scope: requestedOperatorScopes[0],
+          missingScope: requestedOperatorScopes[0] ?? "callerScopes-required",
         };
+      }
+      if (!requestedRoles.includes(OPERATOR_ROLE)) {
+        return { status: "forbidden", missingScope: requestedOperatorScopes[0] };
       }
       const missingScope = resolveMissingRequestedScope({
         role: OPERATOR_ROLE,
@@ -586,7 +541,7 @@ export async function approveDevicePairing(
         allowedScopes: options.callerScopes,
       });
       if (missingScope) {
-        return { status: "forbidden", reason: "caller-missing-scope", scope: missingScope };
+        return { status: "forbidden", missingScope };
       }
     }
     const now = Date.now();
@@ -660,7 +615,7 @@ export async function approveBootstrapDevicePairing(
     const requestedRoles = resolveRequestedRoles(pending);
     const missingRole = requestedRoles.find((role) => !approvedRoles.includes(role));
     if (missingRole) {
-      return { status: "forbidden", reason: "bootstrap-role-not-allowed", role: missingRole };
+      return { status: "forbidden", missingScope: missingRole };
     }
     const requestedOperatorScopes = normalizeDeviceAuthScopes(pending.scopes).filter((scope) =>
       scope.startsWith(OPERATOR_SCOPE_PREFIX),
@@ -671,7 +626,7 @@ export async function approveBootstrapDevicePairing(
       allowedScopes: approvedScopes,
     });
     if (missingScope) {
-      return { status: "forbidden", reason: "bootstrap-scope-not-allowed", scope: missingScope };
+      return { status: "forbidden", missingScope };
     }
 
     const now = Date.now();
@@ -765,30 +720,30 @@ export async function removePairedDevice(
 
 export async function updatePairedDeviceMetadata(
   deviceId: string,
-  patch: Partial<PairedDeviceMetadataPatch>,
+  patch: Partial<
+    Omit<PairedDevice, "deviceId" | "createdAtMs" | "approvedAtMs" | "approvedScopes">
+  >,
   baseDir?: string,
 ): Promise<void> {
   return await withLock(async () => {
     const state = await loadState(baseDir);
-    const normalizedDeviceId = normalizeDeviceId(deviceId);
-    const existing = state.pairedByDeviceId[normalizedDeviceId];
+    const existing = state.pairedByDeviceId[normalizeDeviceId(deviceId)];
     if (!existing) {
       return;
     }
-    const next = { ...existing };
-    if ("displayName" in patch) {
-      next.displayName = patch.displayName;
-    }
-    if ("clientId" in patch) {
-      next.clientId = patch.clientId;
-    }
-    if ("clientMode" in patch) {
-      next.clientMode = patch.clientMode;
-    }
-    if ("remoteIp" in patch) {
-      next.remoteIp = patch.remoteIp;
-    }
-    state.pairedByDeviceId[normalizedDeviceId] = next;
+    const roles = mergeRoles(existing.roles, existing.role, patch.role);
+    const scopes = mergeScopes(existing.scopes, patch.scopes);
+    state.pairedByDeviceId[deviceId] = {
+      ...existing,
+      ...patch,
+      deviceId: existing.deviceId,
+      createdAtMs: existing.createdAtMs,
+      approvedAtMs: existing.approvedAtMs,
+      approvedScopes: existing.approvedScopes,
+      role: patch.role ?? existing.role,
+      roles,
+      scopes,
+    };
     await persistState(state, baseDir);
   });
 }

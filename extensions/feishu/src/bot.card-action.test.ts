@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createRuntimeEnv } from "../../../test/helpers/plugins/runtime-env.js";
 import type { ClawdbotConfig, RuntimeEnv } from "../runtime-api.js";
 import {
-  FeishuRetryableCardActionError,
   handleFeishuCardAction,
   resetProcessedFeishuCardActionTokensForTests,
   type FeishuCardActionEvent,
@@ -89,9 +88,6 @@ describe("Feishu Card Action Handler", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(handleFeishuMessage)
-      .mockReset()
-      .mockResolvedValue(undefined as never);
     resetProcessedFeishuCardActionTokensForTests();
   });
 
@@ -367,7 +363,7 @@ describe("Feishu Card Action Handler", () => {
     expect(handleFeishuMessage).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps a claimed token completed after a non-retryable dispatch failure", async () => {
+  it("releases a claimed token when dispatch fails so retries can succeed", async () => {
     const event = createStructuredQuickActionEvent({
       token: "tok11",
       action: "feishu.quick_actions.help",
@@ -378,22 +374,6 @@ describe("Feishu Card Action Handler", () => {
       .mockResolvedValueOnce(undefined as never);
 
     await expect(handleFeishuCardAction({ cfg, event, runtime })).rejects.toThrow("transient");
-    await handleFeishuCardAction({ cfg, event, runtime });
-
-    expect(handleFeishuMessage).toHaveBeenCalledTimes(1);
-  });
-
-  it("releases a claimed token for explicit retryable dispatch failures", async () => {
-    const event = createStructuredQuickActionEvent({
-      token: "tok11-retryable",
-      action: "feishu.quick_actions.help",
-      command: "/help",
-    });
-    vi.mocked(handleFeishuMessage)
-      .mockRejectedValueOnce(new FeishuRetryableCardActionError("retry me"))
-      .mockResolvedValueOnce(undefined as never);
-
-    await expect(handleFeishuCardAction({ cfg, event, runtime })).rejects.toThrow("retry me");
     await handleFeishuCardAction({ cfg, event, runtime });
 
     expect(handleFeishuMessage).toHaveBeenCalledTimes(2);

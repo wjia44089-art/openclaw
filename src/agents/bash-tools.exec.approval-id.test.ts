@@ -285,7 +285,6 @@ describe("exec approvals", () => {
           invokeParams = params;
           return { payload: { success: true, stdout: "ok" } };
         }
-        return undefined;
       },
     });
 

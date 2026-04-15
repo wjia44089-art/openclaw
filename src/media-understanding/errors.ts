@@ -3,7 +3,6 @@ export type MediaUnderstandingSkipReason =
   | "timeout"
   | "unsupported"
   | "empty"
-  | "blocked"
   | "tooSmall";
 
 export class MediaUnderstandingSkipError extends Error {

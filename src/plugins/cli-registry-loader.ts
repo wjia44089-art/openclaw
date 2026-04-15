@@ -1,6 +1,5 @@
 import { collectUniqueCommandDescriptors } from "../cli/program/command-descriptor-utils.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
-import { resolveManifestActivationPluginIds } from "./activation-planner.js";
+import type { OpenClawConfig } from "../config/config.js";
 import type { PluginLoadOptions } from "./loader.js";
 import { loadOpenClawPluginCliRegistry, loadOpenClawPlugins } from "./loader.js";
 import type { PluginRegistry } from "./registry.js";
@@ -23,7 +22,6 @@ export type PluginCliPublicLoadParams = {
   env?: NodeJS.ProcessEnv;
   loaderOptions?: PluginCliLoaderOptions;
   logger?: PluginLogger;
-  primaryCommand?: string;
 };
 
 export type PluginCliLoadContext = PluginRuntimeLoadContext;
@@ -71,33 +69,9 @@ function mergeCliRegistrars(params: {
 
 function buildPluginCliLoaderParams(
   context: PluginCliLoadContext,
-  params?: { primaryCommand?: string },
   loaderOptions?: PluginCliLoaderOptions,
 ) {
-  const onlyPluginIds = resolvePrimaryCommandPluginIds(context, params?.primaryCommand);
-  return buildPluginRuntimeLoadOptions(context, {
-    ...loaderOptions,
-    ...(onlyPluginIds.length > 0 ? { onlyPluginIds } : {}),
-  });
-}
-
-function resolvePrimaryCommandPluginIds(
-  context: PluginCliLoadContext,
-  primaryCommand: string | undefined,
-): string[] {
-  const normalizedPrimary = primaryCommand?.trim();
-  if (!normalizedPrimary) {
-    return [];
-  }
-  return resolveManifestActivationPluginIds({
-    trigger: {
-      kind: "command",
-      command: normalizedPrimary,
-    },
-    config: context.activationSourceConfig,
-    workspaceDir: context.workspaceDir,
-    env: context.env,
-  });
+  return buildPluginRuntimeLoadOptions(context, loaderOptions);
 }
 
 export function resolvePluginCliLoadContext(params: {
@@ -114,29 +88,23 @@ export function resolvePluginCliLoadContext(params: {
 
 export async function loadPluginCliMetadataRegistryWithContext(
   context: PluginCliLoadContext,
-  params?: { primaryCommand?: string },
   loaderOptions?: PluginCliLoaderOptions,
 ): Promise<PluginCliRegistryLoadResult> {
   return {
     ...context,
     registry: await loadOpenClawPluginCliRegistry(
-      buildPluginCliLoaderParams(context, params, loaderOptions),
+      buildPluginCliLoaderParams(context, loaderOptions),
     ),
   };
 }
 
 export async function loadPluginCliCommandRegistryWithContext(params: {
   context: PluginCliLoadContext;
-  primaryCommand?: string;
   loaderOptions?: PluginCliLoaderOptions;
   onMetadataFallbackError: (error: unknown) => void;
 }): Promise<PluginCliRegistryLoadResult> {
   const runtimeRegistry = loadOpenClawPlugins(
-    buildPluginCliLoaderParams(
-      params.context,
-      { primaryCommand: params.primaryCommand },
-      params.loaderOptions,
-    ),
+    buildPluginCliLoaderParams(params.context, params.loaderOptions),
   );
 
   if (!hasIgnoredAsyncPluginRegistration(runtimeRegistry)) {
@@ -148,11 +116,7 @@ export async function loadPluginCliCommandRegistryWithContext(params: {
 
   try {
     const metadataRegistry = await loadOpenClawPluginCliRegistry(
-      buildPluginCliLoaderParams(
-        params.context,
-        { primaryCommand: params.primaryCommand },
-        params.loaderOptions,
-      ),
+      buildPluginCliLoaderParams(params.context, params.loaderOptions),
     );
     return {
       ...params.context,
@@ -210,7 +174,6 @@ export async function loadPluginCliDescriptors(
     });
     const { registry } = await loadPluginCliMetadataRegistryWithContext(
       context,
-      { primaryCommand: params.primaryCommand },
       params.loaderOptions,
     );
     return collectUniqueCommandDescriptors(
@@ -226,7 +189,6 @@ export async function loadPluginCliRegistrationEntries(params: {
   env?: NodeJS.ProcessEnv;
   loaderOptions?: PluginCliLoaderOptions;
   logger?: PluginLogger;
-  primaryCommand?: string;
   onMetadataFallbackError: (error: unknown) => void;
 }): Promise<PluginCliCommandGroupEntry[]> {
   const resolvedLogger = resolvePluginCliLogger(params.logger);
@@ -237,7 +199,6 @@ export async function loadPluginCliRegistrationEntries(params: {
   });
   const { config, workspaceDir, logger, registry } = await loadPluginCliCommandRegistryWithContext({
     context,
-    primaryCommand: params.primaryCommand,
     loaderOptions: params.loaderOptions,
     onMetadataFallbackError: params.onMetadataFallbackError,
   });

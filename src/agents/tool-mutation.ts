@@ -12,7 +12,6 @@ const MUTATING_TOOL_NAMES = new Set([
   "bash",
   "process",
   "message",
-  "sessions_spawn",
   "sessions_send",
   "cron",
   "gateway",
@@ -130,8 +129,6 @@ export function isMutatingToolCall(toolName: string, args: unknown): boolean {
         typeof record?.content === "string" ||
         typeof record?.message === "string"
       );
-    case "subagents":
-      return action === "kill" || action === "steer";
     case "session_status":
       return typeof record?.model === "string" && record.model.trim().length > 0;
     default: {

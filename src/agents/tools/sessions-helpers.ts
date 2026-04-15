@@ -33,8 +33,7 @@ export {
   sanitizeTextContent,
   stripToolMessages,
 } from "./chat-history-text.js";
-import { loadConfig } from "../../config/config.js";
-import type { OpenClawConfig } from "../../config/types.openclaw.js";
+import { type OpenClawConfig, loadConfig } from "../../config/config.js";
 import { normalizeOptionalString } from "../../shared/string-coerce.js";
 
 export type SessionKind = "main" | "group" | "cron" | "hook" | "node" | "other";
@@ -84,7 +83,6 @@ export type SessionListRow = {
   lastChannel?: string;
   lastTo?: string;
   lastAccountId?: string;
-  lastThreadId?: string | number;
   transcriptPath?: string;
   messages?: unknown[];
 };

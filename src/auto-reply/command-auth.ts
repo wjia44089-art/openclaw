@@ -1,11 +1,7 @@
-import {
-  getLoadedChannelPluginById,
-  listLoadedChannelPlugins,
-} from "../channels/plugins/registry-loaded.js";
-import type { ChannelPlugin } from "../channels/plugins/types.plugin.js";
-import type { ChannelId } from "../channels/plugins/types.public.js";
+import { getChannelPlugin, listChannelPlugins } from "../channels/plugins/index.js";
+import type { ChannelId, ChannelPlugin } from "../channels/plugins/types.js";
 import { normalizeAnyChannelId } from "../channels/registry.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalLowercaseString,
@@ -109,10 +105,10 @@ function resolveProviderFromContext(
 
 function probeInferredProviders(ctx: MsgContext, cfg: OpenClawConfig): InferredProviderProbe {
   let droppedResolutionError = false;
-  const candidates = listLoadedChannelPlugins()
+  const candidates = listChannelPlugins()
     .map((plugin) => {
       const resolvedAllowFrom = buildProviderAllowFromResolution({
-        plugin: plugin as ChannelPlugin,
+        plugin,
         cfg,
         accountId: ctx.AccountId,
       });
@@ -633,9 +629,7 @@ export function resolveCommandAuthorization(params: {
     ctx,
     cfg,
   );
-  const plugin = providerId
-    ? ((getLoadedChannelPluginById(providerId) as ChannelPlugin | undefined) ?? undefined)
-    : undefined;
+  const plugin = providerId ? getChannelPlugin(providerId) : undefined;
   const from = normalizeOptionalString(ctx.From) ?? "";
   const to = normalizeOptionalString(ctx.To) ?? "";
   const commandsAllowFromConfigured = Boolean(

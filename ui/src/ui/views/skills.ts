@@ -82,7 +82,6 @@ function skillMatchesStatus(skill: SkillStatusEntry, status: SkillsStatusFilter)
     case "disabled":
       return skill.disabled;
   }
-  throw new Error("Unsupported skills status filter");
 }
 
 function skillStatusClass(skill: SkillStatusEntry): string {

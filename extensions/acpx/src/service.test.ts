@@ -19,7 +19,7 @@ vi.mock("../runtime-api.js", () => ({
 
 vi.mock("./runtime.js", () => ({
   ACPX_BACKEND_ID: "acpx",
-  AcpxRuntime: function AcpxRuntime() {},
+  AcpxRuntime: class {},
   createAgentRegistry: vi.fn(() => ({})),
   createFileSessionStore: vi.fn(() => ({})),
 }));

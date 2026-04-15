@@ -1,174 +1,189 @@
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { filterHeartbeatPairs } from "../../../auto-reply/heartbeat-filter.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HEARTBEAT_PROMPT } from "../../../auto-reply/heartbeat.js";
 import { limitHistoryTurns } from "../history.js";
-import { buildEmbeddedMessageActionDiscoveryInput } from "../message-action-discovery-input.js";
 import {
-  assembleAttemptContextEngine,
-  type AttemptContextEngine,
-  resolveAttemptBootstrapContext,
-} from "./attempt.context-engine-helpers.js";
-import { resetEmbeddedAttemptHarness } from "./attempt.spawn-workspace.test-support.js";
+  cleanupTempPaths,
+  createContextEngineAttemptRunner,
+  getHoisted,
+  resetEmbeddedAttemptHarness,
+} from "./attempt.spawn-workspace.test-support.js";
 
-async function resolveBootstrapContext(params: {
-  contextInjectionMode?: "always" | "continuation-skip";
-  bootstrapContextMode?: string;
-  bootstrapContextRunKind?: string;
-  completed?: boolean;
-  resolver?: () => Promise<{ bootstrapFiles: unknown[]; contextFiles: unknown[] }>;
-}) {
-  const hasCompletedBootstrapTurn = vi.fn(async () => params.completed ?? false);
-  const resolveBootstrapContextForRun =
-    params.resolver ??
-    vi.fn(async () => ({
-      bootstrapFiles: [],
-      contextFiles: [],
-    }));
+const hoisted = getHoisted();
 
-  const result = await resolveAttemptBootstrapContext({
-    contextInjectionMode: params.contextInjectionMode ?? "always",
-    bootstrapContextMode: params.bootstrapContextMode ?? "full",
-    bootstrapContextRunKind: params.bootstrapContextRunKind ?? "default",
-    sessionFile: "/tmp/session.jsonl",
-    hasCompletedBootstrapTurn,
-    resolveBootstrapContextForRun,
-  });
+describe("runEmbeddedAttempt context injection", () => {
+  const tempPaths: string[] = [];
 
-  return { result, hasCompletedBootstrapTurn, resolveBootstrapContextForRun };
-}
-
-describe("embedded attempt context injection", () => {
   beforeEach(() => {
     resetEmbeddedAttemptHarness();
   });
 
-  it("skips bootstrap reinjection on safe continuation turns when configured", async () => {
-    const { result, hasCompletedBootstrapTurn, resolveBootstrapContextForRun } =
-      await resolveBootstrapContext({
-        contextInjectionMode: "continuation-skip",
-        completed: true,
-      });
+  afterEach(async () => {
+    await cleanupTempPaths(tempPaths);
+  });
 
-    expect(result.isContinuationTurn).toBe(true);
-    expect(result.bootstrapFiles).toEqual([]);
-    expect(result.contextFiles).toEqual([]);
-    expect(hasCompletedBootstrapTurn).toHaveBeenCalledWith("/tmp/session.jsonl");
-    expect(resolveBootstrapContextForRun).not.toHaveBeenCalled();
+  it("skips bootstrap reinjection on safe continuation turns when configured", async () => {
+    hoisted.resolveContextInjectionModeMock.mockReturnValue("continuation-skip");
+    hoisted.hasCompletedBootstrapTurnMock.mockResolvedValue(true);
+
+    await createContextEngineAttemptRunner({
+      contextEngine: {
+        assemble: async ({ messages }) => ({ messages, estimatedTokens: 1 }),
+      },
+      sessionKey: "agent:main",
+      tempPaths,
+    });
+
+    expect(hoisted.hasCompletedBootstrapTurnMock).toHaveBeenCalled();
+    expect(hoisted.resolveBootstrapContextForRunMock).not.toHaveBeenCalled();
+  });
+
+  it("checks continuation state only after taking the session lock", async () => {
+    hoisted.resolveContextInjectionModeMock.mockReturnValue("continuation-skip");
+    hoisted.hasCompletedBootstrapTurnMock.mockResolvedValue(true);
+
+    await createContextEngineAttemptRunner({
+      contextEngine: {
+        assemble: async ({ messages }) => ({ messages, estimatedTokens: 1 }),
+      },
+      sessionKey: "agent:main",
+      tempPaths,
+    });
+
+    expect(hoisted.acquireSessionWriteLockMock).toHaveBeenCalled();
+    expect(hoisted.hasCompletedBootstrapTurnMock).toHaveBeenCalled();
+    const lockCallOrder = hoisted.acquireSessionWriteLockMock.mock.invocationCallOrder[0];
+    const continuationCallOrder = hoisted.hasCompletedBootstrapTurnMock.mock.invocationCallOrder[0];
+    expect(lockCallOrder).toBeLessThan(continuationCallOrder);
   });
 
   it("still resolves bootstrap context when continuation-skip has no completed assistant turn yet", async () => {
-    const resolver = vi.fn(async () => ({
-      bootstrapFiles: [{ name: "AGENTS.md" }],
-      contextFiles: [{ path: "AGENTS.md" }],
-    }));
+    hoisted.resolveContextInjectionModeMock.mockReturnValue("continuation-skip");
+    hoisted.hasCompletedBootstrapTurnMock.mockResolvedValue(false);
 
-    const { result } = await resolveBootstrapContext({
-      contextInjectionMode: "continuation-skip",
-      completed: false,
-      resolver,
-    });
-
-    expect(result.isContinuationTurn).toBe(false);
-    expect(result.bootstrapFiles).toEqual([{ name: "AGENTS.md" }]);
-    expect(result.contextFiles).toEqual([{ path: "AGENTS.md" }]);
-    expect(resolver).toHaveBeenCalledTimes(1);
-  });
-
-  it("forwards senderIsOwner into embedded message-action discovery", async () => {
-    const input = buildEmbeddedMessageActionDiscoveryInput({
-      cfg: {},
-      channel: "matrix",
-      currentChannelId: "room",
-      currentThreadTs: "thread",
-      currentMessageId: 123,
-      accountId: "work",
+    await createContextEngineAttemptRunner({
+      contextEngine: {
+        assemble: async ({ messages }) => ({ messages, estimatedTokens: 1 }),
+      },
       sessionKey: "agent:main",
-      sessionId: "session",
-      agentId: "main",
-      senderId: "@alice:example.org",
-      senderIsOwner: false,
+      tempPaths,
     });
 
-    expect(input).toMatchObject({
-      channel: "matrix",
-      currentChannelId: "room",
-      currentThreadTs: "thread",
-      currentMessageId: 123,
-      accountId: "work",
-      sessionKey: "agent:main",
-      sessionId: "session",
-      agentId: "main",
-      requesterSenderId: "@alice:example.org",
-      senderIsOwner: false,
-    });
+    expect(hoisted.resolveBootstrapContextForRunMock).toHaveBeenCalledTimes(1);
   });
 
   it("never skips heartbeat bootstrap filtering", async () => {
-    const { result, hasCompletedBootstrapTurn, resolveBootstrapContextForRun } =
-      await resolveBootstrapContext({
-        contextInjectionMode: "continuation-skip",
+    hoisted.resolveContextInjectionModeMock.mockReturnValue("continuation-skip");
+    hoisted.hasCompletedBootstrapTurnMock.mockResolvedValue(true);
+
+    await createContextEngineAttemptRunner({
+      contextEngine: {
+        assemble: async ({ messages }) => ({ messages, estimatedTokens: 1 }),
+      },
+      attemptOverrides: {
         bootstrapContextMode: "lightweight",
         bootstrapContextRunKind: "heartbeat",
-        completed: true,
-      });
+      },
+      sessionKey: "agent:main:heartbeat:test",
+      tempPaths,
+    });
 
-    expect(result.isContinuationTurn).toBe(false);
-    expect(result.shouldRecordCompletedBootstrapTurn).toBe(false);
-    expect(hasCompletedBootstrapTurn).not.toHaveBeenCalled();
-    expect(resolveBootstrapContextForRun).toHaveBeenCalledTimes(1);
+    expect(hoisted.hasCompletedBootstrapTurnMock).not.toHaveBeenCalled();
+    expect(hoisted.resolveBootstrapContextForRunMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contextMode: "lightweight",
+        runKind: "heartbeat",
+      }),
+    );
   });
 
   it("runs full bootstrap injection after a successful non-heartbeat turn", async () => {
-    const resolver = vi.fn(async () => ({
-      bootstrapFiles: [{ name: "AGENTS.md", content: "bootstrap context" }],
-      contextFiles: [{ path: "AGENTS.md", content: "bootstrap context" }],
-    }));
-
-    const { result } = await resolveBootstrapContext({
-      bootstrapContextMode: "full",
-      bootstrapContextRunKind: "default",
-      resolver,
+    hoisted.resolveBootstrapContextForRunMock.mockResolvedValue({
+      bootstrapFiles: [
+        {
+          name: "AGENTS.md",
+          path: "AGENTS.md",
+          content: "bootstrap context",
+          missing: false,
+        },
+      ],
+      contextFiles: [
+        {
+          path: "AGENTS.md",
+          content: "bootstrap context",
+        },
+      ],
     });
 
-    expect(result.shouldRecordCompletedBootstrapTurn).toBe(true);
-    expect(result.bootstrapFiles).toEqual([{ name: "AGENTS.md", content: "bootstrap context" }]);
+    const result = await createContextEngineAttemptRunner({
+      contextEngine: {
+        assemble: async ({ messages }) => ({ messages, estimatedTokens: 1 }),
+      },
+      attemptOverrides: {
+        bootstrapContextMode: "full",
+        bootstrapContextRunKind: "default",
+      },
+      sessionKey: "agent:main",
+      tempPaths,
+    });
+
+    expect(result.promptError).toBeNull();
+    expect(hoisted.resolveBootstrapContextForRunMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contextMode: "full",
+        runKind: "default",
+      }),
+    );
   });
 
   it("does not record full bootstrap completion for heartbeat runs", async () => {
-    const { result } = await resolveBootstrapContext({
-      bootstrapContextMode: "lightweight",
-      bootstrapContextRunKind: "heartbeat",
+    await createContextEngineAttemptRunner({
+      contextEngine: {
+        assemble: async ({ messages }) => ({ messages, estimatedTokens: 1 }),
+      },
+      attemptOverrides: {
+        bootstrapContextMode: "lightweight",
+        bootstrapContextRunKind: "heartbeat",
+      },
+      sessionKey: "agent:main:heartbeat:test",
+      tempPaths,
     });
 
-    expect(result.shouldRecordCompletedBootstrapTurn).toBe(false);
+    expect(hoisted.sessionManager.appendCustomEntry).not.toHaveBeenCalledWith(
+      "openclaw:bootstrap-context:full",
+      expect.anything(),
+    );
   });
 
   it("filters no-op heartbeat pairs before history limiting and context-engine assembly", async () => {
+    hoisted.getDmHistoryLimitFromSessionKeyMock.mockReturnValue(1);
+    hoisted.limitHistoryTurnsMock.mockImplementation(
+      (messages: unknown, limit: number | undefined) =>
+        limitHistoryTurns(messages as AgentMessage[], limit),
+    );
     const assemble = vi.fn(async ({ messages }: { messages: AgentMessage[] }) => ({
       messages,
       estimatedTokens: 1,
     }));
     const sessionMessages: AgentMessage[] = [
-      { role: "user", content: "real question", timestamp: 1 } as AgentMessage,
+      { role: "user", content: "real question", timestamp: 1 } as unknown as AgentMessage,
       { role: "assistant", content: "real answer", timestamp: 2 } as unknown as AgentMessage,
-      { role: "user", content: HEARTBEAT_PROMPT, timestamp: 3 } as AgentMessage,
+      { role: "user", content: HEARTBEAT_PROMPT, timestamp: 3 } as unknown as AgentMessage,
       { role: "assistant", content: "HEARTBEAT_OK", timestamp: 4 } as unknown as AgentMessage,
     ];
 
-    const heartbeatFiltered = filterHeartbeatPairs(sessionMessages, undefined, HEARTBEAT_PROMPT);
-    const limited = limitHistoryTurns(heartbeatFiltered, 1);
-    await assembleAttemptContextEngine({
-      contextEngine: {
-        info: { id: "test", name: "Test", version: "0.0.1" },
-        ingest: async () => ({ ingested: true }),
-        compact: async () => ({ ok: false, compacted: false, reason: "unused" }),
-        assemble,
-      } satisfies AttemptContextEngine,
-      sessionId: "session",
+    await createContextEngineAttemptRunner({
+      contextEngine: { assemble },
+      attemptOverrides: {
+        config: {
+          agents: {
+            list: [{ id: "main", heartbeat: {} }],
+          },
+        },
+      },
       sessionKey: "agent:main:discord:dm:test-user",
-      messages: limited,
-      modelId: "gpt-test",
+      sessionMessages,
+      tempPaths,
     });
 
     expect(assemble).toHaveBeenCalledWith(

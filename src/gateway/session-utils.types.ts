@@ -1,11 +1,12 @@
 import type { ChatType } from "../channels/chat-type.js";
-import type { SessionCompactionCheckpoint, SessionEntry } from "../config/sessions/types.js";
+import type { SessionEntry } from "../config/sessions.js";
+import type { SessionCompactionCheckpoint } from "../config/sessions.js";
 import type {
   GatewayAgentRow as SharedGatewayAgentRow,
   SessionsListResultBase,
   SessionsPatchResultBase,
 } from "../shared/session-types.js";
-import type { DeliveryContext } from "../utils/delivery-context.types.js";
+import type { DeliveryContext } from "../utils/delivery-context.js";
 
 export type GatewaySessionsDefaults = {
   modelProvider: string | null;
@@ -41,7 +42,6 @@ export type GatewaySessionRow = {
   thinkingLevel?: string;
   fastMode?: boolean;
   verboseLevel?: string;
-  traceLevel?: string;
   reasoningLevel?: string;
   elevatedLevel?: string;
   sendPolicy?: "allow" | "deny";

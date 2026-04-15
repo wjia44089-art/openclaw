@@ -1,9 +1,9 @@
 import path from "node:path";
 import {
+  defaultQaModelForMode as resolveDefaultQaModelForMode,
   normalizeQaProviderMode as normalizeQaProviderModeInput,
   type QaProviderMode,
 } from "./model-selection.js";
-import { defaultQaRuntimeModelForMode } from "./model-selection.runtime.js";
 import type { QaSeedScenario } from "./scenario-catalog.js";
 
 export type { QaProviderMode } from "./model-selection.js";
@@ -34,25 +34,23 @@ export type QaLabRunnerSnapshot = {
 };
 
 export function defaultQaModelForMode(mode: QaProviderMode, alternate = false) {
-  return defaultQaRuntimeModelForMode(mode, alternate ? { alternate: true } : undefined);
+  return resolveDefaultQaModelForMode(mode, alternate ? { alternate: true } : undefined);
 }
 
 export function createDefaultQaRunSelection(scenarios: QaSeedScenario[]): QaLabRunSelection {
-  const providerMode: QaProviderMode = "live-frontier";
+  const providerMode: QaProviderMode = "mock-openai";
   return {
     providerMode,
     primaryModel: defaultQaModelForMode(providerMode),
     alternateModel: defaultQaModelForMode(providerMode, true),
-    fastMode: true,
+    fastMode: false,
     scenarioIds: scenarios.map((scenario) => scenario.id),
   };
 }
 
 export function normalizeQaProviderMode(input: unknown): QaProviderMode {
   return normalizeQaProviderModeInput(
-    input === "mock-openai" || input === "live-frontier" || input === "live-openai"
-      ? input
-      : "live-frontier",
+    input === "live-frontier" || input === "live-openai" ? input : "mock-openai",
   );
 }
 

@@ -149,19 +149,6 @@ function maybeLoadShellEnvForVideoProviders(providerIds: string[]): void {
   });
 }
 
-function expectBufferedVideo(
-  video: { buffer?: Buffer; mimeType: string; fileName?: string } | undefined,
-): { buffer: Buffer; mimeType: string; fileName?: string } {
-  expect(video).toBeDefined();
-  expect(video?.mimeType.startsWith("video/")).toBe(true);
-  if (!video?.buffer) {
-    throw new Error("expected generated video buffer");
-  }
-  const { buffer, mimeType, fileName } = video;
-  expect(buffer.byteLength).toBeGreaterThan(1024);
-  return { buffer, mimeType, fileName };
-}
-
 describeLive("video generation provider live", () => {
   it(
     "covers declared video-generation modes with shell/profile auth",
@@ -251,7 +238,9 @@ describeLive("video generation provider live", () => {
           });
 
           expect(result.videos.length).toBeGreaterThan(0);
-          generatedVideo = expectBufferedVideo(result.videos[0]);
+          expect(result.videos[0]?.mimeType.startsWith("video/")).toBe(true);
+          expect(result.videos[0]?.buffer.byteLength).toBeGreaterThan(1024);
+          generatedVideo = result.videos[0] ?? null;
           attempted.push(`${testCase.providerId}:generate:${providerModel} (${authLabel})`);
           console.error(
             `${logPrefix} mode=generate done ms=${Date.now() - startedAt} videos=${result.videos.length}`,
@@ -309,7 +298,8 @@ describeLive("video generation provider live", () => {
           });
 
           expect(result.videos.length).toBeGreaterThan(0);
-          expectBufferedVideo(result.videos[0]);
+          expect(result.videos[0]?.mimeType.startsWith("video/")).toBe(true);
+          expect(result.videos[0]?.buffer.byteLength).toBeGreaterThan(1024);
           attempted.push(`${testCase.providerId}:imageToVideo:${providerModel} (${authLabel})`);
           console.error(
             `${logPrefix} mode=imageToVideo done ms=${Date.now() - startedAt} videos=${result.videos.length}`,
@@ -358,7 +348,8 @@ describeLive("video generation provider live", () => {
           });
 
           expect(result.videos.length).toBeGreaterThan(0);
-          expectBufferedVideo(result.videos[0]);
+          expect(result.videos[0]?.mimeType.startsWith("video/")).toBe(true);
+          expect(result.videos[0]?.buffer.byteLength).toBeGreaterThan(1024);
           attempted.push(`${testCase.providerId}:videoToVideo:${providerModel} (${authLabel})`);
           console.error(
             `${logPrefix} mode=videoToVideo done ms=${Date.now() - startedAt} videos=${result.videos.length}`,

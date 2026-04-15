@@ -91,7 +91,7 @@ const resolveTelegramApproverDmTargets = createChannelApproverDmTargetResolver({
 const telegramNativeApprovalCapability = createApproverRestrictedNativeApprovalCapability({
   channel: "telegram",
   channelLabel: "Telegram",
-  describeExecApprovalSetup: ({ accountId }: { accountId?: string | null }) => {
+  describeExecApprovalSetup: ({ accountId }) => {
     const prefix =
       accountId && accountId !== "default"
         ? `channels.telegram.accounts.${accountId}`
@@ -137,10 +137,7 @@ const telegramNativeApprovalCapability = createApproverRestrictedNativeApprovalC
 
 const resolveTelegramApproveCommandBehavior: NonNullable<
   ChannelApprovalCapability["resolveApproveCommandBehavior"]
-> = (
-  params: Parameters<NonNullable<ChannelApprovalCapability["resolveApproveCommandBehavior"]>>[0],
-) => {
-  const { cfg, accountId, senderId, approvalKind } = params;
+> = ({ cfg, accountId, senderId, approvalKind }) => {
   if (approvalKind !== "exec") {
     return undefined;
   }

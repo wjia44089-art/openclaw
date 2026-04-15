@@ -11,7 +11,6 @@ import {
 import type { SecretsApplyPlan } from "./plan.js";
 
 let runSecretsApply: typeof import("./apply.js").runSecretsApply;
-let applyTesting: typeof import("./apply.js").__testing;
 let clearSecretsRuntimeSnapshot: typeof import("./runtime.js").clearSecretsRuntimeSnapshot;
 
 const OPENAI_API_KEY_ENV_REF = {
@@ -182,7 +181,7 @@ describe("secrets apply", () => {
   let fixture: ApplyFixture;
 
   beforeAll(async () => {
-    ({ __testing: applyTesting, runSecretsApply } = await import("./apply.js"));
+    ({ runSecretsApply } = await import("./apply.js"));
     ({ clearSecretsRuntimeSnapshot } = await import("./runtime.js"));
   });
 
@@ -589,14 +588,11 @@ describe("secrets apply", () => {
       },
     });
 
-    const nextConfig = (await applyTesting.projectConfigForTest({
-      plan,
-      env: fixture.env,
-    })) as {
+    const nextConfig = await applyPlanAndReadConfig<{
       models?: {
         providers?: Record<string, { apiKey?: unknown }>;
       };
-    };
+    }>(fixture, plan);
     expect(nextConfig.models?.providers?.["openai.dev"]?.apiKey).toEqual(OPENAI_API_KEY_ENV_REF);
     expect(nextConfig.models?.providers?.openai).toBeUndefined();
   });
@@ -669,10 +665,10 @@ describe("secrets apply", () => {
       },
     };
 
-    const nextConfig = (await applyTesting.projectConfigForTest({
-      plan,
-      env: fixture.env,
-    })) as {
+    const result = await runSecretsApply({ plan, env: fixture.env, write: true });
+    expect(result.changed).toBe(true);
+
+    const nextConfig = JSON.parse(await fs.readFile(fixture.configPath, "utf8")) as {
       talk?: { providers?: Record<string, { apiKey?: unknown }> };
     };
     expect(nextConfig.talk?.providers?.[TALK_TEST_PROVIDER_ID]?.apiKey).toEqual({
@@ -709,10 +705,7 @@ describe("secrets apply", () => {
       },
     });
 
-    const nextConfig = (await applyTesting.projectConfigForTest({
-      plan,
-      env: fixture.env,
-    })) as {
+    const nextConfig = await applyPlanAndReadConfig<{
       models?: {
         providers?: {
           openai?: {
@@ -720,7 +713,7 @@ describe("secrets apply", () => {
           };
         };
       };
-    };
+    }>(fixture, plan);
     expect(nextConfig.models?.providers?.openai?.headers?.["x-api-key"]).toEqual(
       OPENAI_API_KEY_ENV_REF,
     );
@@ -771,10 +764,10 @@ describe("secrets apply", () => {
     };
 
     fixture.env.MEMORY_REMOTE_API_KEY = "sk-memory-live-env"; // pragma: allowlist secret
-    const nextConfig = (await applyTesting.projectConfigForTest({
-      plan,
-      env: fixture.env,
-    })) as {
+    const result = await runSecretsApply({ plan, env: fixture.env, write: true });
+    expect(result.changed).toBe(true);
+
+    const nextConfig = JSON.parse(await fs.readFile(fixture.configPath, "utf8")) as {
       agents?: {
         list?: Array<{
           memorySearch?: {
@@ -866,14 +859,11 @@ describe("secrets apply", () => {
       targets: [],
     });
 
-    const nextConfig = (await applyTesting.projectConfigForTest({
-      plan,
-      env: fixture.env,
-    })) as {
+    const nextConfig = await applyPlanAndReadConfig<{
       secrets?: {
         providers?: Record<string, unknown>;
       };
-    };
+    }>(fixture, plan);
     expect(nextConfig.secrets?.providers?.fileold).toBeUndefined();
     expect(nextConfig.secrets?.providers?.filemain).toEqual({
       source: "file",

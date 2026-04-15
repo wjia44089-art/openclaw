@@ -30,7 +30,6 @@ const SHARED_FAMILY_HOOK_PATTERNS: ReadonlyArray<{
 const PROVIDER_BOUNDARY_TEST_SIGNALS = [
   /\bregister(?:Single)?ProviderPlugin\s*\(/u,
   /\bcreateTestPluginApi\s*\(/u,
-  /\bexpectPassthroughReplayPolicy\s*\(/u,
 ] as const;
 const EXPECTED_SHARED_FAMILY_CONTRACTS: Record<string, ExpectedSharedFamilyContract> = {
   "amazon-bedrock": {
@@ -64,7 +63,6 @@ const EXPECTED_SHARED_FAMILY_CONTRACTS: Record<string, ExpectedSharedFamilyContr
   },
   openai: {
     streamFamilies: ["openai-responses-defaults"],
-    toolCompatFamilies: ["openai"],
   },
   opencode: {
     replayFamilies: ["passthrough-gemini"],

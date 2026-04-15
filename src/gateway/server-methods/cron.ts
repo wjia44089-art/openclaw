@@ -4,7 +4,6 @@ import {
   readCronRunLogEntriesPageAll,
   resolveCronRunLogPath,
 } from "../../cron/run-log.js";
-import { isInvalidCronSessionTargetIdError } from "../../cron/session-target.js";
 import type { CronJobCreate, CronJobPatch } from "../../cron/types.js";
 import { validateScheduleTimestamp } from "../../cron/validate-timestamp.js";
 import { formatErrorMessage } from "../../infra/errors.js";
@@ -251,8 +250,9 @@ export const cronHandlers: GatewayRequestHandlers = {
     try {
       result = await context.cron.enqueueRun(jobId, p.mode ?? "force");
     } catch (error) {
-      if (isInvalidCronSessionTargetIdError(error)) {
-        respond(true, { ok: true, ran: false, reason: "invalid-spec" }, undefined);
+      const message = formatErrorMessage(error);
+      if (message === "invalid cron sessionTarget session id") {
+        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, message));
         return;
       }
       throw error;

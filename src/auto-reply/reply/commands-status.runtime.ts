@@ -1,2 +1,1 @@
-export { buildStatusReply } from "./commands-status.js";
-export { buildStatusText } from "../../status/status-text.js";
+export { buildStatusReply, buildStatusText } from "./commands-status.js";

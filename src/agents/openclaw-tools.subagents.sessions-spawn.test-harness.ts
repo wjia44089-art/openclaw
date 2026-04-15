@@ -1,6 +1,8 @@
 import { vi, type Mock } from "vitest";
 import type { SubagentLifecycleHookRunner } from "../plugins/hooks.js";
+import { __testing as subagentRegistryTesting } from "./subagent-registry.js";
 import { resolveRequesterStoreKey } from "./subagent-requester-store-key.js";
+import { __testing as subagentSpawnTesting } from "./subagent-spawn.js";
 
 type SessionsSpawnTestConfig = ReturnType<(typeof import("../config/config.js"))["loadConfig"]>;
 type SessionsSpawnHookRunner = SubagentLifecycleHookRunner | null;
@@ -24,7 +26,6 @@ type SessionsSpawnGatewayMockOptions = {
 
 const hoisted = vi.hoisted(() => {
   const callGatewayMock = vi.fn();
-  let nextRunId = 0;
   const defaultConfigOverride = {
     session: {
       mainKey: "main",
@@ -87,15 +88,7 @@ const hoisted = vi.hoisted(() => {
     defaultRunSubagentAnnounceFlow,
     runSubagentAnnounceFlowOverride: defaultRunSubagentAnnounceFlow,
   };
-  return {
-    callGatewayMock,
-    defaultConfigOverride,
-    nextRunId: () => {
-      nextRunId += 1;
-      return `run-${nextRunId}`;
-    },
-    state,
-  };
+  return { callGatewayMock, defaultConfigOverride, state };
 });
 
 let cachedCreateSessionsSpawnTool: CreateSessionsSpawnTool | null = null;
@@ -141,8 +134,6 @@ export function setSessionsSpawnAnnounceFlowOverride(next: RunSubagentAnnounceFl
 }
 
 export async function getSessionsSpawnTool(opts: CreateOpenClawToolsOpts) {
-  const [{ __testing: subagentSpawnTesting }, { __testing: subagentRegistryTesting }] =
-    await Promise.all([import("./subagent-spawn.js"), import("./subagent-registry.js")]);
   subagentSpawnTesting.setDepsForTest({
     callGateway: (optsUnknown) => hoisted.callGatewayMock(optsUnknown),
     getGlobalHookRunner: () => hoisted.state.hookRunnerOverride,
@@ -152,7 +143,6 @@ export async function getSessionsSpawnTool(opts: CreateOpenClawToolsOpts) {
   subagentRegistryTesting.setDepsForTest({
     callGateway: (optsUnknown) => hoisted.callGatewayMock(optsUnknown),
     loadConfig: () => hoisted.state.configOverride,
-    cleanupBrowserSessionsForLifecycleEnd: async () => {},
     captureSubagentCompletionReply: (sessionKey) =>
       hoisted.state.captureSubagentCompletionReplyOverride(sessionKey),
     runSubagentAnnounceFlow: (params) => hoisted.state.runSubagentAnnounceFlowOverride(params),
@@ -171,6 +161,7 @@ export function setupSessionsSpawnGatewayMock(setupOpts: SessionsSpawnGatewayMoc
 } {
   const calls: Array<GatewayRequest> = [];
   const waitCalls: Array<AgentWaitCall> = [];
+  let agentCallCount = 0;
   let childRunId: string | undefined;
   let childSessionKey: string | undefined;
 
@@ -191,7 +182,8 @@ export function setupSessionsSpawnGatewayMock(setupOpts: SessionsSpawnGatewayMoc
     }
 
     if (request.method === "agent") {
-      const runId = hoisted.nextRunId();
+      agentCallCount += 1;
+      const runId = `run-${agentCallCount}`;
       const params = request.params as { lane?: string; sessionKey?: string } | undefined;
       // Capture only the subagent run metadata.
       if (params?.lane === "subagent") {
@@ -202,7 +194,7 @@ export function setupSessionsSpawnGatewayMock(setupOpts: SessionsSpawnGatewayMoc
       return {
         runId,
         status: "accepted",
-        acceptedAt: Date.now(),
+        acceptedAt: 1000 + agentCallCount,
       };
     }
 

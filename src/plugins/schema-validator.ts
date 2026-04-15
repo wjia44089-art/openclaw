@@ -37,9 +37,14 @@ function getAjv(mode: "default" | "defaults"): AjvLike {
   instance.addFormat("uri", {
     type: "string",
     validate: (value: string) => {
-      // Accept absolute URIs so generated config schemas can keep JSON Schema
-      // `format: "uri"` without noisy AJV warnings during validation/build.
-      return URL.canParse(value);
+      try {
+        // Accept absolute URIs so generated config schemas can keep JSON Schema
+        // `format: "uri"` without noisy AJV warnings during validation/build.
+        new URL(value);
+        return true;
+      } catch {
+        return false;
+      }
     },
   });
   ajvSingletons.set(mode, instance);

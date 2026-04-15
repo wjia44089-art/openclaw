@@ -18,7 +18,6 @@ import {
   respondUnavailableOnNodeInvokeError,
   safeParseJson,
   startBrowserControlServiceFromConfig,
-  withTimeout,
   type GatewayRequestHandlers,
   type NodeSession,
 } from "../core-api.js";
@@ -247,31 +246,12 @@ export async function handleBrowserGatewayRequest({
     return;
   }
 
-  let result;
-  try {
-    result = timeoutMs
-      ? await withTimeout(
-          (signal) =>
-            dispatcher.dispatch({
-              method: methodRaw,
-              path,
-              query,
-              body,
-              signal,
-            }),
-          timeoutMs,
-          "browser request",
-        )
-      : await dispatcher.dispatch({
-          method: methodRaw,
-          path,
-          query,
-          body,
-        });
-  } catch (err) {
-    respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, String(err)));
-    return;
-  }
+  const result = await dispatcher.dispatch({
+    method: methodRaw,
+    path,
+    query,
+    body,
+  });
 
   if (result.status >= 400) {
     const message =

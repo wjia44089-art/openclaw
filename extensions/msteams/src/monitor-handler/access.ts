@@ -43,7 +43,7 @@ export async function resolveMSTeamsSenderAccess(params: {
     dmPolicy,
     readStore: pairing.readStoreForDmPolicy,
   });
-  const configuredDmAllowFrom = msteamsCfg?.allowFrom ?? [];
+  const configuredDmAllowFrom = (msteamsCfg?.allowFrom ?? []).map((entry) => String(entry));
   const groupAllowFrom = msteamsCfg?.groupAllowFrom;
   const resolvedAllowFromLists = resolveEffectiveAllowFromLists({
     allowFrom: configuredDmAllowFrom,

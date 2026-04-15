@@ -1,6 +1,4 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
+import { getEnvApiKey } from "@mariozechner/pi-ai";
 import { getShellEnvAppliedKeys } from "../infra/shell-env.js";
 import { resolvePluginSetupProvider } from "../plugins/setup-registry.js";
 import { normalizeOptionalSecretInput } from "../utils/normalize-secret-input.js";
@@ -12,29 +10,6 @@ export type EnvApiKeyResult = {
   apiKey: string;
   source: string;
 };
-
-function hasGoogleVertexAdcCredentials(env: NodeJS.ProcessEnv): boolean {
-  const explicitCredentialsPath = normalizeOptionalSecretInput(env.GOOGLE_APPLICATION_CREDENTIALS);
-  if (explicitCredentialsPath) {
-    return fs.existsSync(explicitCredentialsPath);
-  }
-  const homeDir = normalizeOptionalSecretInput(env.HOME) ?? os.homedir();
-  return fs.existsSync(
-    path.join(homeDir, ".config", "gcloud", "application_default_credentials.json"),
-  );
-}
-
-function resolveGoogleVertexEnvApiKey(env: NodeJS.ProcessEnv): string | undefined {
-  const explicitApiKey = normalizeOptionalSecretInput(env.GOOGLE_CLOUD_API_KEY);
-  if (explicitApiKey) {
-    return explicitApiKey;
-  }
-  const hasProject = Boolean(env.GOOGLE_CLOUD_PROJECT || env.GCLOUD_PROJECT);
-  const hasLocation = Boolean(env.GOOGLE_CLOUD_LOCATION);
-  return hasProject && hasLocation && hasGoogleVertexAdcCredentials(env)
-    ? GCP_VERTEX_CREDENTIALS_MARKER
-    : undefined;
-}
 
 export function resolveEnvApiKey(
   provider: string,
@@ -64,7 +39,7 @@ export function resolveEnvApiKey(
   }
 
   if (normalized === "google-vertex") {
-    const envKey = resolveGoogleVertexEnvApiKey(env);
+    const envKey = getEnvApiKey(normalized);
     if (!envKey) {
       return null;
     }

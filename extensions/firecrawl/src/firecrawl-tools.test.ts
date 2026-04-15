@@ -1,6 +1,5 @@
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { mockPinnedHostnameResolution } from "../../../src/test-helpers/ssrf.js";
 import {
   DEFAULT_FIRECRAWL_BASE_URL,
   DEFAULT_FIRECRAWL_MAX_AGE_MS,
@@ -36,7 +35,6 @@ describe("firecrawl tools", () => {
   let createFirecrawlSearchTool: typeof import("./firecrawl-search-tool.js").createFirecrawlSearchTool;
   let createFirecrawlScrapeTool: typeof import("./firecrawl-scrape-tool.js").createFirecrawlScrapeTool;
   let firecrawlClientTesting: typeof import("./firecrawl-client.js").__testing;
-  let ssrfMock: { mockRestore: () => void } | undefined;
 
   beforeAll(async () => {
     ({ fetchFirecrawlContent } = await import("../api.js"));
@@ -49,7 +47,6 @@ describe("firecrawl tools", () => {
   });
 
   beforeEach(() => {
-    ssrfMock = mockPinnedHostnameResolution();
     runFirecrawlSearch.mockReset();
     runFirecrawlSearch.mockImplementation(async (params: Record<string, unknown>) => params);
     runFirecrawlScrape.mockReset();
@@ -61,8 +58,6 @@ describe("firecrawl tools", () => {
   });
 
   afterEach(() => {
-    ssrfMock?.mockRestore();
-    ssrfMock = undefined;
     global.fetch = priorFetch;
   });
 

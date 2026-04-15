@@ -43,18 +43,21 @@ const channelPluginMocks = vi.hoisted(() => ({
   }),
 }));
 
-vi.mock("./dispatch-acp-tts.runtime.js", () => ({
+vi.mock("../../tts/tts.js", () => ({
   maybeApplyTtsToPayload: (params: unknown) => ttsMocks.maybeApplyTtsToPayload(params),
 }));
 
-vi.mock("./route-reply.runtime.js", () => ({
+vi.mock("./route-reply.js", () => ({
   routeReply: (params: unknown) => deliveryMocks.routeReply(params),
 }));
 
-vi.mock("../../channels/plugins/index.js", () => ({
-  getChannelPlugin: (channelId: string) => channelPluginMocks.getChannelPlugin(channelId),
-  normalizeChannelId: (channelId?: string | null) => channelId?.trim().toLowerCase() || null,
-}));
+vi.mock("../../channels/plugins/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../channels/plugins/index.js")>();
+  return {
+    ...actual,
+    getChannelPlugin: (channelId: string) => channelPluginMocks.getChannelPlugin(channelId),
+  };
+});
 
 vi.mock("../../infra/outbound/message-action-runner.js", () => ({
   runMessageAction: (params: unknown) => deliveryMocks.runMessageAction(params),
@@ -309,33 +312,6 @@ describe("createAcpDispatchDeliveryCoordinator", () => {
 
     await coordinator.deliver("final", {});
 
-    expect(onReplyStart).not.toHaveBeenCalled();
-  });
-
-  it("does not fire onReplyStart when user delivery is suppressed", async () => {
-    const onReplyStart = vi.fn(async () => {});
-    const dispatcher = createDispatcher();
-    const coordinator = createAcpDispatchDeliveryCoordinator({
-      cfg: createAcpTestConfig(),
-      ctx: buildTestCtx({
-        Provider: "discord",
-        Surface: "discord",
-        SessionKey: "agent:codex-acp:session-1",
-      }),
-      dispatcher,
-      inboundAudio: false,
-      suppressUserDelivery: true,
-      shouldRouteToOriginating: false,
-      onReplyStart,
-    });
-
-    // Directly invoking the lifecycle (e.g. from dispatch-acp.ts before the
-    // first deliver call) must not fire the typing indicator when delivery is
-    // suppressed by sendPolicy: "deny".
-    await coordinator.startReplyLifecycle();
-    const delivered = await coordinator.deliver("final", { text: "hello" });
-
-    expect(delivered).toBe(false);
     expect(onReplyStart).not.toHaveBeenCalled();
   });
 

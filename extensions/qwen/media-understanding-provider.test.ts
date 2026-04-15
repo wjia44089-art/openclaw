@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  createRequestCaptureJsonFetch,
-  installPinnedHostnameTestHooks,
-} from "../../src/media-understanding/audio.test-helpers.js";
+import { createRequestCaptureJsonFetch } from "../../test/helpers/plugins/media-understanding.js";
 import { describeQwenVideo } from "./media-understanding-provider.js";
-
-installPinnedHostnameTestHooks();
 
 describe("describeQwenVideo", () => {
   it("builds the expected OpenAI-compatible video payload", async () => {

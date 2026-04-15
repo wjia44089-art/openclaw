@@ -65,10 +65,7 @@ function parseQueueDirectiveArgs(raw: string): {
     i = res.nextIndex;
     return res.token;
   };
-  for (;;) {
-    if (i >= len) {
-      break;
-    }
+  while (i < len) {
     const token = takeToken();
     if (!token) {
       break;

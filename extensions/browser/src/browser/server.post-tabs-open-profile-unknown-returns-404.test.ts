@@ -53,7 +53,7 @@ describe("profile CRUD endpoints", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string) => {
-        const u = url;
+        const u = String(url);
         if (u.includes("/json/list")) {
           return makeResponse([]);
         }

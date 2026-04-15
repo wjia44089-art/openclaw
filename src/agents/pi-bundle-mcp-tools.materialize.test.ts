@@ -19,29 +19,24 @@ afterEach(async () => {
   await cleanupBundleMcpHarness();
 });
 
-async function createBundleProbeRuntime(params?: { reservedToolNames?: string[] }) {
-  const workspaceDir = await makeTempDir("openclaw-bundle-mcp-tools-");
-  const pluginRoot = path.join(workspaceDir, ".openclaw", "extensions", "bundle-probe");
-  const serverScriptPath = path.join(pluginRoot, "servers", "bundle-probe.mjs");
-  await writeBundleProbeMcpServer(serverScriptPath);
-  await writeClaudeBundle({ pluginRoot, serverScriptPath });
-
-  return await createBundleMcpToolRuntime({
-    workspaceDir,
-    cfg: {
-      plugins: {
-        entries: {
-          "bundle-probe": { enabled: true },
-        },
-      },
-    },
-    reservedToolNames: params?.reservedToolNames,
-  });
-}
-
 describe("createBundleMcpToolRuntime", () => {
   it("loads bundle MCP tools and executes them", async () => {
-    const runtime = await createBundleProbeRuntime();
+    const workspaceDir = await makeTempDir("openclaw-bundle-mcp-tools-");
+    const pluginRoot = path.join(workspaceDir, ".openclaw", "extensions", "bundle-probe");
+    const serverScriptPath = path.join(pluginRoot, "servers", "bundle-probe.mjs");
+    await writeBundleProbeMcpServer(serverScriptPath);
+    await writeClaudeBundle({ pluginRoot, serverScriptPath });
+
+    const runtime = await createBundleMcpToolRuntime({
+      workspaceDir,
+      cfg: {
+        plugins: {
+          entries: {
+            "bundle-probe": { enabled: true },
+          },
+        },
+      },
+    });
 
     try {
       expect(runtime.tools.map((tool) => tool.name)).toEqual(["bundleProbe__bundle_probe"]);
@@ -60,7 +55,21 @@ describe("createBundleMcpToolRuntime", () => {
   });
 
   it("disambiguates bundle MCP tools that collide with existing tool names", async () => {
-    const runtime = await createBundleProbeRuntime({
+    const workspaceDir = await makeTempDir("openclaw-bundle-mcp-tools-");
+    const pluginRoot = path.join(workspaceDir, ".openclaw", "extensions", "bundle-probe");
+    const serverScriptPath = path.join(pluginRoot, "servers", "bundle-probe.mjs");
+    await writeBundleProbeMcpServer(serverScriptPath);
+    await writeClaudeBundle({ pluginRoot, serverScriptPath });
+
+    const runtime = await createBundleMcpToolRuntime({
+      workspaceDir,
+      cfg: {
+        plugins: {
+          entries: {
+            "bundle-probe": { enabled: true },
+          },
+        },
+      },
       reservedToolNames: ["bundleProbe__bundle_probe"],
     });
 

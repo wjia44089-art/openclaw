@@ -1,4 +1,4 @@
-import type { ChannelMeta } from "./types.core.js";
+import type { ChannelMeta } from "./types.js";
 
 export function resolveChannelExposure(
   meta: Pick<ChannelMeta, "exposure" | "showConfigured" | "showInSetup">,

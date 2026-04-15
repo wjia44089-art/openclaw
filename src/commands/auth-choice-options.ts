@@ -1,6 +1,7 @@
-import type { AuthProfileStore } from "../agents/auth-profiles/types.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { AuthProfileStore } from "../agents/auth-profiles.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { resolveProviderSetupFlowContributions } from "../flows/provider-flow.js";
+import { resolveManifestProviderAuthChoices } from "../plugins/provider-auth-choices.js";
 import {
   CORE_AUTH_CHOICE_OPTIONS,
   type AuthChoiceGroup,
@@ -58,12 +59,22 @@ export function formatAuthChoiceChoicesForCli(params?: {
   workspaceDir?: string;
   env?: NodeJS.ProcessEnv;
 }): string {
+  // Use manifest-based auth choices for the static CLI help string — this reads
+  // JSON manifests only and avoids the expensive full plugin load (Jiti + AJV)
+  // that resolveProviderSetupFlowContributions triggers. The interactive wizard
+  // flow (buildAuthChoiceOptions) still uses the full runtime path.
+  const scope = "text-inference";
   const values = [
     ...formatStaticAuthChoiceChoicesForCli(params).split("|"),
-    ...resolveProviderSetupFlowContributions({
-      ...params,
-      scope: "text-inference",
-    }).map((contribution) => contribution.option.value),
+    ...resolveManifestProviderAuthChoices({
+      config: params?.config,
+      workspaceDir: params?.workspaceDir,
+      env: params?.env,
+    })
+      .filter(
+        (choice) => !choice.onboardingScopes || choice.onboardingScopes.includes(scope),
+      )
+      .map((choice) => choice.choiceId),
   ];
 
   return [...new Set(values)].join("|");

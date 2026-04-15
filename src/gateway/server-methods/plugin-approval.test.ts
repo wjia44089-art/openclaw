@@ -32,14 +32,6 @@ function createMockOptions(
   } as unknown as GatewayRequestHandlerOptions;
 }
 
-function createNoExecApprovalContext(): GatewayRequestHandlerOptions["context"] {
-  return {
-    broadcast: vi.fn(),
-    logGateway: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
-    hasExecApprovalClients: () => false,
-  } as unknown as GatewayRequestHandlerOptions["context"];
-}
-
 describe("createPluginApprovalHandlers", () => {
   let manager: ExecApprovalManager<PluginApprovalRequestPayload>;
 
@@ -134,7 +126,11 @@ describe("createPluginApprovalHandlers", () => {
           description: "Desc",
         },
         {
-          context: createNoExecApprovalContext(),
+          context: {
+            broadcast: vi.fn(),
+            logGateway: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+            hasExecApprovalClients: () => false,
+          } as unknown as GatewayRequestHandlerOptions["context"],
         },
       );
       await handlers["plugin.approval.request"](opts);
@@ -298,7 +294,11 @@ describe("createPluginApprovalHandlers", () => {
         "plugin.approval.request",
         { title: "T", description: "D" },
         {
-          context: createNoExecApprovalContext(),
+          context: {
+            broadcast: vi.fn(),
+            logGateway: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+            hasExecApprovalClients: () => false,
+          } as unknown as GatewayRequestHandlerOptions["context"],
         },
       );
 

@@ -17,8 +17,6 @@ export const auditShortTermPromotionArtifacts: FacadeModule["auditShortTermPromo
   loadFacadeModule()["auditShortTermPromotionArtifacts"](
     ...args,
   )) as FacadeModule["auditShortTermPromotionArtifacts"];
-export const auditDreamingArtifacts: FacadeModule["auditDreamingArtifacts"] = ((...args) =>
-  loadFacadeModule()["auditDreamingArtifacts"](...args)) as FacadeModule["auditDreamingArtifacts"];
 export const getBuiltinMemoryEmbeddingProviderDoctorMetadata: FacadeModule["getBuiltinMemoryEmbeddingProviderDoctorMetadata"] =
   ((...args) =>
     loadFacadeModule()["getBuiltinMemoryEmbeddingProviderDoctorMetadata"](
@@ -39,16 +37,8 @@ export const repairShortTermPromotionArtifacts: FacadeModule["repairShortTermPro
     loadFacadeModule()["repairShortTermPromotionArtifacts"](
       ...args,
     )) as FacadeModule["repairShortTermPromotionArtifacts"];
-export const repairDreamingArtifacts: FacadeModule["repairDreamingArtifacts"] = ((...args) =>
-  loadFacadeModule()["repairDreamingArtifacts"](
-    ...args,
-  )) as FacadeModule["repairDreamingArtifacts"];
 export type BuiltinMemoryEmbeddingProviderDoctorMetadata =
   import("@openclaw/memory-core/runtime-api.js").BuiltinMemoryEmbeddingProviderDoctorMetadata;
-export type DreamingArtifactsAuditSummary =
-  import("@openclaw/memory-core/runtime-api.js").DreamingArtifactsAuditSummary;
-export type RepairDreamingArtifactsResult =
-  import("@openclaw/memory-core/runtime-api.js").RepairDreamingArtifactsResult;
 export type RepairShortTermPromotionArtifactsResult =
   import("@openclaw/memory-core/runtime-api.js").RepairShortTermPromotionArtifactsResult;
 export type ShortTermAuditSummary =

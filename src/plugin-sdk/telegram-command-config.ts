@@ -44,7 +44,7 @@ function resolveTelegramCustomCommandsImpl(params: {
 
   for (let index = 0; index < entries.length; index += 1) {
     const entry = entries[index];
-    const normalized = normalizeTelegramCommandNameImpl(entry?.command ?? "");
+    const normalized = normalizeTelegramCommandNameImpl(String(entry?.command ?? ""));
     if (!normalized) {
       issues.push({
         index,
@@ -77,7 +77,7 @@ function resolveTelegramCustomCommandsImpl(params: {
       });
       continue;
     }
-    const description = normalizeTelegramCommandDescriptionImpl(entry?.description ?? "");
+    const description = normalizeTelegramCommandDescriptionImpl(String(entry?.description ?? ""));
     if (!description) {
       issues.push({
         index,

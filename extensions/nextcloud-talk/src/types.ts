@@ -182,9 +182,6 @@ export type NextcloudTalkWebhookServerOptions = {
   readBody?: (req: import("node:http").IncomingMessage, maxBodyBytes: number) => Promise<string>;
   isBackendAllowed?: (backend: string) => boolean;
   shouldProcessMessage?: (message: NextcloudTalkInboundMessage) => boolean | Promise<boolean>;
-  processMessage?: (
-    message: NextcloudTalkInboundMessage,
-  ) => void | "processed" | "duplicate" | Promise<void | "processed" | "duplicate">;
   onMessage: (message: NextcloudTalkInboundMessage) => void | Promise<void>;
   onError?: (error: Error) => void;
   abortSignal?: AbortSignal;

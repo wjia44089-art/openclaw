@@ -307,9 +307,11 @@ describe("browser config", () => {
     });
   });
 
-  it("defaults browser SSRF policy to strict mode when unset", () => {
+  it("defaults browser SSRF policy to trusted-network mode", () => {
     const resolved = resolveBrowserConfig({});
-    expect(resolved.ssrfPolicy).toEqual({});
+    expect(resolved.ssrfPolicy).toEqual({
+      dangerouslyAllowPrivateNetwork: true,
+    });
   });
 
   it("supports explicit strict mode by disabling private network access", () => {
@@ -319,19 +321,6 @@ describe("browser config", () => {
       },
     });
     expect(resolved.ssrfPolicy).toEqual({});
-  });
-
-  it("keeps allowlist-only browser SSRF policy strict by default", () => {
-    const resolved = resolveBrowserConfig({
-      ssrfPolicy: {
-        allowedHostnames: ["example.com"],
-        hostnameAllowlist: ["*.example.com"],
-      },
-    } as unknown as BrowserConfig);
-    expect(resolved.ssrfPolicy).toEqual({
-      allowedHostnames: ["example.com"],
-      hostnameAllowlist: ["*.example.com"],
-    });
   });
 
   it("resolves existing-session profiles without cdpPort or cdpUrl", () => {

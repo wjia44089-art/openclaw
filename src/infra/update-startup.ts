@@ -2,15 +2,20 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { formatCliCommand } from "../cli/command-format.js";
+import type { loadConfig } from "../config/config.js";
 import { resolveStateDir } from "../config/paths.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { runCommandWithTimeout } from "../process/exec.js";
 import { normalizeLowercaseStringOrEmpty } from "../shared/string-coerce.js";
 import { VERSION } from "../version.js";
 import { writeJsonAtomic } from "./json-files.js";
 import { resolveOpenClawPackageRoot } from "./openclaw-root.js";
 import { normalizeUpdateChannel, DEFAULT_PACKAGE_CHANNEL } from "./update-channels.js";
-import { compareSemverStrings, resolveNpmChannelTag, checkUpdateStatus } from "./update-check.js";
+import {
+  compareSemverStrings,
+  isCompatibleArchUpdate,
+  resolveNpmChannelTag,
+  checkUpdateStatus,
+} from "./update-check.js";
 
 type UpdateCheckState = {
   lastCheckedAt?: string;
@@ -77,7 +82,7 @@ function shouldSkipCheck(allowInTests: boolean): boolean {
   return false;
 }
 
-function resolveAutoUpdatePolicy(cfg: OpenClawConfig): AutoUpdatePolicy {
+function resolveAutoUpdatePolicy(cfg: ReturnType<typeof loadConfig>): AutoUpdatePolicy {
   const auto = cfg.update?.auto;
   const stableDelayHours =
     typeof auto?.stableDelayHours === "number" && Number.isFinite(auto.stableDelayHours)
@@ -100,7 +105,7 @@ function resolveAutoUpdatePolicy(cfg: OpenClawConfig): AutoUpdatePolicy {
   };
 }
 
-function resolveCheckIntervalMs(cfg: OpenClawConfig): number {
+function resolveCheckIntervalMs(cfg: ReturnType<typeof loadConfig>): number {
   const channel = normalizeUpdateChannel(cfg.update?.channel) ?? DEFAULT_PACKAGE_CHANNEL;
   const auto = resolveAutoUpdatePolicy(cfg);
   if (!auto.enabled) {
@@ -299,7 +304,7 @@ function clearAutoState(nextState: UpdateCheckState): void {
 }
 
 export async function runGatewayUpdateCheck(params: {
-  cfg: OpenClawConfig;
+  cfg: ReturnType<typeof loadConfig>;
   log: { info: (msg: string, meta?: Record<string, unknown>) => void };
   isNixMode: boolean;
   allowInTests?: boolean;
@@ -378,6 +383,12 @@ export async function runGatewayUpdateCheck(params: {
   const resolved = await resolveNpmChannelTag({ channel, timeoutMs: 2500 });
   const tag = resolved.tag;
   if (!resolved.version) {
+    await writeState(statePath, nextState);
+    return;
+  }
+
+  // Target version is not compatible with current arch-specific build; skip.
+  if (!isCompatibleArchUpdate(VERSION, resolved.version)) {
     await writeState(statePath, nextState);
     return;
   }
@@ -486,7 +497,7 @@ export async function runGatewayUpdateCheck(params: {
 }
 
 export function scheduleGatewayUpdateCheck(params: {
-  cfg: OpenClawConfig;
+  cfg: ReturnType<typeof loadConfig>;
   log: { info: (msg: string, meta?: Record<string, unknown>) => void };
   isNixMode: boolean;
   onUpdateAvailableChange?: (updateAvailable: UpdateAvailable | null) => void;

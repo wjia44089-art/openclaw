@@ -19,10 +19,16 @@ export function resolveCliCommandPathPolicy(commandPath: string[]): CliCommandPa
     if (!matchesCommandPath(commandPath, entry.commandPath, { exact: entry.exact })) {
       continue;
     }
-    Object.assign(resolvedPolicy, entry.policy);
+    resolvedPolicy = {
+      ...resolvedPolicy,
+      ...entry.policy,
+    };
   }
   if (isGatewayConfigBypassCommandPath(commandPath)) {
-    resolvedPolicy.bypassConfigGuard = true;
+    resolvedPolicy = {
+      ...resolvedPolicy,
+      bypassConfigGuard: true,
+    };
   }
   return resolvedPolicy;
 }

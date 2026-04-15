@@ -72,7 +72,9 @@ describe("sendMessage channel normalization", () => {
         deliveryMode: "direct",
         resolveTarget: ({ to, cfg }) => {
           seen.resolveCfg = cfg;
-          const normalized = (to ?? "").trim().replace(/^imessage:/i, "");
+          const normalized = String(to ?? "")
+            .trim()
+            .replace(/^imessage:/i, "");
           return { ok: true, to: normalized };
         },
         sendText: async ({ cfg, to }) => {

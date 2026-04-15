@@ -22,7 +22,6 @@ import {
 } from "./graph-upload.js";
 import { extractFilename, extractMessageId, getMimeType, isLocalPath } from "./media-helpers.js";
 import { parseMentions } from "./mentions.js";
-import { setPendingUploadActivityId } from "./pending-uploads.js";
 import { withRevokedProxyFallback } from "./revoked-context.js";
 import { getMSTeamsRuntime } from "./runtime.js";
 
@@ -52,18 +51,6 @@ export type MSTeamsConversationReference = {
   channelId: string;
   serviceUrl?: string;
   locale?: string;
-  /**
-   * Top-level tenant ID echoed onto the Bot Framework connector request. Included
-   * alongside `conversation.tenantId` so the connector can route proactive sends
-   * to the correct Azure AD tenant. Missing it causes HTTP 403 on proactive
-   * (bot-initiated) messages.
-   */
-  tenantId?: string;
-  /**
-   * Azure AD object ID of the target user, forwarded on proactive sends so
-   * Bot Framework can resolve the personal DM recipient on the connector side.
-   */
-  aadObjectId?: string;
 };
 
 export type MSTeamsAdapter = {
@@ -132,26 +119,18 @@ export function buildConversationReference(
   if (!user?.id) {
     throw new Error("Invalid stored reference: missing user.id");
   }
-  // Bot Framework proactive sends require `tenantId` on the outbound activity
-  // so the connector routes to the correct Azure AD tenant; otherwise it rejects
-  // with HTTP 403. Prefer the explicit top-level `ref.tenantId` (captured from
-  // `channelData.tenant.id` inbound) and fall back to `conversation.tenantId`.
-  const tenantId = ref.tenantId ?? ref.conversation?.tenantId;
-  const aadObjectId = ref.aadObjectId ?? user.aadObjectId;
   return {
     activityId: ref.activityId,
-    user: aadObjectId ? { ...user, aadObjectId } : user,
+    user,
     agent,
     conversation: {
       id: normalizeConversationId(conversationId),
       conversationType: ref.conversation?.conversationType,
-      tenantId,
+      tenantId: ref.conversation?.tenantId,
     },
     channelId: ref.channelId ?? "msteams",
     serviceUrl: ref.serviceUrl,
     locale: ref.locale,
-    ...(tenantId ? { tenantId } : {}),
-    ...(aadObjectId ? { aadObjectId } : {}),
   };
 }
 
@@ -343,14 +322,11 @@ export async function buildActivity(
       ) {
         // Large file or non-image in personal chat: use FileConsentCard flow
         const conversationId = conversationRef.conversation?.id ?? "unknown";
-        const { activity: consentActivity, uploadId } = prepareFileConsentActivity({
+        const { activity: consentActivity } = prepareFileConsentActivity({
           media: { buffer: media.buffer, filename: fileName, contentType },
           conversationId,
           description: msg.text || undefined,
         });
-
-        // Tag the activity so the caller can store the activity ID after sending
-        consentActivity._pendingUploadId = uploadId;
 
         // Return the consent activity (caller sends it)
         return consentActivity;
@@ -489,40 +465,21 @@ export async function sendMSTeamsMessages(params: {
     message: MSTeamsRenderedMessage,
     messageIndex: number,
   ): Promise<string> => {
-    let pendingUploadId: string | undefined;
     const response = await sendWithRetry(
-      async () => {
-        const activity = await buildActivity(
-          message,
-          params.conversationRef,
-          params.tokenProvider,
-          params.sharePointSiteId,
-          params.mediaMaxBytes,
-          { feedbackLoopEnabled: params.feedbackLoopEnabled },
-        );
-
-        // Extract and strip the internal-only pending upload tag before sending.
-        pendingUploadId =
-          typeof activity._pendingUploadId === "string" ? activity._pendingUploadId : undefined;
-        if (pendingUploadId) {
-          delete activity._pendingUploadId;
-        }
-
-        return await ctx.sendActivity(activity);
-      },
-      {
-        messageIndex,
-        messageCount: messages.length,
-      },
+      async () =>
+        await ctx.sendActivity(
+          await buildActivity(
+            message,
+            params.conversationRef,
+            params.tokenProvider,
+            params.sharePointSiteId,
+            params.mediaMaxBytes,
+            { feedbackLoopEnabled: params.feedbackLoopEnabled },
+          ),
+        ),
+      { messageIndex, messageCount: messages.length },
     );
-    const messageId = extractMessageId(response) ?? "unknown";
-
-    // Store the activity ID so the accept handler can replace the consent card in-place
-    if (pendingUploadId && messageId !== "unknown") {
-      setPendingUploadActivityId(pendingUploadId, messageId);
-    }
-
-    return messageId;
+    return extractMessageId(response) ?? "unknown";
   };
 
   const sendMessageBatchInContext = async (

@@ -13,6 +13,6 @@ const args = [
   "--maxWorkers=1",
 ];
 
-execFileSync(process.execPath, ["scripts/run-vitest.mjs", ...args], {
+execFileSync("vitest", args, {
   stdio: "inherit",
 });

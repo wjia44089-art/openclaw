@@ -5,11 +5,13 @@ export {
   DEFAULT_OPENCLAW_BROWSER_COLOR,
   DEFAULT_OPENCLAW_BROWSER_ENABLED,
   DEFAULT_OPENCLAW_BROWSER_PROFILE_NAME,
-  DEFAULT_UPLOAD_DIR,
+  parseBrowserHttpUrl,
+  redactCdpUrl,
   resolveBrowserConfig,
+  resolveBrowserControlAuth,
   resolveProfile,
+  type BrowserControlAuth,
   type ResolvedBrowserConfig,
   type ResolvedBrowserProfile,
-} from "./browser-profiles.js";
-export { resolveBrowserControlAuth, type BrowserControlAuth } from "./browser-control-auth.js";
-export { parseBrowserHttpUrl, redactCdpUrl } from "./src/browser/config.js";
+} from "./src/browser/config.js";
+export { DEFAULT_UPLOAD_DIR } from "./src/browser/paths.js";

@@ -1,10 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  applyPluginAutoEnable,
-  materializePluginAutoEnableCandidates,
-} from "./plugin-auto-enable.js";
+import { applyPluginAutoEnable } from "./plugin-auto-enable.js";
 import {
   makeApnChannelConfig,
   makeBluebubblesAndImessageChannels,
@@ -12,6 +9,7 @@ import {
   makeRegistry,
   makeTempDir,
   resetPluginAutoEnableTestState,
+  writePluginManifestFixture,
 } from "./plugin-auto-enable.test-helpers.js";
 
 function applyWithApnChannelConfig(extra?: {
@@ -73,29 +71,16 @@ describe("applyPluginAutoEnable channels", () => {
       "utf-8",
     );
 
-    const result = materializePluginAutoEnableCandidates({
+    const result = applyPluginAutoEnable({
       config: {
         channels: {
           "env-primary": { token: "primary" },
           "env-secondary": { token: "secondary" },
         },
       },
-      candidates: [
-        {
-          pluginId: "env-primary",
-          kind: "channel-configured",
-          channelId: "env-primary",
-        },
-        {
-          pluginId: "env-secondary",
-          kind: "channel-configured",
-          channelId: "env-secondary",
-        },
-      ],
       env: {
         ...makeIsolatedEnv(),
         OPENCLAW_STATE_DIR: stateDir,
-        OPENCLAW_BUNDLED_PLUGINS_DIR: "/nonexistent/bundled/plugins",
       },
       manifestRegistry: makeRegistry([]),
     });
@@ -225,6 +210,29 @@ describe("applyPluginAutoEnable channels", () => {
 
       expect(result.config.channels?.imessage?.enabled).toBe(true);
       expect(result.changes.join("\n")).toContain("iMessage configured, enabled automatically.");
+    });
+
+    it("uses the provided env when loading installed plugin manifests", () => {
+      const stateDir = makeTempDir();
+      const pluginDir = path.join(stateDir, "extensions", "apn-channel");
+      writePluginManifestFixture({
+        rootDir: pluginDir,
+        id: "apn-channel",
+        channels: ["apn"],
+      });
+
+      const result = applyPluginAutoEnable({
+        config: makeApnChannelConfig(),
+        env: {
+          ...makeIsolatedEnv(),
+          OPENCLAW_HOME: undefined,
+          OPENCLAW_STATE_DIR: stateDir,
+          OPENCLAW_BUNDLED_PLUGINS_DIR: "/nonexistent/bundled/plugins",
+        },
+      });
+
+      expect(result.config.plugins?.entries?.["apn-channel"]?.enabled).toBe(true);
+      expect(result.config.plugins?.entries?.apn).toBeUndefined();
     });
   });
 });

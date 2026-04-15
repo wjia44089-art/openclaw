@@ -421,7 +421,7 @@ export async function handleInvoke(
   client: GatewayClient,
   skillBins: SkillBinsProvider,
 ) {
-  const command = frame.command ?? "";
+  const command = String(frame.command ?? "");
   if (command === "system.execApprovals.get") {
     try {
       ensureExecApprovals();

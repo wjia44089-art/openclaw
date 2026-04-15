@@ -113,33 +113,14 @@ async function walkDir(dir: string, files: string[], multimodal?: MemoryMultimod
   }
 }
 
-async function resolveDefaultMemoryRootFile(workspaceDir: string): Promise<string | null> {
-  try {
-    let legacyFallback: string | null = null;
-    const entries = await fs.readdir(workspaceDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.isSymbolicLink() || !entry.isFile()) {
-        continue;
-      }
-      if (entry.name === "MEMORY.md") {
-        return path.join(workspaceDir, entry.name);
-      }
-      if (entry.name === "memory.md") {
-        legacyFallback = path.join(workspaceDir, entry.name);
-      }
-    }
-    return legacyFallback;
-  } catch {
-    return null;
-  }
-}
-
 export async function listMemoryFiles(
   workspaceDir: string,
   extraPaths?: string[],
   multimodal?: MemoryMultimodalSettings,
 ): Promise<string[]> {
   const result: string[] = [];
+  const memoryFile = path.join(workspaceDir, "MEMORY.md");
+  const altMemoryFile = path.join(workspaceDir, "memory.md");
   const memoryDir = path.join(workspaceDir, "memory");
 
   const addMarkdownFile = async (absPath: string) => {
@@ -155,10 +136,8 @@ export async function listMemoryFiles(
     } catch {}
   };
 
-  const rootMemoryFile = await resolveDefaultMemoryRootFile(workspaceDir);
-  if (rootMemoryFile) {
-    await addMarkdownFile(rootMemoryFile);
-  }
+  await addMarkdownFile(memoryFile);
+  await addMarkdownFile(altMemoryFile);
   try {
     const dirStat = await fs.lstat(memoryDir);
     if (!dirStat.isSymbolicLink() && dirStat.isDirectory()) {

@@ -1,4 +1,5 @@
-import { isCommandFlagEnabled, type CommandFlagKey } from "../../config/commands.flags.js";
+import type { CommandFlagKey } from "../../config/commands.js";
+import { isCommandFlagEnabled } from "../../config/commands.js";
 import { logVerbose } from "../../globals.js";
 import { redactIdentifier } from "../../logging/redact-identifier.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";

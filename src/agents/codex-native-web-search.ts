@@ -1,4 +1,4 @@
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { normalizeOptionalString } from "../shared/string-coerce.js";
 import { isRecord } from "../utils.js";
 import { ensureAuthProfileStore, listProfilesForProvider } from "./auth-profiles.js";
@@ -113,14 +113,6 @@ export function hasAvailableCodexAuth(params: {
   config?: OpenClawConfig;
   agentDir?: string;
 }): boolean {
-  if (
-    Object.values(params.config?.auth?.profiles ?? {}).some(
-      (profile) => isRecord(profile) && profile.provider === "openai-codex",
-    )
-  ) {
-    return true;
-  }
-
   if (params.agentDir) {
     try {
       if (
@@ -132,7 +124,10 @@ export function hasAvailableCodexAuth(params: {
       // Fall back to config-based detection below.
     }
   }
-  return false;
+
+  return Object.values(params.config?.auth?.profiles ?? {}).some(
+    (profile) => isRecord(profile) && profile.provider === "openai-codex",
+  );
 }
 
 export function resolveCodexNativeSearchActivation(params: {

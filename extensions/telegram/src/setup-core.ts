@@ -10,7 +10,6 @@ import {
 } from "openclaw/plugin-sdk/setup-runtime";
 import { formatCliCommand, formatDocsLink } from "openclaw/plugin-sdk/setup-tools";
 import { resolveDefaultTelegramAccountId, resolveTelegramAccount } from "./accounts.js";
-import { isNumericTelegramSenderUserId } from "./allow-from.js";
 import { lookupTelegramChatId } from "./api-fetch.js";
 
 const channel = "telegram" as const;
@@ -41,7 +40,7 @@ export function normalizeTelegramAllowFromInput(raw: string): string {
 
 export function parseTelegramAllowFromId(raw: string): string | null {
   const stripped = normalizeTelegramAllowFromInput(raw);
-  return isNumericTelegramSenderUserId(stripped) ? stripped : null;
+  return /^\d+$/.test(stripped) ? stripped : null;
 }
 
 export async function resolveTelegramAllowFromEntries(params: {

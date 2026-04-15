@@ -24,7 +24,7 @@ function createReplyDeliveryCore(): DeliverMattermostReplyPayloadParams["core"] 
         resolveChunkMode: vi.fn<() => ChunkMode>(() => "length"),
         resolveTextChunkLimit: vi.fn(
           (
-            _cfg?: OpenClawConfig,
+            _cfg: OpenClawConfig | undefined,
             _provider?: string,
             _accountId?: string | null,
             opts?: { fallbackLimit?: number },

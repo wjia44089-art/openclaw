@@ -1,9 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { URL } from "node:url";
 import type { AgentToolResult } from "@mariozechner/pi-agent-core";
 import { createEditTool, createReadTool, createWriteTool } from "@mariozechner/pi-coding-agent";
-import { isWindowsDrivePath } from "../infra/archive-path.js";
 import {
   appendFileWithinRoot,
   SafeOpenError,
@@ -11,7 +9,7 @@ import {
   readFileWithinRoot,
   writeFileWithinRoot,
 } from "../infra/fs-safe.js";
-import { hasEncodedFileUrlSeparator, trySafeFileURLToPath } from "../infra/local-file-access.js";
+import { trySafeFileURLToPath } from "../infra/local-file-access.js";
 import { detectMime } from "../media/mime.js";
 import { sniffMimeFromBase64 } from "../media/sniff-mime-from-base64.js";
 import type { ImageSanitizationLimits } from "./image-sanitization.js";
@@ -375,41 +373,10 @@ function mapContainerPathToWorkspaceRoot(params: {
   let candidate = params.filePath.startsWith("@") ? params.filePath.slice(1) : params.filePath;
   if (/^file:\/\//i.test(candidate)) {
     const localFilePath = trySafeFileURLToPath(candidate);
-    if (localFilePath) {
-      candidate = localFilePath;
-    } else {
-      // Windows rejects posix-style file:///workspace/... in fileURLToPath; map via URL pathname
-      // when it clearly refers to the container workdir (same idea as sandbox-paths).
-      let parsed: URL;
-      try {
-        parsed = new URL(candidate);
-      } catch {
-        return params.filePath;
-      }
-      if (parsed.protocol !== "file:") {
-        return params.filePath;
-      }
-      const host = parsed.hostname.trim().toLowerCase();
-      if (host && host !== "localhost") {
-        return params.filePath;
-      }
-      if (hasEncodedFileUrlSeparator(parsed.pathname)) {
-        return params.filePath;
-      }
-      let normalizedPathname: string;
-      try {
-        normalizedPathname = decodeURIComponent(parsed.pathname).replace(/\\/g, "/");
-      } catch {
-        return params.filePath;
-      }
-      if (
-        normalizedPathname !== normalizedWorkdir &&
-        !normalizedPathname.startsWith(`${normalizedWorkdir}/`)
-      ) {
-        return params.filePath;
-      }
-      candidate = normalizedPathname;
+    if (!localFilePath) {
+      return params.filePath;
     }
+    candidate = localFilePath;
   }
 
   const normalizedCandidate = candidate.replace(/\\/g, "/");
@@ -434,13 +401,9 @@ export function resolveToolPathAgainstWorkspaceRoot(params: {
 }): string {
   const mapped = mapContainerPathToWorkspaceRoot(params);
   const candidate = mapped.startsWith("@") ? mapped.slice(1) : mapped;
-  if (isWindowsDrivePath(candidate)) {
-    return path.win32.normalize(candidate);
-  }
-  if (path.isAbsolute(candidate)) {
-    return path.resolve(candidate);
-  }
-  return path.resolve(params.root, candidate || ".");
+  return path.isAbsolute(candidate)
+    ? path.resolve(candidate)
+    : path.resolve(params.root, candidate || ".");
 }
 
 type MemoryFlushAppendOnlyWriteOptions = {
@@ -588,34 +551,22 @@ export function wrapToolWorkspaceRootGuardWithOptions(
   root: string,
   options?: {
     containerWorkdir?: string;
-    pathParamKeys?: readonly string[];
-    normalizeGuardedPathParams?: boolean;
   },
 ): AnyAgentTool {
-  const pathParamKeys =
-    options?.pathParamKeys && options.pathParamKeys.length > 0 ? options.pathParamKeys : ["path"];
   return {
     ...tool,
     execute: async (toolCallId, args, signal, onUpdate) => {
       const record = getToolParamsRecord(args);
-      let normalizedRecord: Record<string, unknown> | undefined;
-      for (const key of pathParamKeys) {
-        const filePath = record?.[key];
-        if (typeof filePath !== "string" || !filePath.trim()) {
-          continue;
-        }
+      const filePath = record?.path;
+      if (typeof filePath === "string" && filePath.trim()) {
         const sandboxPath = mapContainerPathToWorkspaceRoot({
           filePath,
           root,
           containerWorkdir: options?.containerWorkdir,
         });
-        const sandboxResult = await assertSandboxPath({ filePath: sandboxPath, cwd: root, root });
-        if (options?.normalizeGuardedPathParams && record) {
-          normalizedRecord ??= { ...record };
-          normalizedRecord[key] = sandboxResult.resolved;
-        }
+        await assertSandboxPath({ filePath: sandboxPath, cwd: root, root });
       }
-      return tool.execute(toolCallId, normalizedRecord ?? args, signal, onUpdate);
+      return tool.execute(toolCallId, args, signal, onUpdate);
     },
   };
 }
@@ -690,7 +641,7 @@ export function createOpenClawReadTool(
         signal,
         maxBytes: resolveAdaptiveReadMaxBytes(options),
       });
-      const filePath = typeof record?.path === "string" ? record.path : "<unknown>";
+      const filePath = typeof record?.path === "string" ? String(record.path) : "<unknown>";
       const strippedDetailsResult = stripReadTruncationContentDetails(result);
       const normalizedResult = await normalizeReadImageResult(strippedDetailsResult, filePath);
       return sanitizeToolResultImages(

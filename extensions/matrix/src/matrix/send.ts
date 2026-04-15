@@ -31,7 +31,6 @@ import {
 import { normalizeThreadId, resolveMatrixRoomId } from "./send/targets.js";
 import {
   EventType,
-  MSC4357_LIVE_KEY,
   MsgType,
   RelationType,
   type MatrixExtraContentFields,
@@ -414,8 +413,6 @@ export async function sendSingleTextMessageMatrix(
     msgtype?: MatrixTextMsgType;
     includeMentions?: boolean;
     extraContent?: MatrixExtraContentFields;
-    /** When true, marks the message as a live/streaming update (MSC4357). */
-    live?: boolean;
   } = {},
 ): Promise<MatrixSendResult> {
   const { trimmedText, convertedText, singleEventLimit, fitsInSingleEvent } =
@@ -455,11 +452,6 @@ export async function sendSingleTextMessageMatrix(
         markdown: convertedText,
         includeMentions: opts.includeMentions,
       });
-      // MSC4357: mark the initial message as live so supporting clients start
-      // rendering a streaming animation immediately.
-      if (opts.live) {
-        (content as Record<string, unknown>)[MSC4357_LIVE_KEY] = {};
-      }
       const eventId = await client.sendMessage(resolvedRoom, content);
       return {
         messageId: eventId ?? "unknown",
@@ -500,8 +492,6 @@ export async function editMessageMatrix(
     msgtype?: MatrixTextMsgType;
     includeMentions?: boolean;
     extraContent?: MatrixExtraContentFields;
-    /** When true, marks the edit as a live/streaming update (MSC4357). */
-    live?: boolean;
   } = {},
 ): Promise<string> {
   return await withResolvedMatrixSendClient(
@@ -569,15 +559,6 @@ export async function editMessageMatrix(
       };
       if (replaceMentions !== undefined) {
         content["m.mentions"] = replaceMentions;
-      }
-
-      // MSC4357: mark in-progress edits so supporting clients can render a
-      // streaming animation. The marker is placed in both the outer content
-      // (for unencrypted rooms / server-side aggregation) and inside
-      // m.new_content (for E2EE rooms where only decrypted content is read).
-      if (opts.live) {
-        content[MSC4357_LIVE_KEY] = {};
-        (content["m.new_content"] as Record<string, unknown>)[MSC4357_LIVE_KEY] = {};
       }
 
       const eventId = await client.sendMessage(resolvedRoom, content);

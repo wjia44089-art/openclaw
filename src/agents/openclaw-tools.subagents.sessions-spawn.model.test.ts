@@ -151,14 +151,4 @@ describe("subagent spawn model + thinking plan", () => {
       }),
     ).toBe(2);
   });
-
-  it("falls back to 0 when config omits the timeout", () => {
-    expect(
-      resolveConfiguredSubagentRunTimeoutSeconds({
-        cfg: createConfig({
-          agents: { defaults: { subagents: { maxConcurrent: 8 } } },
-        }),
-      }),
-    ).toBe(0);
-  });
 });

@@ -159,41 +159,36 @@ export function createFeishuThreadBindingManager(params: {
       metadata,
     }) => {
       const normalizedConversationId = conversationId.trim();
-      const normalizedTargetSessionKey = targetSessionKey.trim();
-      if (!normalizedConversationId || !normalizedTargetSessionKey) {
+      if (!normalizedConversationId || !targetSessionKey.trim()) {
         return null;
       }
-      const existing = getState().bindingsByAccountConversation.get(
-        resolveBindingKey({ accountId, conversationId: normalizedConversationId }),
-      );
       const now = Date.now();
       const record: FeishuThreadBindingRecord = {
         accountId,
         conversationId: normalizedConversationId,
-        parentConversationId:
-          normalizeOptionalString(parentConversationId) ?? existing?.parentConversationId,
+        parentConversationId: normalizeOptionalString(parentConversationId),
         deliveryTo:
           typeof metadata?.deliveryTo === "string" && metadata.deliveryTo.trim()
             ? metadata.deliveryTo.trim()
-            : existing?.deliveryTo,
+            : undefined,
         deliveryThreadId:
           typeof metadata?.deliveryThreadId === "string" && metadata.deliveryThreadId.trim()
             ? metadata.deliveryThreadId.trim()
-            : existing?.deliveryThreadId,
+            : undefined,
         targetKind: toFeishuTargetKind(targetKind),
-        targetSessionKey: normalizedTargetSessionKey,
+        targetSessionKey: targetSessionKey.trim(),
         agentId:
           typeof metadata?.agentId === "string" && metadata.agentId.trim()
             ? metadata.agentId.trim()
-            : (existing?.agentId ?? resolveAgentIdFromSessionKey(normalizedTargetSessionKey)),
+            : resolveAgentIdFromSessionKey(targetSessionKey),
         label:
           typeof metadata?.label === "string" && metadata.label.trim()
             ? metadata.label.trim()
-            : existing?.label,
+            : undefined,
         boundBy:
           typeof metadata?.boundBy === "string" && metadata.boundBy.trim()
             ? metadata.boundBy.trim()
-            : existing?.boundBy,
+            : undefined,
         boundAt: now,
         lastActivityAt: now,
       };

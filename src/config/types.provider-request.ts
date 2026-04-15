@@ -42,6 +42,4 @@ export type ConfiguredProviderRequest = {
   tls?: ConfiguredProviderRequestTls;
 };
 
-export type ConfiguredModelProviderRequest = ConfiguredProviderRequest & {
-  allowPrivateNetwork?: boolean;
-};
+export type ConfiguredModelProviderRequest = ConfiguredProviderRequest;

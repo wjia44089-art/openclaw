@@ -89,10 +89,8 @@ const installRunEmbeddedMocks = () => {
     initializeGlobalHookRunner: vi.fn(),
     resetGlobalHookRunner: vi.fn(),
   }));
-  vi.doMock("../context-engine/init.js", () => ({
+  vi.doMock("../context-engine/index.js", () => ({
     ensureContextEnginesInitialized: vi.fn(),
-  }));
-  vi.doMock("../context-engine/registry.js", () => ({
     resolveContextEngine: vi.fn(async () => ({
       dispose: async () => undefined,
     })),

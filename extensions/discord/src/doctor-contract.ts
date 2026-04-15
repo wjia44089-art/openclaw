@@ -5,10 +5,16 @@ import type {
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
 import {
   asObjectRecord,
+  hasLegacyAccountStreamingAliases,
+  hasLegacyStreamingAliases,
   normalizeLegacyDmAliases,
   normalizeLegacyStreamingAliases,
 } from "openclaw/plugin-sdk/runtime-doctor";
 import { resolveDiscordPreviewStreamMode } from "./preview-streaming.js";
+
+function hasLegacyDiscordStreamingAliases(value: unknown): boolean {
+  return hasLegacyStreamingAliases(value, { includePreviewChunk: true });
+}
 
 const LEGACY_TTS_PROVIDER_KEYS = ["openai", "elevenlabs", "microsoft", "edge"] as const;
 
@@ -109,6 +115,18 @@ function migrateLegacyTtsConfig(
 
 export const legacyConfigRules: ChannelDoctorLegacyConfigRule[] = [
   {
+    path: ["channels", "discord"],
+    message:
+      "channels.discord.streamMode, channels.discord.streaming (scalar), chunkMode, blockStreaming, draftChunk, and blockStreamingCoalesce are legacy; use channels.discord.streaming.{mode,chunkMode,preview.chunk,block.enabled,block.coalesce}.",
+    match: hasLegacyDiscordStreamingAliases,
+  },
+  {
+    path: ["channels", "discord", "accounts"],
+    message:
+      "channels.discord.accounts.<id>.streamMode, streaming (scalar), chunkMode, blockStreaming, draftChunk, and blockStreamingCoalesce are legacy; use channels.discord.accounts.<id>.streaming.{mode,chunkMode,preview.chunk,block.enabled,block.coalesce}.",
+    match: (value) => hasLegacyAccountStreamingAliases(value, hasLegacyDiscordStreamingAliases),
+  },
+  {
     path: ["channels", "discord", "voice", "tts"],
     message:
       'channels.discord.voice.tts.<provider> keys (openai/elevenlabs/microsoft/edge) are legacy; use channels.discord.voice.tts.providers.<provider>. Run "openclaw doctor --fix".',
@@ -150,8 +168,10 @@ export function normalizeCompatibilityConfig({
     entry: updated,
     pathPrefix: "channels.discord",
     changes,
-    resolvedMode: resolveDiscordPreviewStreamMode(updated),
     includePreviewChunk: true,
+    resolvedMode: resolveDiscordPreviewStreamMode(updated),
+    offModeLegacyNotice: (pathPrefix) =>
+      `${pathPrefix}.streaming remains off by default to avoid Discord preview-edit rate limits; set ${pathPrefix}.streaming.mode="partial" to opt in explicitly.`,
   });
   updated = streaming.entry;
   changed = changed || streaming.changed;
@@ -178,8 +198,10 @@ export function normalizeCompatibilityConfig({
         entry: accountEntry,
         pathPrefix: `channels.discord.accounts.${accountId}`,
         changes,
-        resolvedMode: resolveDiscordPreviewStreamMode(accountEntry),
         includePreviewChunk: true,
+        resolvedMode: resolveDiscordPreviewStreamMode(accountEntry),
+        offModeLegacyNotice: (pathPrefix) =>
+          `${pathPrefix}.streaming remains off by default to avoid Discord preview-edit rate limits; set ${pathPrefix}.streaming.mode="partial" to opt in explicitly.`,
       });
       accountEntry = accountStreaming.entry;
       accountChanged = accountChanged || accountStreaming.changed;

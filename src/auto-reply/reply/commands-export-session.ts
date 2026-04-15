@@ -11,7 +11,6 @@ import {
 import { loadSessionStore } from "../../config/sessions/store.js";
 import type { SessionEntry } from "../../config/sessions/types.js";
 import { formatErrorMessage } from "../../infra/errors.js";
-import { resolveAgentIdFromSessionKey } from "../../routing/session-key.js";
 import type { ReplyPayload } from "../types.js";
 import { resolveCommandsSystemPromptBundle } from "./commands-system-prompt.js";
 import type { HandleCommandsParams } from "./commands-types.js";
@@ -114,9 +113,13 @@ function parseExportArgs(commandBodyNormalized: string): { outputPath?: string }
 export async function buildExportSessionReply(params: HandleCommandsParams): Promise<ReplyPayload> {
   const args = parseExportArgs(params.command.commandBodyNormalized);
 
-  // 1. Resolve target session entry and session file from the canonical target store.
-  const targetAgentId = resolveAgentIdFromSessionKey(params.sessionKey) || params.agentId;
-  const storePath = params.storePath ?? resolveDefaultSessionStorePath(targetAgentId);
+  // 1. Resolve session file
+  const sessionEntry = params.sessionEntry;
+  if (!sessionEntry?.sessionId) {
+    return { text: "❌ No active session found." };
+  }
+
+  const storePath = resolveDefaultSessionStorePath(params.agentId);
   const store = loadSessionStore(storePath, { skipCache: true });
   const entry = store[params.sessionKey] as SessionEntry | undefined;
   if (!entry?.sessionId) {
@@ -128,7 +131,7 @@ export async function buildExportSessionReply(params: HandleCommandsParams): Pro
     sessionFile = resolveSessionFilePath(
       entry.sessionId,
       entry,
-      resolveSessionFilePathOptions({ agentId: targetAgentId, storePath }),
+      resolveSessionFilePathOptions({ agentId: params.agentId, storePath }),
     );
   } catch (err) {
     return {
@@ -147,10 +150,7 @@ export async function buildExportSessionReply(params: HandleCommandsParams): Pro
   const leafId = sessionManager.getLeafId();
 
   // 3. Build full system prompt
-  const { systemPrompt, tools } = await resolveCommandsSystemPromptBundle({
-    ...params,
-    sessionEntry: entry as HandleCommandsParams["sessionEntry"],
-  });
+  const { systemPrompt, tools } = await resolveCommandsSystemPromptBundle(params);
 
   // 4. Prepare session data
   const sessionData: SessionData = {

@@ -42,14 +42,6 @@ export {
 export type { BrowserControlAuth };
 export { parseBrowserHttpUrl as parseHttpUrl };
 
-type BrowserSsrFPolicyCompat = NonNullable<BrowserConfig["ssrfPolicy"]> & {
-  /**
-   * Legacy raw-config alias. Keep it out of the public BrowserConfig type while
-   * still accepting old user files until doctor rewrites them.
-   */
-  allowPrivateNetwork?: boolean;
-};
-
 export type ResolvedBrowserConfig = {
   enabled: boolean;
   evaluateEnabled: boolean;
@@ -127,7 +119,9 @@ function resolveCdpPortRangeStart(
 const normalizeStringList = normalizeOptionalTrimmedStringList;
 
 function resolveBrowserSsrFPolicy(cfg: BrowserConfig | undefined): SsrFPolicy | undefined {
-  const rawPolicy = cfg?.ssrfPolicy as BrowserSsrFPolicyCompat | undefined;
+  const rawPolicy = cfg?.ssrfPolicy as
+    | (BrowserConfig["ssrfPolicy"] & { allowPrivateNetwork?: boolean })
+    | undefined;
   const allowPrivateNetwork = rawPolicy?.allowPrivateNetwork;
   const dangerouslyAllowPrivateNetwork = rawPolicy?.dangerouslyAllowPrivateNetwork;
   const allowedHostnames = normalizeStringList(rawPolicy?.allowedHostnames);
@@ -135,7 +129,9 @@ function resolveBrowserSsrFPolicy(cfg: BrowserConfig | undefined): SsrFPolicy | 
   const hasExplicitPrivateSetting =
     allowPrivateNetwork !== undefined || dangerouslyAllowPrivateNetwork !== undefined;
   const resolvedAllowPrivateNetwork =
-    dangerouslyAllowPrivateNetwork === true || allowPrivateNetwork === true;
+    dangerouslyAllowPrivateNetwork === true ||
+    allowPrivateNetwork === true ||
+    !hasExplicitPrivateSetting;
 
   if (
     !resolvedAllowPrivateNetwork &&
@@ -143,9 +139,7 @@ function resolveBrowserSsrFPolicy(cfg: BrowserConfig | undefined): SsrFPolicy | 
     !allowedHostnames &&
     !hostnameAllowlist
   ) {
-    // Keep the default policy object present so CDP guards still enforce
-    // fail-closed private-network checks on unconfigured installs.
-    return {};
+    return undefined;
   }
 
   return {

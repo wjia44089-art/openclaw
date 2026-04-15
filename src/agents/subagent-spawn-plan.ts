@@ -1,7 +1,11 @@
-import { formatThinkingLevels } from "../auto-reply/thinking.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import { formatThinkingLevels, normalizeThinkLevel } from "../auto-reply/thinking.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { resolveSubagentSpawnModelSelection } from "./model-selection.js";
-import { resolveSubagentThinkingOverride } from "./subagent-spawn-thinking.js";
+import { readStringParam } from "./tools/common.js";
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
+}
 
 export function splitModelRef(ref?: string) {
   if (!ref) {
@@ -45,18 +49,31 @@ export function resolveSubagentModelAndThinkingPlan(params: {
     modelOverride: params.modelOverride,
   });
 
-  const thinkingPlan = resolveSubagentThinkingOverride({
-    cfg: params.cfg,
-    targetAgentConfig: params.targetAgentConfig,
-    thinkingOverrideRaw: params.thinkingOverrideRaw,
-  });
-  if (thinkingPlan.status === "error") {
+  const targetSubagents = asRecord(asRecord(params.targetAgentConfig)?.subagents);
+  const defaultSubagents = asRecord(params.cfg.agents?.defaults?.subagents);
+  const resolvedThinkingDefaultRaw =
+    readStringParam(targetSubagents ?? {}, "thinking") ??
+    readStringParam(defaultSubagents ?? {}, "thinking");
+
+  const thinkingCandidateRaw = params.thinkingOverrideRaw || resolvedThinkingDefaultRaw;
+  if (!thinkingCandidateRaw) {
+    return {
+      status: "ok" as const,
+      resolvedModel,
+      modelApplied: Boolean(resolvedModel),
+      initialSessionPatch: resolvedModel ? { model: resolvedModel } : {},
+      thinkingOverride: undefined,
+    };
+  }
+
+  const normalizedThinking = normalizeThinkLevel(thinkingCandidateRaw);
+  if (!normalizedThinking) {
     const { provider, model } = splitModelRef(resolvedModel);
     const hint = formatThinkingLevels(provider, model);
     return {
       status: "error" as const,
       resolvedModel,
-      error: `Invalid thinking level "${thinkingPlan.thinkingCandidateRaw}". Use one of: ${hint}.`,
+      error: `Invalid thinking level "${thinkingCandidateRaw}". Use one of: ${hint}.`,
     };
   }
 
@@ -64,10 +81,10 @@ export function resolveSubagentModelAndThinkingPlan(params: {
     status: "ok" as const,
     resolvedModel,
     modelApplied: Boolean(resolvedModel),
-    thinkingOverride: thinkingPlan.thinkingOverride,
+    thinkingOverride: normalizedThinking,
     initialSessionPatch: {
       ...(resolvedModel ? { model: resolvedModel } : {}),
-      ...thinkingPlan.initialSessionPatch,
+      thinkingLevel: normalizedThinking === "off" ? null : normalizedThinking,
     },
   };
 }

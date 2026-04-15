@@ -99,6 +99,7 @@ export function processEvent(ctx: EventContext, event: NormalizedEvent): void {
   if (ctx.processedEventIds.has(dedupeKey)) {
     return;
   }
+  ctx.processedEventIds.add(dedupeKey);
 
   let call = findCall({
     activeCalls: ctx.activeCalls,
@@ -124,7 +125,6 @@ export function processEvent(ctx: EventContext, event: NormalizedEvent): void {
         );
         return;
       }
-      ctx.processedEventIds.add(dedupeKey);
       if (ctx.rejectedProviderCallIds.has(pid)) {
         return;
       }
@@ -138,7 +138,6 @@ export function processEvent(ctx: EventContext, event: NormalizedEvent): void {
           reason: "hangup-bot",
         })
         .catch((err) => {
-          ctx.rejectedProviderCallIds.delete(pid);
           const message = formatErrorMessage(err);
           console.warn(`[voice-call] Failed to reject inbound call ${pid}:`, message);
         });
@@ -173,11 +172,7 @@ export function processEvent(ctx: EventContext, event: NormalizedEvent): void {
     }
   }
 
-  const shouldCommitReplayKey = !(event.type === "call.error" && event.retryable);
-  if (shouldCommitReplayKey) {
-    ctx.processedEventIds.add(dedupeKey);
-    call.processedEventIds.push(dedupeKey);
-  }
+  call.processedEventIds.push(dedupeKey);
 
   switch (event.type) {
     case "call.initiated":
@@ -249,8 +244,6 @@ export function processEvent(ctx: EventContext, event: NormalizedEvent): void {
         });
         return;
       }
-      // Keep retryable provider errors replayable so a redelivery can still
-      // drive later recovery or terminal handling for the same event key.
       break;
   }
 

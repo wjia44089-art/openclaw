@@ -5,10 +5,6 @@ import {
 
 let builtinsRegisteredPromise: Promise<void> | null = null;
 
-export function isStatefulTargetBuiltinDriverId(id: string): boolean {
-  return id.trim() === "acp";
-}
-
 export async function ensureStatefulTargetBuiltinsRegistered(): Promise<void> {
   if (builtinsRegisteredPromise) {
     await builtinsRegisteredPromise;

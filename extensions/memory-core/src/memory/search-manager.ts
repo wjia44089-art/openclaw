@@ -1,4 +1,3 @@
-import fs from "node:fs/promises";
 import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
 import {
   createSubsystemLogger,
@@ -11,7 +10,6 @@ import {
   resolveMemoryBackendConfig,
   type MemoryEmbeddingProbeResult,
   type MemorySearchManager,
-  type MemorySearchRuntimeDebug,
   type MemorySyncProgressUpdate,
   type ResolvedQmdConfig,
 } from "openclaw/plugin-sdk/memory-core-host-engine-storage";
@@ -69,20 +67,10 @@ export async function getMemorySearchManager(params: {
       }
     }
 
-    const workspaceDir = resolveAgentWorkspaceDir(params.cfg, params.agentId);
-    try {
-      await fs.mkdir(workspaceDir, { recursive: true });
-    } catch (err) {
-      log.warn(
-        `qmd workspace unavailable (${workspaceDir}); falling back to builtin: ${formatErrorMessage(err)}`,
-      );
-      return await getBuiltinMemorySearchManager(params);
-    }
-
     const qmdBinary = await checkQmdBinaryAvailability({
       command: resolved.qmd.command,
       env: process.env,
-      cwd: workspaceDir,
+      cwd: resolveAgentWorkspaceDir(params.cfg, params.agentId),
     });
     if (!qmdBinary.available) {
       log.warn(
@@ -123,14 +111,6 @@ export async function getMemorySearchManager(params: {
     }
   }
 
-  return await getBuiltinMemorySearchManager(params);
-}
-
-async function getBuiltinMemorySearchManager(params: {
-  cfg: OpenClawConfig;
-  agentId: string;
-  purpose?: "default" | "status";
-}): Promise<MemorySearchManagerResult> {
   try {
     const { MemoryIndexManager } = await loadManagerRuntime();
     const manager = await MemoryIndexManager.get(params);
@@ -146,13 +126,7 @@ class BorrowedMemoryManager implements MemorySearchManager {
 
   async search(
     query: string,
-    opts?: {
-      maxResults?: number;
-      minScore?: number;
-      sessionKey?: string;
-      qmdSearchModeOverride?: "query" | "search" | "vsearch";
-      onDebug?: (debug: MemorySearchRuntimeDebug) => void;
-    },
+    opts?: { maxResults?: number; minScore?: number; sessionKey?: string },
   ) {
     return await this.inner.search(query, opts);
   }
@@ -217,13 +191,7 @@ class FallbackMemoryManager implements MemorySearchManager {
 
   async search(
     query: string,
-    opts?: {
-      maxResults?: number;
-      minScore?: number;
-      sessionKey?: string;
-      qmdSearchModeOverride?: "query" | "search" | "vsearch";
-      onDebug?: (debug: MemorySearchRuntimeDebug) => void;
-    },
+    opts?: { maxResults?: number; minScore?: number; sessionKey?: string },
   ) {
     if (!this.primaryFailed) {
       try {

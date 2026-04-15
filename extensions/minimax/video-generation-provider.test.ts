@@ -1,5 +1,4 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { expectExplicitVideoGenerationCapabilities } from "../../test/helpers/media-generation/provider-capability-assertions.js";
 import {
   getMinimaxProviderHttpMocks,
   installMinimaxProviderHttpMockCleanup,
@@ -19,10 +18,6 @@ beforeAll(async () => {
 installMinimaxProviderHttpMockCleanup();
 
 describe("minimax video generation provider", () => {
-  it("declares explicit mode capabilities", () => {
-    expectExplicitVideoGenerationCapabilities(buildMinimaxVideoGenerationProvider());
-  });
-
   it("creates a task, polls status, and downloads the generated video", async () => {
     postJsonRequestMock.mockResolvedValue({
       response: {

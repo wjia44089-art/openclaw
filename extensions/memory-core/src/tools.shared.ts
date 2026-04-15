@@ -133,11 +133,6 @@ export function buildMemorySearchUnavailableResult(error: string | undefined) {
     error: reason,
     warning,
     action,
-    debug: {
-      warning,
-      action,
-      error: reason,
-    },
   };
 }
 

@@ -1,11 +1,11 @@
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  collectTelegramInvalidAllowFromWarnings,
+  collectTelegramAllowFromUsernameWarnings,
   collectTelegramEmptyAllowlistExtraWarnings,
   collectTelegramGroupPolicyWarnings,
   maybeRepairTelegramAllowFromUsernames,
-  scanTelegramInvalidAllowFromEntries,
+  scanTelegramAllowFromUsernameEntries,
   telegramDoctor,
 } from "./doctor.js";
 
@@ -14,9 +14,12 @@ const listTelegramAccountIdsMock = vi.hoisted(() => vi.fn());
 const inspectTelegramAccountMock = vi.hoisted(() => vi.fn());
 const lookupTelegramChatIdMock = vi.hoisted(() => vi.fn());
 
-vi.mock("openclaw/plugin-sdk/runtime-secret-resolution", () => {
+vi.mock("openclaw/plugin-sdk/runtime", async () => {
+  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/runtime")>(
+    "openclaw/plugin-sdk/runtime",
+  );
   return {
-    getChannelsCommandSecretTargetIds: () => ["channels"],
+    ...actual,
     resolveCommandSecretRefsViaGateway: resolveCommandSecretRefsViaGatewayMock,
   };
 });
@@ -152,14 +155,14 @@ describe("telegram doctor", () => {
     ).toEqual(["Moved channels.telegram.streamMode → channels.telegram.streaming.mode (block)."]);
   });
 
-  it("finds invalid allowFrom entries across scopes", () => {
-    const hits = scanTelegramInvalidAllowFromEntries({
+  it("finds username allowFrom entries across scopes", () => {
+    const hits = scanTelegramAllowFromUsernameEntries({
       channels: {
         telegram: {
           allowFrom: ["@top"],
           accounts: {
             work: {
-              allowFrom: ["tg:@work", -1001234567890],
+              allowFrom: ["tg:@work"],
               groups: { "-100123": { topics: { "99": { allowFrom: ["@topic"] } } } },
             },
           },
@@ -170,7 +173,6 @@ describe("telegram doctor", () => {
     expect(hits).toEqual([
       { path: "channels.telegram.allowFrom", entry: "@top" },
       { path: "channels.telegram.accounts.work.allowFrom", entry: "tg:@work" },
-      { path: "channels.telegram.accounts.work.allowFrom", entry: "-1001234567890" },
       {
         path: "channels.telegram.accounts.work.groups.-100123.topics.99.allowFrom",
         entry: "@topic",
@@ -216,21 +218,6 @@ describe("telegram doctor", () => {
 
     expect(result.config.channels?.telegram?.allowFrom).toEqual(["111"]);
     expect(result.changes[0]).toContain("@testuser");
-  });
-
-  it("surfaces negative chat ids as invalid allowFrom sender entries", async () => {
-    const result = await maybeRepairTelegramAllowFromUsernames({
-      channels: {
-        telegram: {
-          allowFrom: [-1001234567890],
-        },
-      },
-    } as unknown as OpenClawConfig);
-
-    expect(result.config.channels?.telegram?.allowFrom).toEqual([-1001234567890]);
-    expect(result.changes).toEqual([
-      "- channels.telegram.allowFrom: invalid sender entry -1001234567890; allowFrom requires positive numeric Telegram user IDs. Move group chat IDs under channels.telegram.groups.",
-    ]);
   });
 
   it("warns when @username entries cannot be resolved because configured tokens are unavailable", async () => {
@@ -279,13 +266,13 @@ describe("telegram doctor", () => {
     ]);
   });
 
-  it("formats invalid allowFrom warnings", () => {
-    const warnings = collectTelegramInvalidAllowFromWarnings({
+  it("formats username repair warnings", () => {
+    const warnings = collectTelegramAllowFromUsernameWarnings({
       hits: [{ path: "channels.telegram.allowFrom", entry: "@top" }],
       doctorFixCommand: "openclaw doctor --fix",
     });
 
-    expect(warnings[0]).toContain("invalid sender entries");
+    expect(warnings[0]).toContain("non-numeric entries");
     expect(warnings[1]).toContain("openclaw doctor --fix");
   });
 });

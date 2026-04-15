@@ -16,7 +16,6 @@ import {
   resolveThreadBindingPlacementForCurrentContext,
   resolveThreadBindingSpawnPolicy,
 } from "../../../channels/thread-bindings-policy.js";
-import { normalizeConversationRef } from "../../../infra/outbound/session-binding-normalization.js";
 import { getSessionBindingService } from "../../../infra/outbound/session-binding-service.js";
 import { normalizeOptionalString } from "../../../shared/string-coerce.js";
 import type { CommandHandlerResult } from "../commands-types.js";
@@ -39,18 +38,12 @@ function resolveFocusBindingContext(
     return null;
   }
   const chatType = normalizeChatType(params.ctx.ChatType);
-  const conversation = normalizeConversationRef({
+  return {
     channel: bindingContext.channel,
     accountId: bindingContext.accountId,
     conversationId: bindingContext.conversationId,
-    parentConversationId: bindingContext.parentConversationId,
-  });
-  return {
-    channel: conversation.channel,
-    accountId: conversation.accountId,
-    conversationId: conversation.conversationId,
-    ...(conversation.parentConversationId
-      ? { parentConversationId: conversation.parentConversationId }
+    ...(bindingContext.parentConversationId
+      ? { parentConversationId: bindingContext.parentConversationId }
       : {}),
     placement:
       chatType === "direct"
@@ -118,13 +111,15 @@ export async function handleSubagentsFocusAction(
   }
 
   const senderId = normalizeOptionalString(params.command.senderId) ?? "";
-  const conversationRef = normalizeConversationRef({
+  const existingBinding = bindingService.resolveByConversation({
     channel: bindingContext.channel,
     accountId: bindingContext.accountId,
     conversationId: bindingContext.conversationId,
-    parentConversationId: bindingContext.parentConversationId,
+    ...(bindingContext.parentConversationId &&
+    bindingContext.parentConversationId !== bindingContext.conversationId
+      ? { parentConversationId: bindingContext.parentConversationId }
+      : {}),
   });
-  const existingBinding = bindingService.resolveByConversation(conversationRef);
   const boundBy =
     typeof existingBinding?.metadata?.boundBy === "string"
       ? existingBinding.metadata.boundBy.trim()
@@ -151,12 +146,15 @@ export async function handleSubagentsFocusAction(
     binding = await bindingService.bind({
       targetSessionKey: focusTarget.targetSessionKey,
       targetKind: focusTarget.targetKind === "acp" ? "session" : "subagent",
-      conversation: normalizeConversationRef({
+      conversation: {
         channel: bindingContext.channel,
         accountId: bindingContext.accountId,
         conversationId: bindingContext.conversationId,
-        parentConversationId: bindingContext.parentConversationId,
-      }),
+        ...(bindingContext.parentConversationId &&
+        bindingContext.parentConversationId !== bindingContext.conversationId
+          ? { parentConversationId: bindingContext.parentConversationId }
+          : {}),
+      },
       placement: bindingContext.placement,
       metadata: {
         threadName: resolveThreadBindingThreadName({

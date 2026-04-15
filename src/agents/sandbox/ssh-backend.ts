@@ -1,14 +1,12 @@
 import path from "node:path";
 import { normalizeLowercaseStringOrEmpty } from "../../shared/string-coerce.js";
 import type {
+  CreateSandboxBackendParams,
   SandboxBackendCommandParams,
   SandboxBackendCommandResult,
-} from "./backend-handle.types.js";
-import type {
-  CreateSandboxBackendParams,
   SandboxBackendHandle,
   SandboxBackendManager,
-} from "./backend.types.js";
+} from "./backend.js";
 import { resolveSandboxConfigForAgent } from "./config.js";
 import {
   createRemoteShellSandboxFsBridge,

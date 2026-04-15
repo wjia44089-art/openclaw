@@ -10,7 +10,6 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
-import { resolvePreferredOpenClawTmpDir } from "openclaw/plugin-sdk/temp-path";
 import { debugLog, debugWarn } from "./debug-log.js";
 
 // Basic platform information.
@@ -37,7 +36,7 @@ export function isWindows(): boolean {
  * Priority:
  * 1. `os.homedir()`
  * 2. `$HOME` or `%USERPROFILE%`
- * 3. the OpenClaw temp directory as a last resort
+ * 3. `os.tmpdir()` as a last resort
  */
 export function getHomeDir(): string {
   try {
@@ -54,7 +53,7 @@ export function getHomeDir(): string {
   }
 
   // Final fallback.
-  return resolvePreferredOpenClawTmpDir();
+  return os.tmpdir();
 }
 
 /**
@@ -84,9 +83,9 @@ export function getQQBotMediaDir(...subPaths: string[]): string {
 
 // Temporary directory helpers.
 
-/** Return the preferred OpenClaw temp directory. */
+/** Return the OS temp directory. */
 export function getTempDir(): string {
-  return resolvePreferredOpenClawTmpDir();
+  return os.tmpdir();
 }
 
 // Tilde expansion.

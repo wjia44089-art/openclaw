@@ -11,12 +11,14 @@ import {
   type ResolvedMatrixAccount,
 } from "./matrix/accounts.js";
 import { normalizeMatrixAllowList } from "./matrix/monitor/allowlist.js";
+import type { CoreConfig } from "./types.js";
 
 export { DEFAULT_ACCOUNT_ID };
 
 export const matrixConfigAdapter = createScopedChannelConfigAdapter<
   ResolvedMatrixAccount,
-  ReturnType<typeof resolveMatrixAccountConfig>
+  ReturnType<typeof resolveMatrixAccountConfig>,
+  CoreConfig
 >({
   sectionKey: "matrix",
   listAccountIds: listMatrixAccountIds,

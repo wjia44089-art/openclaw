@@ -9,10 +9,9 @@ export function trackBackgroundTask(
   task: Promise<unknown>,
 ) {
   backgroundTasks.add(task);
-  const cleanup = () => {
+  void task.finally(() => {
     backgroundTasks.delete(task);
-  };
-  task.then(cleanup, cleanup);
+  });
 }
 
 export function updateLastRouteInBackground(params: {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 type SplitCommandLine = (
   value: string,
-  platform?: string,
+  platform?: NodeJS.Platform | string,
 ) => {
   command: string;
   args: string[];

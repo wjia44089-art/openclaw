@@ -17,10 +17,6 @@ const compilerArgs = [buildScript, "--no-clean"];
 const runNodeSourceRoots = ["src", BUNDLED_PLUGIN_ROOT_DIR];
 const runNodeConfigFiles = ["tsconfig.json", "package.json", "tsdown.config.ts"];
 export const runNodeWatchedPaths = [...runNodeSourceRoots, ...runNodeConfigFiles];
-const ignoredRunNodeRepoPaths = new Set([
-  "src/canvas-host/a2ui/.bundle.hash",
-  "src/canvas-host/a2ui/a2ui.bundle.js",
-]);
 const extensionSourceFilePattern = /\.(?:[cm]?[jt]sx?)$/;
 const extensionRestartMetadataFiles = new Set(["openclaw.plugin.json", "package.json"]);
 
@@ -42,9 +38,6 @@ const isBuildRelevantSourcePath = (relativePath) => {
 
 export const isBuildRelevantRunNodePath = (repoPath) => {
   const normalizedPath = normalizePath(repoPath).replace(/^\.\/+/, "");
-  if (ignoredRunNodeRepoPaths.has(normalizedPath)) {
-    return false;
-  }
   if (runNodeConfigFiles.includes(normalizedPath)) {
     return true;
   }
@@ -67,9 +60,6 @@ const isRestartRelevantExtensionPath = (relativePath) => {
 
 export const isRestartRelevantRunNodePath = (repoPath) => {
   const normalizedPath = normalizePath(repoPath).replace(/^\.\/+/, "");
-  if (ignoredRunNodeRepoPaths.has(normalizedPath)) {
-    return false;
-  }
   if (runNodeConfigFiles.includes(normalizedPath)) {
     return true;
   }
@@ -323,8 +313,21 @@ const waitForSpawnedProcess = async (childProcess, deps) => {
   }
 };
 
+const riscvNodeFlags = () => {
+  // RISC-V Sv39 has only 256GB user virtual address space.  V8 reserves ~10GB
+  // per Wasm instance for trap-handler guard regions, which exhausts the VA
+  // space after ~24 instances and causes "Out of memory: Cannot allocate Wasm
+  // memory" errors in Node's built-in undici/llhttp.  Disabling the trap
+  // handler makes V8 use explicit bounds checks instead, removing the large VA
+  // reservations.
+  if (process.arch === "riscv64") {
+    return ["--disable-wasm-trap-handler"];
+  }
+  return [];
+};
+
 const runOpenClaw = async (deps) => {
-  const nodeProcess = deps.spawn(deps.execPath, ["openclaw.mjs", ...deps.args], {
+  const nodeProcess = deps.spawn(deps.execPath, [...riscvNodeFlags(), "openclaw.mjs", ...deps.args], {
     cwd: deps.cwd,
     env: deps.env,
     stdio: "inherit",

@@ -52,21 +52,23 @@ vi.mock("@opentelemetry/sdk-node", () => ({
 }));
 
 vi.mock("@opentelemetry/exporter-metrics-otlp-proto", () => ({
-  OTLPMetricExporter: function OTLPMetricExporter() {},
+  OTLPMetricExporter: class {},
 }));
 
 vi.mock("@opentelemetry/exporter-trace-otlp-proto", () => ({
-  OTLPTraceExporter: function OTLPTraceExporter(options?: unknown) {
-    traceExporterCtor(options);
+  OTLPTraceExporter: class {
+    constructor(options?: unknown) {
+      traceExporterCtor(options);
+    }
   },
 }));
 
 vi.mock("@opentelemetry/exporter-logs-otlp-proto", () => ({
-  OTLPLogExporter: function OTLPLogExporter() {},
+  OTLPLogExporter: class {},
 }));
 
 vi.mock("@opentelemetry/sdk-logs", () => ({
-  BatchLogRecordProcessor: function BatchLogRecordProcessor() {},
+  BatchLogRecordProcessor: class {},
   LoggerProvider: class {
     getLogger = vi.fn(() => ({
       emit: logEmit,
@@ -76,18 +78,19 @@ vi.mock("@opentelemetry/sdk-logs", () => ({
 }));
 
 vi.mock("@opentelemetry/sdk-metrics", () => ({
-  PeriodicExportingMetricReader: function PeriodicExportingMetricReader() {},
+  PeriodicExportingMetricReader: class {},
 }));
 
 vi.mock("@opentelemetry/sdk-trace-base", () => ({
-  ParentBasedSampler: function ParentBasedSampler() {},
-  TraceIdRatioBasedSampler: function TraceIdRatioBasedSampler() {},
+  ParentBasedSampler: class {},
+  TraceIdRatioBasedSampler: class {},
 }));
 
 vi.mock("@opentelemetry/resources", () => ({
   resourceFromAttributes: vi.fn((attrs: Record<string, unknown>) => attrs),
-  Resource: function Resource(_value?: unknown) {
-    // Constructor shape required by the mocked OpenTelemetry API.
+  Resource: class {
+    // eslint-disable-next-line @typescript-eslint/no-useless-constructor
+    constructor(_value?: unknown) {}
   },
 }));
 

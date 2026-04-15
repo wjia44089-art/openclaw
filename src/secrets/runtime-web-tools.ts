@@ -1,5 +1,9 @@
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { resolveSecretInputRef } from "../config/types.secrets.js";
+import {
+  resolveManifestContractPluginIds,
+  resolveManifestContractPluginIdsByCompatibilityRuntimePath,
+} from "../plugins/manifest-registry.js";
 import type {
   PluginWebFetchProviderEntry,
   PluginWebSearchProviderEntry,
@@ -48,10 +52,6 @@ const loadRuntimeWebToolsFallbackProviders = createLazyRuntimeSurface(
 );
 const loadRuntimeWebToolsPublicArtifacts = createLazyRuntimeSurface(
   () => import("./runtime-web-tools-public-artifacts.runtime.js"),
-  (mod) => mod,
-);
-const loadRuntimeWebToolsManifest = createLazyRuntimeSurface(
-  () => import("./runtime-web-tools-manifest.runtime.js"),
   (mod) => mod,
 );
 
@@ -120,11 +120,8 @@ function inferExactBundledPluginScopedWebToolConfigOwner(params: {
   return isRecord(pluginConfig?.[params.key]) ? params.pluginId : undefined;
 }
 
-async function hasCustomWebSearchPluginRisk(params: {
-  config: OpenClawConfig;
-  env: NodeJS.ProcessEnv;
-}): Promise<boolean> {
-  const plugins = params.config.plugins;
+function hasCustomWebSearchPluginRisk(config: OpenClawConfig): boolean {
+  const plugins = config.plugins;
   if (!plugins) {
     return false;
   }
@@ -135,13 +132,12 @@ async function hasCustomWebSearchPluginRisk(params: {
     return true;
   }
 
-  const { resolveManifestContractPluginIds } = await loadRuntimeWebToolsManifest();
   const bundledPluginIds = new Set<string>(
     resolveManifestContractPluginIds({
       contract: "webSearchProviders",
       origin: "bundled",
-      config: params.config,
-      env: params.env,
+      config,
+      env: process.env,
     }),
   );
   const hasNonBundledPluginId = (pluginId: string) => !bundledPluginIds.has(pluginId.trim());
@@ -469,7 +465,6 @@ export async function resolveRuntimeWebTools(params: {
 }): Promise<RuntimeWebToolsMetadata> {
   const defaults = params.sourceConfig.secrets?.defaults;
   const diagnostics: RuntimeWebDiagnostic[] = [];
-  const env = { ...process.env, ...params.context.env };
 
   const sourceTools = isRecord(params.sourceConfig.tools) ? params.sourceConfig.tools : undefined;
   const sourceWeb = isRecord(sourceTools?.web) ? sourceTools.web : undefined;
@@ -477,12 +472,9 @@ export async function resolveRuntimeWebTools(params: {
     ? params.resolvedConfig.tools
     : undefined;
   const resolvedWeb = isRecord(resolvedTools?.web) ? resolvedTools.web : undefined;
-  let hasCustomWebSearchRisk: Promise<boolean> | undefined;
-  const getHasCustomWebSearchRisk = (): Promise<boolean> => {
-    hasCustomWebSearchRisk ??= hasCustomWebSearchPluginRisk({
-      config: params.sourceConfig,
-      env,
-    });
+  let hasCustomWebSearchRisk: boolean | undefined;
+  const getHasCustomWebSearchRisk = (): boolean => {
+    hasCustomWebSearchRisk ??= hasCustomWebSearchPluginRisk(params.sourceConfig);
     return hasCustomWebSearchRisk;
   };
   const legacyXSearchSource = isRecord(sourceWeb?.x_search) ? sourceWeb.x_search : undefined;
@@ -541,44 +533,35 @@ export async function resolveRuntimeWebTools(params: {
     };
   }
   const rawProvider = normalizeLowercaseStringOrEmpty(search?.provider);
-  let configuredBundledWebSearchPluginIdHint: string | undefined;
-  if (rawProvider && hasPluginWebSearchConfig) {
-    configuredBundledWebSearchPluginIdHint = inferExactBundledPluginScopedWebToolConfigOwner({
-      config: params.sourceConfig,
-      key: "webSearch",
-      pluginId: rawProvider,
-    });
-    if (!configuredBundledWebSearchPluginIdHint && !(await getHasCustomWebSearchRisk())) {
-      configuredBundledWebSearchPluginIdHint = inferSingleBundledPluginScopedWebToolConfigOwner(
-        params.sourceConfig,
-        "webSearch",
-      );
-    }
-  }
+  const configuredBundledWebSearchPluginIdHint =
+    rawProvider && hasPluginWebSearchConfig
+      ? (inferExactBundledPluginScopedWebToolConfigOwner({
+          config: params.sourceConfig,
+          key: "webSearch",
+          pluginId: rawProvider,
+        }) ??
+        (!getHasCustomWebSearchRisk()
+          ? inferSingleBundledPluginScopedWebToolConfigOwner(params.sourceConfig, "webSearch")
+          : undefined))
+      : undefined;
   const searchMetadata: RuntimeWebSearchMetadata = {
     providerSource: "none",
     diagnostics: [],
   };
   if (search || hasPluginWebSearchConfig) {
-    let searchCompatibilityOnlyPluginIds: string[] = [];
-    if (
+    const searchCompatibilityOnlyPluginIds =
       !rawProvider &&
       !hasPluginWebSearchConfig &&
       isRecord(search) &&
       Object.prototype.hasOwnProperty.call(search, "apiKey")
-    ) {
-      const { resolveManifestContractPluginIdsByCompatibilityRuntimePath } =
-        await loadRuntimeWebToolsManifest();
-      searchCompatibilityOnlyPluginIds = resolveManifestContractPluginIdsByCompatibilityRuntimePath(
-        {
-          contract: "webSearchProviders",
-          path: "tools.web.search.apiKey",
-          origin: "bundled",
-          config: params.sourceConfig,
-          env,
-        },
-      );
-    }
+        ? resolveManifestContractPluginIdsByCompatibilityRuntimePath({
+            contract: "webSearchProviders",
+            path: "tools.web.search.apiKey",
+            origin: "bundled",
+            config: params.sourceConfig,
+            env: { ...process.env, ...params.context.env },
+          })
+        : [];
     const searchSurface = await resolveRuntimeWebProviderSurface({
       contract: "webSearchProviders",
       rawProvider,
@@ -590,7 +573,7 @@ export async function resolveRuntimeWebTools(params: {
       sourceConfig: params.sourceConfig,
       context: params.context,
       configuredBundledPluginIdHint: configuredBundledWebSearchPluginIdHint,
-      resolveProviders: async ({ configuredBundledPluginId }) =>
+      resolveProviders: ({ configuredBundledPluginId }) =>
         resolveBundledWebSearchProviders({
           sourceConfig: params.sourceConfig,
           context: params.context,
@@ -598,10 +581,10 @@ export async function resolveRuntimeWebTools(params: {
           onlyPluginIds:
             configuredBundledPluginId === undefined &&
             searchCompatibilityOnlyPluginIds.length > 0 &&
-            !(await getHasCustomWebSearchRisk())
+            !getHasCustomWebSearchRisk()
               ? searchCompatibilityOnlyPluginIds
               : undefined,
-          hasCustomWebSearchPluginRisk: await getHasCustomWebSearchRisk(),
+          hasCustomWebSearchPluginRisk: getHasCustomWebSearchRisk(),
         }),
       sortProviders: sortWebSearchProvidersForAutoDetect,
       readConfiguredCredential: ({ provider, config, toolConfig }) =>

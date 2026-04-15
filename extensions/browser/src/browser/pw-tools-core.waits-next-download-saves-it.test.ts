@@ -130,9 +130,6 @@ describe("pw-tools-core", () => {
 
     const res = await p;
     const outPath = (vi.mocked(saveAs).mock.calls as unknown as Array<[string]>)[0]?.[0];
-    if (typeof outPath !== "string") {
-      throw new Error("download save path was not captured");
-    }
     return { res, outPath };
   }
 
@@ -287,8 +284,8 @@ describe("pw-tools-core", () => {
       path.join(path.sep, "tmp", "openclaw-preferred", "downloads"),
     );
     const expectedDownloadsTail = `${path.join("tmp", "openclaw-preferred", "downloads")}${path.sep}`;
-    expect(path.dirname(outPath)).toBe(expectedRootedDownloadsDir);
-    expect(path.basename(outPath)).toMatch(/-file\.bin$/);
+    expect(path.dirname(String(outPath))).toBe(expectedRootedDownloadsDir);
+    expect(path.basename(String(outPath))).toMatch(/-file\.bin$/);
     expect(path.normalize(res.path)).toContain(path.normalize(expectedDownloadsTail));
     expect(tmpDirMocks.resolvePreferredOpenClawTmpDir).toHaveBeenCalled();
   });
@@ -300,10 +297,10 @@ describe("pw-tools-core", () => {
       suggestedFilename: "../../../../etc/passwd",
     });
     expect(typeof outPath).toBe("string");
-    expect(path.dirname(outPath)).toBe(
+    expect(path.dirname(String(outPath))).toBe(
       path.resolve(path.join(path.sep, "tmp", "openclaw-preferred", "downloads")),
     );
-    expect(path.basename(outPath)).toMatch(/-passwd$/);
+    expect(path.basename(String(outPath))).toMatch(/-passwd$/);
     expect(path.normalize(res.path)).toContain(
       path.normalize(`${path.join("tmp", "openclaw-preferred", "downloads")}${path.sep}`),
     );

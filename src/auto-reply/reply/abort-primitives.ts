@@ -1,6 +1,5 @@
 import { normalizeLowercaseStringOrEmpty } from "../../shared/string-coerce.js";
-import { normalizeCommandBody } from "../commands-registry-normalize.js";
-import type { CommandNormalizeOptions } from "../commands-registry.types.js";
+import { normalizeCommandBody, type CommandNormalizeOptions } from "../commands-registry.js";
 
 const ABORT_TRIGGERS = new Set([
   "stop",

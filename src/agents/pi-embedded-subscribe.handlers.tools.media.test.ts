@@ -220,11 +220,11 @@ describe("handleToolExecutionEnd media emission", () => {
     expect(ctx.state.pendingToolAudioAsVoice).toBe(true);
   });
 
-  async function handleVerboseGeneratedImage(toolResultFormat: "plain" | "markdown") {
+  it("does not queue structured media already emitted in plain verbose output", async () => {
     const ctx = createMockContext({
       shouldEmitToolOutput: true,
       onToolResult: vi.fn(),
-      toolResultFormat,
+      toolResultFormat: "plain",
     });
 
     await handleToolExecutionEnd(ctx, {
@@ -247,18 +247,36 @@ describe("handleToolExecutionEnd media emission", () => {
       },
     });
 
-    return ctx;
-  }
-
-  it("does not queue structured media already emitted in plain verbose output", async () => {
-    const ctx = await handleVerboseGeneratedImage("plain");
-
     expect(ctx.emitToolOutput).toHaveBeenCalled();
     expect(ctx.state.pendingToolMediaUrls).toEqual([]);
   });
 
   it("still queues structured media for markdown verbose output", async () => {
-    const ctx = await handleVerboseGeneratedImage("markdown");
+    const ctx = createMockContext({
+      shouldEmitToolOutput: true,
+      onToolResult: vi.fn(),
+      toolResultFormat: "markdown",
+    });
+
+    await handleToolExecutionEnd(ctx, {
+      type: "tool_execution_end",
+      toolName: "image_generate",
+      toolCallId: "tc-1",
+      isError: false,
+      result: {
+        content: [
+          {
+            type: "text",
+            text: "Generated 1 image with google/gemini-3.1-flash-image-preview.\nMEDIA:/tmp/generated.png",
+          },
+        ],
+        details: {
+          media: {
+            mediaUrls: ["/tmp/generated.png"],
+          },
+        },
+      },
+    });
 
     expect(ctx.emitToolOutput).toHaveBeenCalled();
     expect(ctx.state.pendingToolMediaUrls).toEqual(["/tmp/generated.png"]);

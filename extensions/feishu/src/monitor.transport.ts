@@ -4,9 +4,11 @@ import * as Lark from "@larksuiteoapi/node-sdk";
 import { createFeishuWSClient } from "./client.js";
 import {
   applyBasicWebhookRequestGuards,
+  isRequestBodyLimitError,
   type RuntimeEnv,
   installRequestBodyLimitGuard,
-  readWebhookBodyOrReject,
+  readRequestBodyWithLimit,
+  requestBodyErrorToText,
   safeEqualSecret,
 } from "./monitor-transport-runtime-api.js";
 import {
@@ -188,20 +190,13 @@ export async function monitorWebhook({
 
     void (async () => {
       try {
-        const body = await readWebhookBodyOrReject({
-          req,
-          res,
+        const rawBody = await readRequestBodyWithLimit(req, {
           maxBytes: FEISHU_WEBHOOK_MAX_BODY_BYTES,
           timeoutMs: FEISHU_WEBHOOK_BODY_TIMEOUT_MS,
-          profile: "pre-auth",
         });
-        if (!body.ok || res.writableEnded) {
+        if (guard.isTripped() || res.writableEnded) {
           return;
         }
-        if (guard.isTripped()) {
-          return;
-        }
-        const rawBody = body.value;
 
         // Reject invalid signatures before any JSON parsing to keep the auth boundary strict.
         if (
@@ -240,9 +235,17 @@ export async function monitorWebhook({
           res.end(JSON.stringify(value));
         }
       } catch (err) {
-        error(`feishu[${accountId}]: webhook handler error: ${String(err)}`);
-        if (!res.headersSent) {
-          respondText(res, 500, "Internal Server Error");
+        if (isRequestBodyLimitError(err)) {
+          if (!res.headersSent) {
+            respondText(res, err.statusCode, requestBodyErrorToText(err.code));
+          }
+          return;
+        }
+        if (!guard.isTripped()) {
+          error(`feishu[${accountId}]: webhook handler error: ${String(err)}`);
+          if (!res.headersSent) {
+            respondText(res, 500, "Internal Server Error");
+          }
         }
       } finally {
         guard.dispose();

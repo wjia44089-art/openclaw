@@ -22,19 +22,16 @@ describe("chat markdown rendering", () => {
 
     await app.updateComplete;
 
-    const toolSummary = app.querySelector<HTMLElement>(".chat-tool-msg-summary");
-    expect(toolSummary).not.toBeNull();
-    toolSummary?.click();
+    const toolCards = Array.from(app.querySelectorAll<HTMLElement>(".chat-tool-card"));
+    const toolCard = toolCards.find((card) =>
+      card.querySelector(".chat-tool-card__preview, .chat-tool-card__inline"),
+    );
+    expect(toolCard).not.toBeUndefined();
+    toolCard?.click();
 
     await app.updateComplete;
 
-    const openSidebarButton = app.querySelector<HTMLElement>(".chat-tool-card__action-btn");
-    expect(openSidebarButton).not.toBeNull();
-    openSidebarButton?.click();
-
-    await app.updateComplete;
-
-    const strongNodes = Array.from(app.querySelectorAll(".sidebar-markdown strong"));
-    expect(strongNodes.some((node) => node.textContent === "world")).toBe(true);
+    const strong = app.querySelector(".sidebar-markdown strong");
+    expect(strong?.textContent).toBe("world");
   });
 });

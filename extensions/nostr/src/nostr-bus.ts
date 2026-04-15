@@ -505,24 +505,15 @@ export async function startNostrBus(options: NostrBusOptions): Promise<NostrBusH
       }
       inflight.add(event.id);
 
-      const markSeen = () => {
-        seen.add(event.id);
-        metrics.emit("memory.seen_tracker_size", seen.size());
-      };
-      const rejectAndMarkSeen = (metric: Parameters<typeof metrics.emit>[0]) => {
-        markSeen();
-        metrics.emit(metric);
-      };
-
       // Self-message loop prevention: skip our own messages
       if (event.pubkey === pk) {
-        rejectAndMarkSeen("event.rejected.self_message");
+        metrics.emit("event.rejected.self_message");
         return;
       }
 
       // Skip events older than our `since` (relay may ignore filter)
       if (event.created_at < since) {
-        rejectAndMarkSeen("event.rejected.stale");
+        metrics.emit("event.rejected.stale");
         return;
       }
 
@@ -532,7 +523,7 @@ export async function startNostrBus(options: NostrBusOptions): Promise<NostrBusH
       }
 
       if (!guardPolicy.allowedKinds.includes(event.kind)) {
-        rejectAndMarkSeen("event.rejected.wrong_kind");
+        metrics.emit("event.rejected.wrong_kind");
         return;
       }
 
@@ -545,7 +536,7 @@ export async function startNostrBus(options: NostrBusOptions): Promise<NostrBusH
         }
       }
       if (!targetsUs) {
-        rejectAndMarkSeen("event.rejected.wrong_kind");
+        metrics.emit("event.rejected.wrong_kind");
         return;
       }
 
@@ -587,11 +578,16 @@ export async function startNostrBus(options: NostrBusOptions): Promise<NostrBusH
         return false;
       };
 
+      const markSeen = () => {
+        seen.add(event.id);
+        metrics.emit("memory.seen_tracker_size", seen.size());
+      };
+
       if (Buffer.byteLength(event.content, "utf8") > guardPolicy.maxCiphertextBytes) {
         if (rejectIfGlobalRateLimited()) {
           return;
         }
-        rejectAndMarkSeen("event.rejected.oversized_ciphertext");
+        metrics.emit("event.rejected.oversized_ciphertext");
         return;
       }
 
@@ -601,7 +597,7 @@ export async function startNostrBus(options: NostrBusOptions): Promise<NostrBusH
 
       // Verify signature (must pass before we trust the event)
       if (!verifyEvent(event)) {
-        rejectAndMarkSeen("event.rejected.invalid_signature");
+        metrics.emit("event.rejected.invalid_signature");
         onError?.(new Error("Invalid signature"), `event ${event.id}`);
         return;
       }
@@ -621,13 +617,15 @@ export async function startNostrBus(options: NostrBusOptions): Promise<NostrBusH
         }
       }
 
+      // Mark seen AFTER verify (don't cache invalid IDs)
+      markSeen();
+
       // Decrypt the message
       let plaintext: string;
       try {
         plaintext = decrypt(sk, event.pubkey, event.content);
         metrics.emit("decrypt.success");
       } catch (err) {
-        markSeen();
         metrics.emit("decrypt.failure");
         metrics.emit("event.rejected.decrypt_failed");
         onError?.(err as Error, `decrypt from ${event.pubkey}`);
@@ -635,7 +633,6 @@ export async function startNostrBus(options: NostrBusOptions): Promise<NostrBusH
       }
 
       if (Buffer.byteLength(plaintext, "utf8") > guardPolicy.maxPlaintextBytes) {
-        markSeen();
         metrics.emit("event.rejected.oversized_plaintext");
         return;
       }
@@ -645,9 +642,6 @@ export async function startNostrBus(options: NostrBusOptions): Promise<NostrBusH
         eventId: event.id,
         createdAt: event.created_at,
       });
-
-      // Only cache successful deliveries so handler failures can retry.
-      markSeen();
 
       // Mark as processed
       metrics.emit("event.processed");

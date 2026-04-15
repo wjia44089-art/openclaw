@@ -1,5 +1,5 @@
 import type { AssistantMessage } from "@mariozechner/pi-ai";
-import type { OpenClawConfig } from "../../../config/types.openclaw.js";
+import type { OpenClawConfig } from "../../../config/config.js";
 import { sanitizeForLog } from "../../../terminal/ansi.js";
 import type { AuthProfileFailureReason } from "../../auth-profiles.js";
 import { FailoverError, resolveFailoverStatus } from "../../failover-error.js";
@@ -24,7 +24,6 @@ type AssistantFailoverOutcome =
       action: "retry";
       overloadProfileRotations: number;
       lastRetryFailoverReason: FailoverReason | null;
-      retryKind?: "same_model_idle_timeout";
     }
   | {
       action: "throw";
@@ -35,14 +34,11 @@ type AssistantFailoverOutcome =
 export async function handleAssistantFailover(params: {
   initialDecision: AssistantFailoverDecision;
   aborted: boolean;
-  externalAbort: boolean;
   fallbackConfigured: boolean;
   failoverFailure: boolean;
   failoverReason: FailoverReason | null;
   timedOut: boolean;
-  idleTimedOut: boolean;
   timedOutDuringCompaction: boolean;
-  allowSameModelIdleTimeoutRetry: boolean;
   assistantProfileFailureReason: AuthProfileFailureReason | null;
   lastProfileId?: string;
   modelId: string;
@@ -79,21 +75,6 @@ export async function handleAssistantFailover(params: {
 }): Promise<AssistantFailoverOutcome> {
   let overloadProfileRotations = params.overloadProfileRotations;
   let decision = params.initialDecision;
-  const sameModelIdleTimeoutRetry = (): AssistantFailoverOutcome => {
-    params.warn(
-      `[llm-idle-timeout] ${sanitizeForLog(params.provider)}/${sanitizeForLog(params.modelId)} produced no reply before the idle watchdog; retrying same model`,
-    );
-    return {
-      action: "retry",
-      overloadProfileRotations,
-      retryKind: "same_model_idle_timeout",
-      lastRetryFailoverReason: mergeRetryFailoverReason({
-        previous: params.previousRetryFailoverReason,
-        failoverReason: params.failoverReason,
-        timedOut: true,
-      }),
-    };
-  };
 
   if (decision.action === "rotate_profile") {
     if (params.lastProfileId) {
@@ -163,14 +144,10 @@ export async function handleAssistantFailover(params: {
         }),
       };
     }
-    if (params.idleTimedOut && params.allowSameModelIdleTimeoutRetry) {
-      return sameModelIdleTimeoutRetry();
-    }
 
     decision = resolveRunFailoverDecision({
       stage: "assistant",
       aborted: params.aborted,
-      externalAbort: params.externalAbort,
       fallbackConfigured: params.fallbackConfigured,
       failoverFailure: params.failoverFailure,
       failoverReason: params.failoverReason,
@@ -221,9 +198,6 @@ export async function handleAssistantFailover(params: {
   }
 
   if (decision.action === "surface_error") {
-    if (!params.externalAbort && params.idleTimedOut && params.allowSameModelIdleTimeoutRetry) {
-      return sameModelIdleTimeoutRetry();
-    }
     params.logAssistantFailoverDecision("surface_error");
   }
 

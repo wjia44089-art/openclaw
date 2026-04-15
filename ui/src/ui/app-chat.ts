@@ -1,18 +1,12 @@
-import { setLastActiveSessionKey } from "./app-last-active-session.ts";
 import { scheduleChatScroll, resetChatScroll } from "./app-scroll.ts";
+import { setLastActiveSessionKey } from "./app-settings.ts";
 import { resetToolStream } from "./app-tool-stream.ts";
-import type { ChatSideResult } from "./chat/side-result.ts";
+import type { OpenClawApp } from "./app.ts";
 import { executeSlashCommand } from "./chat/slash-command-executor.ts";
-import { parseSlashCommand, refreshSlashCommands } from "./chat/slash-commands.ts";
-import {
-  abortChatRun,
-  loadChatHistory,
-  sendChatMessage,
-  sendDetachedChatMessage,
-  type ChatState,
-} from "./controllers/chat.ts";
+import { parseSlashCommand } from "./chat/slash-commands.ts";
+import { abortChatRun, loadChatHistory, sendChatMessage } from "./controllers/chat.ts";
 import { loadModels } from "./controllers/models.ts";
-import { loadSessions, type SessionsState } from "./controllers/sessions.ts";
+import { loadSessions } from "./controllers/sessions.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import { normalizeBasePath } from "./navigation.ts";
 import { parseAgentSessionKey } from "./session-key.ts";
@@ -37,8 +31,6 @@ export type ChatHost = {
   basePath: string;
   hello: GatewayHelloOk | null;
   chatAvatarUrl: string | null;
-  chatSideResult?: ChatSideResult | null;
-  chatSideResultTerminalRuns?: Set<string>;
   chatModelOverrides: Record<string, ChatModelOverride | null>;
   chatModelsLoading: boolean;
   chatModelCatalog: ModelCatalogEntry[];
@@ -85,16 +77,12 @@ function isChatResetCommand(text: string) {
   return normalized.startsWith("/new ") || normalized.startsWith("/reset ");
 }
 
-function isBtwCommand(text: string) {
-  return /^\/btw(?::|\s|$)/i.test(text.trim());
-}
-
 export async function handleAbortChat(host: ChatHost) {
   if (!host.connected) {
     return;
   }
   host.chatMessage = "";
-  await abortChatRun(host as unknown as ChatState);
+  await abortChatRun(host as unknown as OpenClawApp);
 }
 
 function enqueueChatMessage(
@@ -154,7 +142,7 @@ async function sendChatMessageNow(
   resetToolStream(host as unknown as Parameters<typeof resetToolStream>[0]);
   // Reset scroll state before sending to ensure auto-scroll works for the response
   resetChatScroll(host as unknown as Parameters<typeof resetChatScroll>[0]);
-  const runId = await sendChatMessage(host as unknown as ChatState, message, opts?.attachments);
+  const runId = await sendChatMessage(host as unknown as OpenClawApp, message, opts?.attachments);
   const ok = Boolean(runId);
   if (!ok && opts?.previousDraft != null) {
     host.chatMessage = opts.previousDraft;
@@ -181,36 +169,6 @@ async function sendChatMessageNow(
   }
   if (ok && opts?.refreshSessions && runId) {
     host.refreshSessionsAfterChat.add(runId);
-  }
-  return ok;
-}
-
-async function sendDetachedBtwMessage(
-  host: ChatHost,
-  message: string,
-  opts?: {
-    previousDraft?: string;
-    attachments?: ChatAttachment[];
-    previousAttachments?: ChatAttachment[];
-  },
-) {
-  const runId = await sendDetachedChatMessage(
-    host as unknown as ChatState,
-    message,
-    opts?.attachments,
-  );
-  const ok = Boolean(runId);
-  if (!ok && opts?.previousDraft != null) {
-    host.chatMessage = opts.previousDraft;
-  }
-  if (!ok && opts?.previousAttachments) {
-    host.chatAttachments = opts.previousAttachments;
-  }
-  if (ok) {
-    setLastActiveSessionKey(
-      host as unknown as Parameters<typeof setLastActiveSessionKey>[0],
-      host.sessionKey,
-    );
   }
   return ok;
 }
@@ -278,19 +236,6 @@ export async function handleSendChat(
 
   if (isChatStopCommand(message)) {
     await handleAbortChat(host);
-    return;
-  }
-
-  if (isBtwCommand(message)) {
-    if (messageOverride == null) {
-      host.chatMessage = "";
-      host.chatAttachments = [];
-    }
-    await sendDetachedBtwMessage(host, message, {
-      previousDraft: messageOverride == null ? previousDraft : undefined,
-      attachments: hasAttachments ? attachmentsToSend : undefined,
-      previousAttachments: messageOverride == null ? attachments : undefined,
-    });
     return;
   }
 
@@ -428,11 +373,9 @@ async function clearChatHistory(host: ChatHost) {
   try {
     await host.client.request("sessions.reset", { key: host.sessionKey });
     host.chatMessages = [];
-    host.chatSideResult = null;
-    host.chatSideResultTerminalRuns?.clear();
     host.chatStream = null;
     host.chatRunId = null;
-    await loadChatHistory(host as unknown as ChatState);
+    await loadChatHistory(host as unknown as OpenClawApp);
   } catch (err) {
     host.lastError = String(err);
   }
@@ -452,8 +395,8 @@ function injectCommandResult(host: ChatHost, content: string) {
 
 export async function refreshChat(host: ChatHost, opts?: { scheduleScroll?: boolean }) {
   await Promise.all([
-    loadChatHistory(host as unknown as ChatState),
-    loadSessions(host as unknown as SessionsState, {
+    loadChatHistory(host as unknown as OpenClawApp),
+    loadSessions(host as unknown as OpenClawApp, {
       activeMinutes: 0,
       limit: 0,
       includeGlobal: true,
@@ -461,7 +404,6 @@ export async function refreshChat(host: ChatHost, opts?: { scheduleScroll?: bool
     }),
     refreshChatAvatar(host),
     refreshChatModels(host),
-    refreshChatCommands(host),
   ]);
   if (opts?.scheduleScroll !== false) {
     scheduleChatScroll(host as unknown as Parameters<typeof scheduleChatScroll>[0]);
@@ -480,13 +422,6 @@ async function refreshChatModels(host: ChatHost) {
   } finally {
     host.chatModelsLoading = false;
   }
-}
-
-async function refreshChatCommands(host: ChatHost) {
-  await refreshSlashCommands({
-    client: host.client,
-    agentId: resolveAgentIdForSession(host),
-  });
 }
 
 export const flushChatQueueForEvent = flushChatQueue;

@@ -28,7 +28,7 @@ export const DeliveryThreadIdFieldSchema = z.union([
 export const TimeoutSecondsFieldSchema = z
   .number()
   .finite()
-  .transform((value) => Math.max(0, value));
+  .transform((value) => Math.max(0, Math.floor(value)));
 
 export type ParsedDeliveryInput = {
   mode?: "announce" | "none" | "webhook";

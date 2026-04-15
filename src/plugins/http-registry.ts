@@ -15,7 +15,6 @@ export function registerPluginHttpRoute(params: {
   handler: PluginHttpRouteHandler;
   auth: PluginHttpRouteRegistration["auth"];
   match?: PluginHttpRouteRegistration["match"];
-  gatewayRuntimeScopeSurface?: PluginHttpRouteRegistration["gatewayRuntimeScopeSurface"];
   replaceExisting?: boolean;
   pluginId?: string;
   source?: string;
@@ -79,9 +78,6 @@ export function registerPluginHttpRoute(params: {
     handler: params.handler,
     auth: params.auth,
     match: routeMatch,
-    ...(params.gatewayRuntimeScopeSurface
-      ? { gatewayRuntimeScopeSurface: params.gatewayRuntimeScopeSurface }
-      : {}),
     pluginId: params.pluginId,
     source: params.source,
   };

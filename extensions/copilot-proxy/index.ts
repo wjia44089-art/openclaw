@@ -41,7 +41,12 @@ function normalizeBaseUrl(value: string): string {
 
 function validateBaseUrl(value: string): string | undefined {
   const normalized = normalizeBaseUrl(value);
-  return URL.canParse(normalized) ? undefined : "Enter a valid URL";
+  try {
+    new URL(normalized);
+  } catch {
+    return "Enter a valid URL";
+  }
+  return undefined;
 }
 
 function parseModelIds(input: string): string[] {

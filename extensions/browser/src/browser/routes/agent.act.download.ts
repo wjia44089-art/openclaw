@@ -6,7 +6,6 @@ import {
   resolveTargetIdFromBody,
   withRouteTabContext,
 } from "./agent.shared.js";
-import { EXISTING_SESSION_LIMITS } from "./existing-session-limits.js";
 import { ensureOutputRootDir, resolveWritableOutputPathOrRespond } from "./output-paths.js";
 import { DEFAULT_DOWNLOAD_DIR } from "./path-output.js";
 import type { BrowserRouteRegistrar } from "./types.js";
@@ -37,7 +36,11 @@ export function registerBrowserAgentActDownloadRoutes(
       targetId,
       run: async ({ profileCtx, cdpUrl, tab }) => {
         if (getBrowserProfileCapabilities(profileCtx.profile).usesChromeMcp) {
-          return jsonError(res, 501, EXISTING_SESSION_LIMITS.download.waitUnsupported);
+          return jsonError(
+            res,
+            501,
+            "download waiting is not supported for existing-session profiles yet.",
+          );
         }
         const pw = await requirePwAi(res, "wait for download");
         if (!pw) {
@@ -87,7 +90,11 @@ export function registerBrowserAgentActDownloadRoutes(
       targetId,
       run: async ({ profileCtx, cdpUrl, tab }) => {
         if (getBrowserProfileCapabilities(profileCtx.profile).usesChromeMcp) {
-          return jsonError(res, 501, EXISTING_SESSION_LIMITS.download.downloadUnsupported);
+          return jsonError(
+            res,
+            501,
+            "downloads are not supported for existing-session profiles yet.",
+          );
         }
         const pw = await requirePwAi(res, "download");
         if (!pw) {

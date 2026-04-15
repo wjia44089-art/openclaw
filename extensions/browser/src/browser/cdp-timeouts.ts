@@ -20,13 +20,6 @@ export const PROFILE_POST_RESTART_WS_TIMEOUT_MS = 600;
 export const CHROME_MCP_ATTACH_READY_WINDOW_MS = 8000;
 export const CHROME_MCP_ATTACH_READY_POLL_MS = 200;
 
-export function usesFastLoopbackCdpProbeClass(params: {
-  profileIsLoopback: boolean;
-  attachOnly?: boolean;
-}): boolean {
-  return params.profileIsLoopback && params.attachOnly !== true;
-}
-
 function normalizeTimeoutMs(value: number | undefined): number | undefined {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return undefined;
@@ -36,18 +29,12 @@ function normalizeTimeoutMs(value: number | undefined): number | undefined {
 
 export function resolveCdpReachabilityTimeouts(params: {
   profileIsLoopback: boolean;
-  attachOnly?: boolean;
   timeoutMs?: number;
   remoteHttpTimeoutMs: number;
   remoteHandshakeTimeoutMs: number;
 }): { httpTimeoutMs: number; wsTimeoutMs: number } {
   const normalized = normalizeTimeoutMs(params.timeoutMs);
-  if (
-    usesFastLoopbackCdpProbeClass({
-      profileIsLoopback: params.profileIsLoopback,
-      attachOnly: params.attachOnly,
-    })
-  ) {
+  if (params.profileIsLoopback) {
     const httpTimeoutMs = normalized ?? PROFILE_HTTP_REACHABILITY_TIMEOUT_MS;
     const wsTimeoutMs = Math.max(
       PROFILE_WS_REACHABILITY_MIN_TIMEOUT_MS,

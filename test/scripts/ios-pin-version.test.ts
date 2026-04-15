@@ -1,11 +1,51 @@
 import fs from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { pinIosVersion, parseArgs } from "../../scripts/ios-pin-version.ts";
 import { resolveIosVersion } from "../../scripts/lib/ios-version.ts";
-import { installIosFixtureCleanup, writeIosFixture } from "./ios-version.test-support.ts";
+import { cleanupTempDirs, makeTempDir } from "../helpers/temp-dir.js";
 
-installIosFixtureCleanup();
+const tempDirs: string[] = [];
+
+function writeIosFixture(params: {
+  version: string;
+  changelog: string;
+  packageVersion?: string;
+  releaseNotes?: string;
+  versionXcconfig?: string;
+}) {
+  const rootDir = makeTempDir(tempDirs, "openclaw-ios-pin-");
+  fs.mkdirSync(path.join(rootDir, "apps", "ios", "Config"), { recursive: true });
+  fs.mkdirSync(path.join(rootDir, "apps", "ios", "fastlane", "metadata", "en-US"), {
+    recursive: true,
+  });
+  fs.writeFileSync(
+    path.join(rootDir, "package.json"),
+    `${JSON.stringify({ version: params.packageVersion ?? "2026.4.6" }, null, 2)}\n`,
+    "utf8",
+  );
+  fs.writeFileSync(
+    path.join(rootDir, "apps", "ios", "version.json"),
+    `${JSON.stringify({ version: params.version }, null, 2)}\n`,
+    "utf8",
+  );
+  fs.writeFileSync(path.join(rootDir, "apps", "ios", "CHANGELOG.md"), params.changelog, "utf8");
+  fs.writeFileSync(
+    path.join(rootDir, "apps", "ios", "Config", "Version.xcconfig"),
+    params.versionXcconfig ?? "",
+    "utf8",
+  );
+  fs.writeFileSync(
+    path.join(rootDir, "apps", "ios", "fastlane", "metadata", "en-US", "release_notes.txt"),
+    params.releaseNotes ?? "",
+    "utf8",
+  );
+  return rootDir;
+}
+
+afterEach(() => {
+  cleanupTempDirs(tempDirs);
+});
 
 describe("parseArgs", () => {
   it("requires exactly one pin source", () => {
@@ -28,7 +68,6 @@ describe("pinIosVersion", () => {
 
 - Draft release notes.
 `,
-      prefix: "openclaw-ios-pin-",
     });
 
     const result = pinIosVersion({
@@ -67,7 +106,6 @@ describe("pinIosVersion", () => {
 
 - Candidate release notes.
 `,
-      prefix: "openclaw-ios-pin-",
     });
 
     const result = pinIosVersion({
@@ -94,7 +132,6 @@ describe("pinIosVersion", () => {
 `,
       versionXcconfig: "stale\n",
       releaseNotes: "stale\n",
-      prefix: "openclaw-ios-pin-",
     });
 
     const result = pinIosVersion({

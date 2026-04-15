@@ -9,7 +9,6 @@ import {
 import { GatewayCloseCodes, type GatewayPlugin } from "@buape/carbon/gateway";
 import { Routes } from "discord-api-types/v10";
 import { CHANNEL_APPROVAL_NATIVE_RUNTIME_CONTEXT_CAPABILITY } from "openclaw/plugin-sdk/approval-handler-adapter-runtime";
-import type { ChannelRuntimeSurface } from "openclaw/plugin-sdk/channel-contract";
 import { registerChannelRuntimeContext } from "openclaw/plugin-sdk/channel-runtime-context";
 import {
   listNativeCommandSpecsForConfig,
@@ -96,7 +95,7 @@ export type MonitorDiscordOpts = {
   accountId?: string;
   config?: OpenClawConfig;
   runtime?: RuntimeEnv;
-  channelRuntime?: ChannelRuntimeSurface;
+  channelRuntime?: import("openclaw/plugin-sdk/channel-core").PluginRuntime["channel"];
   abortSignal?: AbortSignal;
   mediaMaxMb?: number;
   historyLimit?: number;

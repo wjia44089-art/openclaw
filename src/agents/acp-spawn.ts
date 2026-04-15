@@ -26,15 +26,14 @@ import {
 } from "../channels/thread-bindings-policy.js";
 import { parseDurationMs } from "../cli/parse-duration.js";
 import { loadConfig } from "../config/config.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { resolveStorePath } from "../config/sessions/paths.js";
 import { loadSessionStore } from "../config/sessions/store.js";
 import { resolveSessionTranscriptFile } from "../config/sessions/transcript.js";
 import type { SessionEntry } from "../config/sessions/types.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { callGateway } from "../gateway/call.js";
 import { areHeartbeatsEnabled } from "../infra/heartbeat-wake.js";
 import { resolveConversationIdFromTargets } from "../infra/outbound/conversation-id.js";
-import { normalizeConversationTargetRef } from "../infra/outbound/session-binding-normalization.js";
 import {
   getSessionBindingService,
   isSessionBindingError,
@@ -45,7 +44,6 @@ import {
   isSubagentSessionKey,
   normalizeAgentId,
   parseAgentSessionKey,
-  resolveAgentIdFromSessionKey,
 } from "../routing/session-key.js";
 import {
   normalizeOptionalLowercaseString,
@@ -172,7 +170,6 @@ type PreparedAcpThreadBinding = {
   accountId: string;
   placement: "current" | "child";
   conversationId: string;
-  parentConversationId?: string;
 };
 
 type AcpSpawnInitializedSession = Awaited<
@@ -262,38 +259,6 @@ function normalizeTelegramConversationIdFallback(params: {
     return `${topicMatch[1]}:topic:${topicMatch[2]}`;
   }
   return /^-?\d+$/.test(normalized) ? normalized : undefined;
-}
-
-const threadBindingFallbackConversationResolvers = {
-  line: (params: { to?: string; groupId?: string }) =>
-    normalizeLineConversationIdFallback(params.groupId ?? params.to),
-  telegram: (params: { to?: string; threadId?: string | number; groupId?: string }) =>
-    normalizeTelegramConversationIdFallback(params),
-} as const;
-
-function resolvePluginConversationRefForThreadBinding(params: {
-  channelId: string;
-  to?: string;
-  threadId?: string | number;
-  groupId?: string;
-}): { conversationId: string; parentConversationId?: string } | null {
-  const resolvedConversation = getChannelPlugin(
-    params.channelId,
-  )?.messaging?.resolveInboundConversation?.({
-    // Keep the live delivery target authoritative; conversationId is only a fallback hint.
-    to: params.to,
-    conversationId: params.groupId ?? params.to,
-    threadId: params.threadId,
-    isGroup: true,
-  });
-  const conversationId = normalizeOptionalString(resolvedConversation?.conversationId);
-  if (!conversationId) {
-    return null;
-  }
-  return normalizeConversationTargetRef({
-    conversationId,
-    parentConversationId: resolvedConversation?.parentConversationId,
-  });
 }
 
 function resolveSpawnMode(params: {
@@ -523,49 +488,46 @@ async function persistAcpSpawnSessionFileBestEffort(params: {
   }
 }
 
-function resolveConversationRefForThreadBinding(params: {
+function resolveConversationIdForThreadBinding(params: {
   channel?: string;
   to?: string;
   threadId?: string | number;
   groupId?: string;
-}): { conversationId: string; parentConversationId?: string } | null {
+}): string | undefined {
   const channel = normalizeOptionalLowercaseString(params.channel);
   const normalizedChannelId = channel ? normalizeChannelId(channel) : null;
   const channelKey = normalizedChannelId ?? channel ?? null;
-  const pluginResolvedConversation = normalizedChannelId
-    ? resolvePluginConversationRefForThreadBinding({
-        channelId: normalizedChannelId,
-        to: params.to,
+  const pluginResolvedConversationId = normalizedChannelId
+    ? getChannelPlugin(normalizedChannelId)?.messaging?.resolveInboundConversation?.({
+        to: params.groupId ?? params.to,
+        conversationId: params.groupId ?? params.to,
         threadId: params.threadId,
-        groupId: params.groupId,
-      })
+        isGroup: true,
+      })?.conversationId
     : null;
-  if (pluginResolvedConversation) {
-    return pluginResolvedConversation;
+  if (normalizeOptionalString(pluginResolvedConversationId)) {
+    return normalizeOptionalString(pluginResolvedConversationId);
   }
-  const compatibilityConversationId =
-    channelKey && Object.hasOwn(threadBindingFallbackConversationResolvers, channelKey)
-      ? threadBindingFallbackConversationResolvers[
-          channelKey as keyof typeof threadBindingFallbackConversationResolvers
-        ](params)
-      : undefined;
-  if (compatibilityConversationId) {
-    return normalizeConversationTargetRef({ conversationId: compatibilityConversationId });
+  if (channelKey === "line") {
+    const lineConversationId = normalizeLineConversationIdFallback(params.groupId ?? params.to);
+    if (lineConversationId) {
+      return lineConversationId;
+    }
   }
-  const parentConversationId = resolveConversationIdFromTargets({
-    targets: [params.to],
-  });
+  if (channelKey === "telegram") {
+    const telegramConversationId = normalizeTelegramConversationIdFallback(params);
+    if (telegramConversationId) {
+      return telegramConversationId;
+    }
+  }
   const genericConversationId = resolveConversationIdFromTargets({
     threadId: params.threadId,
     targets: [params.to],
   });
   if (genericConversationId) {
-    return normalizeConversationTargetRef({
-      conversationId: genericConversationId,
-      parentConversationId: params.threadId != null ? parentConversationId : undefined,
-    });
+    return genericConversationId;
   }
-  return null;
+  return undefined;
 }
 
 function resolveAcpSpawnChannelAccountId(params: {
@@ -658,13 +620,13 @@ function prepareAcpThreadBinding(params: {
       error: `Thread bindings do not support ${placementToUse} placement for ${policy.channel}.`,
     };
   }
-  const conversationRef = resolveConversationRefForThreadBinding({
+  const conversationIdRaw = resolveConversationIdForThreadBinding({
     channel: policy.channel,
     to: params.to,
     threadId: params.threadId,
     groupId: params.groupId,
   });
-  if (!conversationRef?.conversationId) {
+  if (!conversationIdRaw) {
     return {
       ok: false,
       error: `Could not resolve a ${policy.channel} conversation for ACP thread spawn.`,
@@ -677,10 +639,7 @@ function prepareAcpThreadBinding(params: {
       channel: policy.channel,
       accountId: policy.accountId,
       placement: placementToUse,
-      conversationId: conversationRef.conversationId,
-      ...(conversationRef.parentConversationId
-        ? { parentConversationId: conversationRef.parentConversationId }
-        : {}),
+      conversationId: conversationIdRaw,
     },
   };
 }
@@ -826,9 +785,6 @@ async function bindPreparedAcpThread(params: {
       channel: params.preparedBinding.channel,
       accountId: params.preparedBinding.accountId,
       conversationId: params.preparedBinding.conversationId,
-      ...(params.preparedBinding.parentConversationId
-        ? { parentConversationId: params.preparedBinding.parentConversationId }
-        : {}),
     },
     placement: params.preparedBinding.placement,
     metadata: {
@@ -870,7 +826,7 @@ async function bindPreparedAcpThread(params: {
 
   let sessionEntry = params.initializedRuntime.sessionEntry;
   if (params.initializedRuntime.sessionId && params.preparedBinding.placement === "child") {
-    const boundThreadId = normalizeOptionalString(binding.conversation.conversationId);
+    const boundThreadId = normalizeOptionalString(String(binding.conversation.conversationId));
     if (boundThreadId) {
       sessionEntry = await persistAcpSpawnSessionFileBestEffort({
         sessionId: params.initializedRuntime.sessionId,
@@ -899,12 +855,14 @@ function resolveAcpSpawnBootstrapDeliveryPlan(params: {
   // Child-thread ACP spawns deliver bootstrap output to the new thread; current-conversation
   // binds deliver back to the originating target.
   const boundThreadIdRaw = params.binding?.conversation.conversationId;
-  const boundThreadId = boundThreadIdRaw ? normalizeOptionalString(boundThreadIdRaw) : undefined;
+  const boundThreadId = boundThreadIdRaw
+    ? normalizeOptionalString(String(boundThreadIdRaw))
+    : undefined;
   const fallbackThreadIdRaw = params.requester.origin?.threadId;
   const fallbackThreadId =
     fallbackThreadIdRaw != null ? normalizeOptionalString(String(fallbackThreadIdRaw)) : undefined;
   const deliveryThreadId = boundThreadId ?? fallbackThreadId;
-  const requesterConversationRef = resolveConversationRefForThreadBinding({
+  const requesterConversationId = resolveConversationIdForThreadBinding({
     channel: params.requester.origin?.channel,
     threadId: fallbackThreadId,
     to: params.requester.origin?.to,
@@ -918,10 +876,8 @@ function resolveAcpSpawnBootstrapDeliveryPlan(params: {
     params.requester.origin?.channel &&
     params.binding?.conversation.channel === params.requester.origin.channel &&
     params.binding?.conversation.accountId === requesterAccountId &&
-    requesterConversationRef?.conversationId &&
-    params.binding?.conversation.conversationId === requesterConversationRef.conversationId &&
-    (params.binding?.conversation.parentConversationId ?? undefined) ===
-      (requesterConversationRef.parentConversationId ?? undefined),
+    requesterConversationId &&
+    params.binding?.conversation.conversationId === requesterConversationId,
   );
   const boundDeliveryTarget = resolveConversationDeliveryTarget({
     channel: params.requester.origin?.channel ?? params.binding?.conversation.channel,
@@ -1152,19 +1108,6 @@ export async function spawnAcpDirect(
           childSessionKey: sessionKey,
         })
       : undefined;
-  // Resolve parent session delivery context so system events route to the
-  // correct thread/topic instead of falling back to the main DM.
-  const parentDeliveryCtx =
-    effectiveStreamToParent && parentSessionKey
-      ? deliveryContextFromSession(
-          loadSessionStore(
-            resolveStorePath(cfg.session?.store, {
-              agentId: resolveAgentIdFromSessionKey(parentSessionKey),
-            }),
-          )[parentSessionKey],
-        )
-      : undefined;
-
   let parentRelay: AcpSpawnParentRelayHandle | undefined;
   if (effectiveStreamToParent && parentSessionKey) {
     // Register relay before dispatch so fast lifecycle failures are not missed.
@@ -1174,12 +1117,11 @@ export async function spawnAcpDirect(
       childSessionKey: sessionKey,
       agentId: targetAgentId,
       logPath: streamLogPath,
-      deliveryContext: parentDeliveryCtx,
       emitStartNotice: false,
     });
   }
   try {
-    const response = await callGateway({
+    const response = await callGateway<{ runId?: string }>({
       method: "agent",
       params: {
         message: params.task,
@@ -1224,7 +1166,6 @@ export async function spawnAcpDirect(
         childSessionKey: sessionKey,
         agentId: targetAgentId,
         logPath: streamLogPath,
-        deliveryContext: parentDeliveryCtx,
         emitStartNotice: false,
       });
     }

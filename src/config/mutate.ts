@@ -38,17 +38,11 @@ function assertBaseHashMatches(snapshot: ConfigFileSnapshot, expectedHash?: stri
 export async function replaceConfigFile(params: {
   nextConfig: OpenClawConfig;
   baseHash?: string;
-  snapshot?: ConfigFileSnapshot;
   writeOptions?: ConfigWriteOptions;
 }): Promise<ConfigReplaceResult> {
-  const prepared =
-    params.snapshot && params.writeOptions
-      ? { snapshot: params.snapshot, writeOptions: params.writeOptions }
-      : await readConfigFileSnapshotForWrite();
-  const { snapshot, writeOptions } = prepared;
+  const { snapshot, writeOptions } = await readConfigFileSnapshotForWrite();
   const previousHash = assertBaseHashMatches(snapshot, params.baseHash);
   await writeConfigFile(params.nextConfig, {
-    baseSnapshot: snapshot,
     ...writeOptions,
     ...params.writeOptions,
   });

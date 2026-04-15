@@ -57,9 +57,6 @@ steps:
       - set: wakeMarker
         value:
           expr: "`QA-RESTART-${randomUUID().slice(0, 8)}`"
-      - set: wakeStartIndex
-        value:
-          expr: "state.getSnapshot().messages.length"
       - call: applyConfig
         args:
           - env:
@@ -68,8 +65,6 @@ steps:
               ref: nextConfig
             sessionKey:
               ref: sessionKey
-            deliveryContext:
-              expr: "({ channel: 'qa-channel', to: `channel:${config.channelId}` })"
             note:
               ref: wakeMarker
       - try:
@@ -104,8 +99,6 @@ steps:
                     params: [candidate]
                     expr: "candidate.text.includes(wakeMarker)"
                 - 60000
-                - sinceIndex:
-                    ref: wakeStartIndex
           catchAs: wakeError
           catch:
             - throw:

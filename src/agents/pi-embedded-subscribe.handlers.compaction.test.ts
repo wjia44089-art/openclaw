@@ -1,12 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  drainSessionStoreLockQueuesForTest,
-  resetSessionStoreLockRuntimeForTests,
-  setSessionWriteLockAcquirerForTests,
-} from "../config/sessions.js";
+import { describe, expect, it, vi } from "vitest";
 import {
   readCompactionCount,
   seedSessionStore,
@@ -54,17 +49,6 @@ function createCompactionContext(params: {
     getCompactionCount: () => compactionCount,
   } as unknown as EmbeddedPiSubscribeContext;
 }
-
-beforeEach(() => {
-  setSessionWriteLockAcquirerForTests(async () => ({
-    release: async () => {},
-  }));
-});
-
-afterEach(async () => {
-  resetSessionStoreLockRuntimeForTests();
-  await drainSessionStoreLockQueuesForTest();
-});
 
 describe("reconcileSessionStoreCompactionCountAfterSuccess", () => {
   it("raises the stored compaction count to the observed value", async () => {

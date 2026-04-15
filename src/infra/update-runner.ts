@@ -18,7 +18,7 @@ import {
   isStableTag,
   type UpdateChannel,
 } from "./update-channels.js";
-import { compareSemverStrings } from "./update-check.js";
+import { compareSemverStrings, isCompatibleArchUpdate } from "./update-check.js";
 import {
   collectInstalledGlobalPackageErrors,
   cleanupGlobalRenameDirs,
@@ -1117,6 +1117,23 @@ export async function runGatewayUpdate(opts: UpdateRunnerOptions = {}): Promise<
     });
     const channel = opts.channel ?? DEFAULT_PACKAGE_CHANNEL;
     const tag = normalizeTag(opts.tag ?? channelToNpmTag(channel));
+
+    // RISC-V builds are published to a private registry under a different
+    // package name.  The global package-manager update command would install
+    // from the public registry, which carries a non-RISC-V build.  Block the
+    // update entirely so the user can upgrade manually from the private registry.
+    if (!isCompatibleArchUpdate(beforeVersion, null)) {
+      return {
+        status: "skipped",
+        mode: globalManager,
+        root: pkgRoot,
+        reason: "arch-incompatible",
+        before: { version: beforeVersion },
+        steps: [],
+        durationMs: Date.now() - startedAt,
+      };
+    }
+
     const steps: UpdateStepResult[] = [];
     const globalInstallEnv = await createGlobalInstallEnv();
     const spec = resolveGlobalInstallSpec({

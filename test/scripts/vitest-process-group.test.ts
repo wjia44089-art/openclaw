@@ -23,7 +23,7 @@ describe("vitest process group helpers", () => {
     );
   });
 
-  it("forwards signals to the computed target and ignores cleanup races", () => {
+  it("forwards signals to the computed target and ignores ESRCH", () => {
     const kill = vi.fn();
     expect(
       forwardSignalToVitestProcessGroup({
@@ -38,20 +38,6 @@ describe("vitest process group helpers", () => {
     kill.mockImplementationOnce(() => {
       const error = new Error("gone") as NodeJS.ErrnoException;
       error.code = "ESRCH";
-      throw error;
-    });
-    expect(
-      forwardSignalToVitestProcessGroup({
-        child: { pid: 4200 },
-        signal: "SIGTERM",
-        platform: "darwin",
-        kill,
-      }),
-    ).toBe(false);
-
-    kill.mockImplementationOnce(() => {
-      const error = new Error("permission race") as NodeJS.ErrnoException;
-      error.code = "EPERM";
       throw error;
     });
     expect(

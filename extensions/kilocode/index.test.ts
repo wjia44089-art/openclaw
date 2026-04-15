@@ -2,16 +2,26 @@ import type { StreamFn } from "@mariozechner/pi-agent-core";
 import type { Context, Model } from "@mariozechner/pi-ai";
 import { describe, expect, it } from "vitest";
 import { registerSingleProviderPlugin } from "../../test/helpers/plugins/plugin-registration.js";
-import { expectPassthroughReplayPolicy } from "../../test/helpers/provider-replay-policy.ts";
 import plugin from "./index.js";
 
 describe("kilocode provider plugin", () => {
   it("owns passthrough-gemini replay policy for Gemini-backed models", async () => {
-    await expectPassthroughReplayPolicy({
-      plugin,
-      providerId: "kilocode",
-      modelId: "gemini-2.5-pro",
-      sanitizeThoughtSignatures: true,
+    const provider = await registerSingleProviderPlugin(plugin);
+
+    expect(
+      provider.buildReplayPolicy?.({
+        provider: "kilocode",
+        modelApi: "openai-completions",
+        modelId: "gemini-2.5-pro",
+      } as never),
+    ).toMatchObject({
+      applyAssistantFirstOrderingFix: false,
+      validateGeminiTurns: false,
+      validateAnthropicTurns: false,
+      sanitizeThoughtSignatures: {
+        allowBase64Only: true,
+        includeCamelCase: true,
+      },
     });
   });
 

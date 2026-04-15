@@ -89,7 +89,7 @@ async function resolveWhatsAppCommandAuthorized(params: {
         return true;
       }
       const normalizedEntries = allowEntries
-        .map((entry) => normalizeE164(entry))
+        .map((entry) => normalizeE164(String(entry)))
         .filter((entry): entry is string => Boolean(entry));
       return normalizedEntries.includes(senderE164);
     },

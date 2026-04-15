@@ -1,6 +1,6 @@
 import type { Command } from "commander";
+import qrcode from "qrcode-terminal";
 import { loadConfig } from "../config/config.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { hasConfiguredSecretInput } from "../config/types.secrets.js";
 import { trimToUndefined } from "../gateway/credentials.js";
 import { resolveRequiredConfiguredSecretRefInputString } from "../gateway/resolve-configured-secret-input-string.js";
@@ -23,13 +23,7 @@ type QrCliOptions = {
   password?: string;
 };
 
-async function loadQrTerminal() {
-  const mod = await import("qrcode-terminal");
-  return mod.default ?? mod;
-}
-
-async function renderQrAscii(data: string): Promise<string> {
-  const qrcode = await loadQrTerminal();
+function renderQrAscii(data: string): Promise<string> {
   return new Promise((resolve) => {
     qrcode.generate(data, { small: true }, (output: string) => {
       resolve(output);
@@ -37,7 +31,7 @@ async function renderQrAscii(data: string): Promise<string> {
   });
 }
 
-function readDevicePairPublicUrlFromConfig(cfg: OpenClawConfig): string | undefined {
+function readDevicePairPublicUrlFromConfig(cfg: ReturnType<typeof loadConfig>): string | undefined {
   const value = cfg.plugins?.entries?.["device-pair"]?.config?.["publicUrl"];
   if (typeof value !== "string") {
     return undefined;
@@ -47,7 +41,7 @@ function readDevicePairPublicUrlFromConfig(cfg: OpenClawConfig): string | undefi
 }
 
 function shouldResolveLocalGatewayPasswordSecret(
-  cfg: OpenClawConfig,
+  cfg: ReturnType<typeof loadConfig>,
   env: NodeJS.ProcessEnv,
 ): boolean {
   if (trimToUndefined(env.OPENCLAW_GATEWAY_PASSWORD)) {
@@ -68,7 +62,9 @@ function shouldResolveLocalGatewayPasswordSecret(
   return !envToken && !configTokenConfigured;
 }
 
-async function resolveLocalGatewayPasswordSecretIfNeeded(cfg: OpenClawConfig): Promise<void> {
+async function resolveLocalGatewayPasswordSecretIfNeeded(
+  cfg: ReturnType<typeof loadConfig>,
+): Promise<void> {
   const resolvedPassword = await resolveRequiredConfiguredSecretRefInputString({
     config: cfg,
     env: process.env,

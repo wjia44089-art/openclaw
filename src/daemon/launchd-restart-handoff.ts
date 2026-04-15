@@ -3,7 +3,6 @@ import os from "node:os";
 import path from "node:path";
 import { formatErrorMessage } from "../infra/errors.js";
 import { normalizeOptionalString } from "../shared/string-coerce.js";
-import { sanitizeForLog } from "../terminal/ansi.js";
 import { resolveGatewayLaunchAgentLabel } from "./constants.js";
 
 export type LaunchdRestartHandoffMode = "kickstart" | "start-after-exit";
@@ -21,14 +20,6 @@ export type LaunchdRestartTarget = {
   serviceTarget: string;
 };
 
-function assertValidLaunchAgentLabel(label: string): string {
-  const trimmed = label.trim();
-  if (!/^[A-Za-z0-9._-]+$/.test(trimmed)) {
-    throw new Error(`Invalid launchd label: ${sanitizeForLog(trimmed)}`);
-  }
-  return trimmed;
-}
-
 function resolveGuiDomain(): string {
   if (typeof process.getuid !== "function") {
     return "gui/501";
@@ -39,9 +30,9 @@ function resolveGuiDomain(): string {
 function resolveLaunchAgentLabel(env?: Record<string, string | undefined>): string {
   const envLabel = normalizeOptionalString(env?.OPENCLAW_LAUNCHD_LABEL);
   if (envLabel) {
-    return assertValidLaunchAgentLabel(envLabel);
+    return envLabel;
   }
-  return assertValidLaunchAgentLabel(resolveGatewayLaunchAgentLabel(env?.OPENCLAW_PROFILE));
+  return resolveGatewayLaunchAgentLabel(env?.OPENCLAW_PROFILE);
 }
 
 export function resolveLaunchdRestartTarget(
@@ -76,7 +67,6 @@ export function isCurrentProcessLaunchdServiceLabel(
 
 function buildLaunchdRestartScript(mode: LaunchdRestartHandoffMode): string {
   const waitForCallerPid = `wait_pid="$4"
-label="$5"
 if [ -n "$wait_pid" ] && [ "$wait_pid" -gt 1 ] 2>/dev/null; then
   while kill -0 "$wait_pid" >/dev/null 2>&1; do
     sleep 0.1
@@ -85,13 +75,12 @@ fi
 `;
 
   if (mode === "kickstart") {
-    // Restart is explicit operator intent; undo any previous `launchctl disable`.
     return `service_target="$1"
 domain="$2"
 plist_path="$3"
 ${waitForCallerPid}
-launchctl enable "$service_target" >/dev/null 2>&1
 if ! launchctl kickstart -k "$service_target" >/dev/null 2>&1; then
+  launchctl enable "$service_target" >/dev/null 2>&1
   if launchctl bootstrap "$domain" "$plist_path" >/dev/null 2>&1; then
     launchctl kickstart -k "$service_target" >/dev/null 2>&1 || true
   fi
@@ -99,15 +88,14 @@ fi
 `;
   }
 
-  // Restart is explicit operator intent; undo any previous `launchctl disable`.
   return `service_target="$1"
 domain="$2"
 plist_path="$3"
 ${waitForCallerPid}
-launchctl enable "$service_target" >/dev/null 2>&1
-if ! launchctl start "$label" >/dev/null 2>&1; then
+if ! launchctl start "$service_target" >/dev/null 2>&1; then
+  launchctl enable "$service_target" >/dev/null 2>&1
   if launchctl bootstrap "$domain" "$plist_path" >/dev/null 2>&1; then
-    launchctl start "$label" >/dev/null 2>&1 || launchctl kickstart -k "$service_target" >/dev/null 2>&1 || true
+    launchctl start "$service_target" >/dev/null 2>&1 || launchctl kickstart -k "$service_target" >/dev/null 2>&1 || true
   else
     launchctl kickstart -k "$service_target" >/dev/null 2>&1 || true
   fi
@@ -136,7 +124,6 @@ export function scheduleDetachedLaunchdRestartHandoff(params: {
         target.domain,
         target.plistPath,
         String(waitForPid),
-        target.label,
       ],
       {
         detached: true,

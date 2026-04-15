@@ -70,7 +70,7 @@ steps:
               expr: liveTurnTimeoutMs(env, 30000)
       - set: expectedReplyAny
         value:
-          expr: config.expectedReplyAny.map(normalizeLowercaseStringOrEmpty)
+          expr: config.expectedReplyAny.map((needle) => needle.toLowerCase())
       - call: waitForCondition
         saveAs: outbound
         args:

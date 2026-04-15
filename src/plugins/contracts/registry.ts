@@ -192,7 +192,6 @@ function resolveBundledManifestPluginIdsForContract(contract: ManifestContractKe
           case "tools":
             return entry.toolNames.length > 0;
         }
-        throw new Error("Unsupported manifest contract key");
       })
       .map((entry) => entry.pluginId),
   ).toSorted((left, right) => left.localeCompare(right));

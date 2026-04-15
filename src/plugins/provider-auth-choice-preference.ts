@@ -1,5 +1,5 @@
 import { normalizeLegacyOnboardAuthChoice } from "../commands/auth-choice-legacy.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { resolveManifestProviderAuthChoice } from "./provider-auth-choices.js";
 
 function normalizeLegacyAuthChoice(choice: string, env?: NodeJS.ProcessEnv): string {

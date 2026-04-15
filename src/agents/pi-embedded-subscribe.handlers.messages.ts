@@ -5,10 +5,7 @@ import { parseReplyDirectives } from "../auto-reply/reply/reply-directives.js";
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
 import { emitAgentEvent } from "../infra/agent-events.js";
 import { createInlineCodeState } from "../markdown/code-spans.js";
-import {
-  resolveAssistantMessagePhase,
-  type AssistantPhase,
-} from "../shared/chat-message-content.js";
+import { resolveAssistantMessagePhase } from "../shared/chat-message-content.js";
 import { normalizeOptionalString } from "../shared/string-coerce.js";
 import {
   isMessagingToolDuplicateNormalized,
@@ -168,21 +165,13 @@ export function buildAssistantStreamData(params: {
   replace?: boolean;
   mediaUrls?: string[];
   mediaUrl?: string;
-  phase?: AssistantPhase;
-}): {
-  text: string;
-  delta: string;
-  replace?: true;
-  mediaUrls?: string[];
-  phase?: AssistantPhase;
-} {
+}): { text: string; delta: string; replace?: true; mediaUrls?: string[] } {
   const mediaUrls = resolveSendableOutboundReplyParts(params).mediaUrls;
   return {
     text: params.text ?? "",
     delta: params.delta ?? "",
     replace: params.replace ? true : undefined,
     mediaUrls: mediaUrls.length ? mediaUrls : undefined,
-    phase: params.phase,
   };
 }
 
@@ -223,7 +212,6 @@ export function handleMessageUpdate(
     ctx.state.deterministicApprovalPromptPending || ctx.state.deterministicApprovalPromptSent;
 
   const assistantEvent = evt.assistantMessageEvent;
-  const assistantPhase = resolveAssistantMessagePhase(msg);
   const assistantRecord =
     assistantEvent && typeof assistantEvent === "object"
       ? (assistantEvent as Record<string, unknown>)
@@ -400,7 +388,6 @@ export function handleMessageUpdate(
         delta: deltaText,
         replace,
         mediaUrls,
-        phase: assistantPhase,
       });
       emitAgentEvent({
         runId: ctx.params.runId,
@@ -446,14 +433,13 @@ export function handleMessageUpdate(
 export function handleMessageEnd(
   ctx: EmbeddedPiSubscribeContext,
   evt: AgentEvent & { message: AgentMessage },
-): void | Promise<void> {
+) {
   const msg = evt.message;
   if (msg?.role !== "assistant" || isTranscriptOnlyOpenClawAssistantMessage(msg)) {
     return;
   }
 
   const assistantMessage = msg;
-  const assistantPhase = resolveAssistantMessagePhase(assistantMessage);
   const suppressVisibleAssistantOutput = shouldSuppressAssistantVisibleOutput(assistantMessage);
   const suppressDeterministicApprovalOutput =
     ctx.state.deterministicApprovalPromptPending || ctx.state.deterministicApprovalPromptSent;
@@ -526,7 +512,6 @@ export function handleMessageEnd(
       delta: finalStreamDelta,
       replace: shouldReplaceFinalStream,
       mediaUrls,
-      phase: assistantPhase,
     });
     emitAgentEvent({
       runId: ctx.params.runId,
@@ -674,7 +659,6 @@ export function handleMessageEnd(
           if (isPromiseLike<void>(onBlockReplyFlushResult)) {
             return onBlockReplyFlushResult;
           }
-          return undefined;
         })
         .finally(() => {
           finalizeMessageEnd();
@@ -689,5 +673,4 @@ export function handleMessageEnd(
   }
 
   finalizeMessageEnd();
-  return undefined;
 }

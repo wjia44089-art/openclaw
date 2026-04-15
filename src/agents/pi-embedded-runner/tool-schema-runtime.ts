@@ -1,12 +1,11 @@
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import type { TSchema } from "@sinclair/typebox";
-import type { OpenClawConfig } from "../../config/types.openclaw.js";
-import type { ProviderRuntimeModel } from "../../plugins/provider-runtime-model.types.js";
+import type { OpenClawConfig } from "../../config/config.js";
 import {
   inspectProviderToolSchemasWithPlugin,
   normalizeProviderToolSchemasWithPlugin,
 } from "../../plugins/provider-runtime.js";
-import type { ProviderToolSchemaDiagnostic } from "../../plugins/types.js";
+import type { ProviderRuntimeModel } from "../../plugins/types.js";
 import type { AnyAgentTool } from "../tools/common.js";
 import { log } from "./logger.js";
 
@@ -73,35 +72,19 @@ export function logProviderToolSchemaDiagnostics(params: ProviderToolSchemaParam
   if (!Array.isArray(diagnostics)) {
     return;
   }
-  if (diagnostics.length === 0) {
-    return;
-  }
 
-  const summary = summarizeProviderToolSchemaDiagnostics(diagnostics);
-  log.warn(
-    `provider tool schema diagnostics: ${diagnostics.length} ${diagnostics.length === 1 ? "tool" : "tools"} for ${params.provider}: ${summary}`,
-    {
-      provider: params.provider,
-      toolCount: params.tools.length,
-      diagnosticCount: diagnostics.length,
-      tools: params.tools.map((tool, index) => `${index}:${tool.name}`),
-      diagnostics: diagnostics.map((diagnostic) => ({
-        index: diagnostic.toolIndex,
-        tool: diagnostic.toolName,
-        violations: diagnostic.violations.slice(0, 12),
-        violationCount: diagnostic.violations.length,
-      })),
-    },
-  );
-}
-
-function summarizeProviderToolSchemaDiagnostics(
-  diagnostics: readonly ProviderToolSchemaDiagnostic[],
-) {
-  const visible = diagnostics.slice(0, 6).map((diagnostic) => {
-    const violationCount = diagnostic.violations.length;
-    return `${diagnostic.toolName || "unknown"} (${violationCount} ${violationCount === 1 ? "violation" : "violations"})`;
+  log.info("provider tool schema snapshot", {
+    provider: params.provider,
+    toolCount: params.tools.length,
+    tools: params.tools.map((tool, index) => `${index}:${tool.name}`),
   });
-  const remaining = diagnostics.length - visible.length;
-  return remaining > 0 ? `${visible.join(", ")}, +${remaining} more` : visible.join(", ");
+  for (const diagnostic of diagnostics) {
+    log.warn("provider tool schema diagnostic", {
+      provider: params.provider,
+      index: diagnostic.toolIndex,
+      tool: diagnostic.toolName,
+      violations: diagnostic.violations.slice(0, 12),
+      violationCount: diagnostic.violations.length,
+    });
+  }
 }

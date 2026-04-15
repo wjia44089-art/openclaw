@@ -3,7 +3,7 @@ import {
   resolveThreadBindingIdleTimeoutMsForChannel,
   resolveThreadBindingMaxAgeMsForChannel,
 } from "../../channels/thread-bindings-policy.js";
-import type { OpenClawConfig } from "../../config/types.openclaw.js";
+import type { OpenClawConfig } from "../../config/config.js";
 import { normalizeAccountId, resolveAgentIdFromSessionKey } from "../../routing/session-key.js";
 import {
   registerSessionBindingAdapter,
@@ -158,9 +158,6 @@ export function createAccountScopedConversationBindingManager<TKind extends stri
       if (!normalizedConversationId || !normalizedTargetSessionKey) {
         return null;
       }
-      const existing = getState<TKind>(params.stateKey).bindingsByAccountConversation.get(
-        resolveBindingKey({ accountId, conversationId: normalizedConversationId }),
-      );
       const now = Date.now();
       const record: AccountScopedConversationBindingRecord<TKind> = {
         accountId,
@@ -170,15 +167,15 @@ export function createAccountScopedConversationBindingManager<TKind extends stri
         agentId:
           typeof metadata?.agentId === "string" && metadata.agentId.trim()
             ? metadata.agentId.trim()
-            : (existing?.agentId ?? resolveAgentIdFromSessionKey(normalizedTargetSessionKey)),
+            : resolveAgentIdFromSessionKey(normalizedTargetSessionKey),
         label:
           typeof metadata?.label === "string" && metadata.label.trim()
             ? metadata.label.trim()
-            : existing?.label,
+            : undefined,
         boundBy:
           typeof metadata?.boundBy === "string" && metadata.boundBy.trim()
             ? metadata.boundBy.trim()
-            : existing?.boundBy,
+            : undefined,
         boundAt: now,
         lastActivityAt: now,
       };

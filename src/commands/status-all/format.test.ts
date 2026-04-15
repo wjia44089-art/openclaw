@@ -56,8 +56,6 @@ describe("status-all format", () => {
   });
 
   it("builds shared update surface values", () => {
-    const newerRegistryVersion = "9999.0.0";
-
     expect(
       buildStatusUpdateSurface({
         updateConfigChannel: "stable",
@@ -73,7 +71,7 @@ describe("status-all format", () => {
             fetchOk: true,
           },
           registry: {
-            latestVersion: newerRegistryVersion,
+            latestVersion: "2026.4.9",
           },
         } as never,
       }),
@@ -85,7 +83,7 @@ describe("status-all format", () => {
       },
       channelLabel: "stable (config)",
       gitLabel: "main · tag v1.2.3",
-      updateLine: `git main · ↔ origin/main · behind 2 · npm update ${newerRegistryVersion}`,
+      updateLine: "git main · ↔ origin/main · behind 2 · npm update 2026.4.9",
       updateAvailable: true,
     });
   });
@@ -324,7 +322,7 @@ describe("status-all format", () => {
             ahead: 0,
             fetchOk: true,
           },
-          registry: { latestVersion: "2026.4.10" },
+          registry: { latestVersion: "2026.4.9" },
         } as never,
         tailscaleMode: "serve",
         tailscaleDns: "box.tail.ts.net",

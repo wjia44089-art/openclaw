@@ -2,27 +2,14 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { createJiti } from "jiti";
-import {
-  clearAgentHarnesses,
-  listRegisteredAgentHarnesses,
-  restoreRegisteredAgentHarnesses,
-} from "../agents/harness/registry.js";
-import type { ChannelPlugin } from "../channels/plugins/types.plugin.js";
+import type { ChannelPlugin } from "../channels/plugins/types.js";
 import { isChannelConfigured } from "../config/channel-configured.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import type { PluginInstallRecord } from "../config/types.plugins.js";
 import type { GatewayRequestHandler } from "../gateway/server-methods/types.js";
 import { openBoundaryFileSync } from "../infra/boundary-file-read.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
-import {
-  DEFAULT_MEMORY_DREAMING_PLUGIN_ID,
-  resolveMemoryDreamingConfig,
-  resolveMemoryDreamingPluginConfig,
-} from "../memory-host-sdk/dreaming.js";
-import {
-  normalizeLowercaseStringOrEmpty,
-  normalizeOptionalString,
-} from "../shared/string-coerce.js";
+import { normalizeOptionalString } from "../shared/string-coerce.js";
 import { resolveUserPath } from "../utils.js";
 import { buildPluginApi } from "./api-builder.js";
 import { inspectBundleMcpRuntimeSupport } from "./bundle-mcp.js";
@@ -47,7 +34,6 @@ import { discoverOpenClawPlugins } from "./discovery.js";
 import { initializeGlobalHookRunner } from "./hook-runner-global.js";
 import { clearPluginInteractiveHandlers } from "./interactive-registry.js";
 import { loadPluginManifestRegistry } from "./manifest-registry.js";
-import type { PluginBundleFormat, PluginDiagnostic, PluginFormat } from "./manifest-types.js";
 import type { PluginManifestContracts } from "./manifest.js";
 import {
   clearMemoryEmbeddingProviders,
@@ -56,7 +42,6 @@ import {
 } from "./memory-embedding-providers.js";
 import {
   clearMemoryPluginState,
-  getMemoryCapabilityRegistration,
   getMemoryFlushPlanResolver,
   getMemoryPromptSectionBuilder,
   getMemoryRuntime,
@@ -64,14 +49,7 @@ import {
   listMemoryPromptSupplements,
   restoreMemoryPluginState,
 } from "./memory-state.js";
-import { unwrapDefaultModuleExport } from "./module-export.js";
 import { isPathInside, safeStatSync } from "./path-safety.js";
-import {
-  createPluginIdScopeSet,
-  hasExplicitPluginIdScope,
-  normalizePluginIdScope,
-  serializePluginIdScope,
-} from "./plugin-scope.js";
 import { createPluginRegistry, type PluginRecord, type PluginRegistry } from "./registry.js";
 import { resolvePluginCacheInputs } from "./roots.js";
 import {
@@ -81,7 +59,7 @@ import {
   recordImportedPluginId,
   setActivePluginRegistry,
 } from "./runtime.js";
-import type { CreatePluginRuntimeOptions } from "./runtime/types.js";
+import type { CreatePluginRuntimeOptions } from "./runtime/index.js";
 import type { PluginRuntime } from "./runtime/types.js";
 import { validateJsonSchemaValue } from "./schema-validator.js";
 import {
@@ -98,7 +76,14 @@ import {
   shouldPreferNativeJiti,
 } from "./sdk-alias.js";
 import { hasKind, kindsEqual } from "./slots.js";
-import type { OpenClawPluginDefinition, OpenClawPluginModule, PluginLogger } from "./types.js";
+import type {
+  OpenClawPluginDefinition,
+  OpenClawPluginModule,
+  PluginDiagnostic,
+  PluginBundleFormat,
+  PluginFormat,
+  PluginLogger,
+} from "./types.js";
 
 export type PluginLoadResult = PluginRegistry;
 
@@ -135,25 +120,6 @@ const CLI_METADATA_ENTRY_BASENAMES = [
   "cli-metadata.cjs",
 ] as const;
 
-function resolveDreamingSidecarEngineId(params: {
-  cfg: OpenClawConfig;
-  memorySlot: string | null | undefined;
-}): string | null {
-  const normalizedMemorySlot = normalizeLowercaseStringOrEmpty(params.memorySlot);
-  if (
-    !normalizedMemorySlot ||
-    normalizedMemorySlot === "none" ||
-    normalizedMemorySlot === DEFAULT_MEMORY_DREAMING_PLUGIN_ID
-  ) {
-    return null;
-  }
-  const dreamingConfig = resolveMemoryDreamingConfig({
-    pluginConfig: resolveMemoryDreamingPluginConfig(params.cfg),
-    cfg: params.cfg,
-  });
-  return dreamingConfig.enabled ? DEFAULT_MEMORY_DREAMING_PLUGIN_ID : null;
-}
-
 export class PluginLoadFailureError extends Error {
   readonly pluginIds: string[];
   readonly registry: PluginRegistry;
@@ -182,9 +148,7 @@ export class PluginLoadReentryError extends Error {
 
 type CachedPluginState = {
   registry: PluginRegistry;
-  memoryCapability: ReturnType<typeof getMemoryCapabilityRegistration>;
   memoryCorpusSupplements: ReturnType<typeof listMemoryCorpusSupplements>;
-  agentHarnesses: ReturnType<typeof listRegisteredAgentHarnesses>;
   compactionProviders: ReturnType<typeof listRegisteredCompactionProviders>;
   memoryEmbeddingProviders: ReturnType<typeof listRegisteredMemoryEmbeddingProviders>;
   memoryFlushPlanResolver: ReturnType<typeof getMemoryFlushPlanResolver>;
@@ -218,7 +182,6 @@ export function clearPluginLoaderCache(): void {
   registryCache.clear();
   inFlightPluginRegistryLoads.clear();
   openAllowlistWarningCache.clear();
-  clearAgentHarnesses();
   clearCompactionProviders();
   clearMemoryEmbeddingProviders();
   clearMemoryPluginState();
@@ -393,7 +356,7 @@ function buildCacheKey(params: {
       },
     ]),
   );
-  const scopeKey = serializePluginIdScope(params.onlyPluginIds);
+  const scopeKey = JSON.stringify(params.onlyPluginIds ?? []);
   const setupOnlyKey = params.includeSetupOnlyChannelPlugins === true ? "setup-only" : "runtime";
   const startupChannelMode =
     params.preferSetupRuntimeForChannelPlugins === true ? "prefer-setup" : "full";
@@ -406,6 +369,14 @@ function buildCacheKey(params: {
     loadPaths,
     activationMetadataKey: params.activationMetadataKey ?? "",
   })}::${scopeKey}::${setupOnlyKey}::${startupChannelMode}::${moduleLoadMode}::${runtimeSubagentMode}::${params.pluginSdkResolution ?? "auto"}::${gatewayMethodsKey}`;
+}
+
+function normalizeScopedPluginIds(ids?: string[]): string[] | undefined {
+  if (!ids) {
+    return undefined;
+  }
+  const normalized = Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean))).toSorted();
+  return normalized.length > 0 ? normalized : undefined;
 }
 
 function matchesScopedPluginRequest(params: {
@@ -469,19 +440,19 @@ function buildActivationMetadataHash(params: {
 }
 
 function hasExplicitCompatibilityInputs(options: PluginLoadOptions): boolean {
-  return (
+  return Boolean(
     options.config !== undefined ||
     options.activationSourceConfig !== undefined ||
     options.autoEnabledReasons !== undefined ||
     options.workspaceDir !== undefined ||
     options.env !== undefined ||
-    hasExplicitPluginIdScope(options.onlyPluginIds) ||
+    options.onlyPluginIds?.length ||
     options.runtimeOptions !== undefined ||
     options.pluginSdkResolution !== undefined ||
     options.coreGatewayHandlers !== undefined ||
     options.includeSetupOnlyChannelPlugins === true ||
     options.preferSetupRuntimeForChannelPlugins === true ||
-    options.loadModules === false
+    options.loadModules === false,
   );
 }
 
@@ -493,7 +464,7 @@ function resolvePluginLoadCacheContext(options: PluginLoadOptions = {}) {
   const activationSource = createPluginActivationSource({
     config: activationSourceConfig,
   });
-  const onlyPluginIds = normalizePluginIdScope(options.onlyPluginIds);
+  const onlyPluginIds = normalizeScopedPluginIds(options.onlyPluginIds);
   const includeSetupOnlyChannelPlugins = options.includeSetupOnlyChannelPlugins === true;
   const preferSetupRuntimeForChannelPlugins = options.preferSetupRuntimeForChannelPlugins === true;
   const runtimeSubagentMode = resolveRuntimeSubagentMode(options.runtimeOptions);
@@ -630,7 +601,12 @@ function resolvePluginModuleExport(moduleExport: unknown): {
   definition?: OpenClawPluginDefinition;
   register?: OpenClawPluginDefinition["register"];
 } {
-  const resolved = unwrapDefaultModuleExport(moduleExport);
+  const resolved =
+    moduleExport &&
+    typeof moduleExport === "object" &&
+    "default" in (moduleExport as Record<string, unknown>)
+      ? (moduleExport as { default: unknown }).default
+      : moduleExport;
   if (typeof resolved === "function") {
     return {
       register: resolved as OpenClawPluginDefinition["register"],
@@ -647,7 +623,12 @@ function resolvePluginModuleExport(moduleExport: unknown): {
 function resolveSetupChannelRegistration(moduleExport: unknown): {
   plugin?: ChannelPlugin;
 } {
-  const resolved = unwrapDefaultModuleExport(moduleExport);
+  const resolved =
+    moduleExport &&
+    typeof moduleExport === "object" &&
+    "default" in (moduleExport as Record<string, unknown>)
+      ? (moduleExport as { default: unknown }).default
+      : moduleExport;
   if (!resolved || typeof resolved !== "object") {
     return {};
   }
@@ -733,9 +714,7 @@ function createPluginRecord(params: {
     musicGenerationProviderIds: [],
     webFetchProviderIds: [],
     webSearchProviderIds: [],
-    contextEngineIds: [],
     memoryEmbeddingProviderIds: [],
-    agentHarnessIds: [],
     gatewayMethods: [],
     cliCommands: [],
     services: [],
@@ -1122,16 +1101,14 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
   } = resolvePluginLoadCacheContext(options);
   const logger = options.logger ?? defaultLogger();
   const validateOnly = options.mode === "validate";
-  const onlyPluginIdSet = createPluginIdScopeSet(onlyPluginIds);
+  const onlyPluginIdSet = onlyPluginIds ? new Set(onlyPluginIds) : null;
   const cacheEnabled = options.cache !== false;
   if (cacheEnabled) {
     const cached = getCachedPluginRegistry(cacheKey);
     if (cached) {
-      restoreRegisteredAgentHarnesses(cached.agentHarnesses);
       restoreRegisteredCompactionProviders(cached.compactionProviders);
       restoreRegisteredMemoryEmbeddingProviders(cached.memoryEmbeddingProviders);
       restoreMemoryPluginState({
-        capability: cached.memoryCapability,
         corpusSupplements: cached.memoryCorpusSupplements,
         promptBuilder: cached.memoryPromptBuilder,
         promptSupplements: cached.memoryPromptSupplements,
@@ -1157,7 +1134,6 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
     // Clear previously registered plugin state before reloading.
     // Skip for non-activating (snapshot) loads to avoid wiping commands from other plugins.
     if (shouldActivate) {
-      clearAgentHarnesses();
       clearPluginCommands();
       clearPluginInteractiveHandlers();
       clearMemoryPluginState();
@@ -1314,7 +1290,6 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
     const memorySlot = normalized.slots.memory;
     let selectedMemoryPluginId: string | null = null;
     let memorySlotMatched = false;
-    const dreamingEngineId = resolveDreamingSidecarEngineId({ cfg, memorySlot });
 
     for (const candidate of orderedCandidates) {
       const manifestRecord = manifestByRoot.get(candidate.rootDir);
@@ -1506,29 +1481,25 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
       }
       // Fast-path bundled memory plugins that are guaranteed disabled by slot policy.
       // This avoids opening/importing heavy memory plugin modules that will never register.
-      // Exception: the dreaming engine (memory-core by default) must load alongside the
-      // selected memory slot plugin so dreaming can run even when lancedb holds the slot.
       if (
         registrationMode === "full" &&
         candidate.origin === "bundled" &&
         hasKind(manifestRecord.kind, "memory")
       ) {
-        if (pluginId !== dreamingEngineId) {
-          const earlyMemoryDecision = resolveMemorySlotDecision({
-            id: record.id,
-            kind: manifestRecord.kind,
-            slot: memorySlot,
-            selectedId: selectedMemoryPluginId,
-          });
-          if (!earlyMemoryDecision.enabled) {
-            record.enabled = false;
-            record.status = "disabled";
-            record.error = earlyMemoryDecision.reason;
-            markPluginActivationDisabled(record, earlyMemoryDecision.reason);
-            registry.plugins.push(record);
-            seenIds.set(pluginId, candidate.origin);
-            continue;
-          }
+        const earlyMemoryDecision = resolveMemorySlotDecision({
+          id: record.id,
+          kind: manifestRecord.kind,
+          slot: memorySlot,
+          selectedId: selectedMemoryPluginId,
+        });
+        if (!earlyMemoryDecision.enabled) {
+          record.enabled = false;
+          record.status = "disabled";
+          record.error = earlyMemoryDecision.reason;
+          markPluginActivationDisabled(record, earlyMemoryDecision.reason);
+          registry.plugins.push(record);
+          seenIds.set(pluginId, candidate.origin);
+          continue;
         }
       }
 
@@ -1545,7 +1516,7 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
           selectedId: selectedMemoryPluginId,
         });
 
-        if (!memoryDecision.enabled && pluginId !== dreamingEngineId) {
+        if (!memoryDecision.enabled) {
           record.enabled = false;
           record.status = "disabled";
           record.error = memoryDecision.reason;
@@ -1686,28 +1657,26 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
       }
 
       if (registrationMode === "full") {
-        if (pluginId !== dreamingEngineId) {
-          const memoryDecision = resolveMemorySlotDecision({
-            id: record.id,
-            kind: record.kind,
-            slot: memorySlot,
-            selectedId: selectedMemoryPluginId,
-          });
+        const memoryDecision = resolveMemorySlotDecision({
+          id: record.id,
+          kind: record.kind,
+          slot: memorySlot,
+          selectedId: selectedMemoryPluginId,
+        });
 
-          if (!memoryDecision.enabled) {
-            record.enabled = false;
-            record.status = "disabled";
-            record.error = memoryDecision.reason;
-            markPluginActivationDisabled(record, memoryDecision.reason);
-            registry.plugins.push(record);
-            seenIds.set(pluginId, candidate.origin);
-            continue;
-          }
+        if (!memoryDecision.enabled) {
+          record.enabled = false;
+          record.status = "disabled";
+          record.error = memoryDecision.reason;
+          markPluginActivationDisabled(record, memoryDecision.reason);
+          registry.plugins.push(record);
+          seenIds.set(pluginId, candidate.origin);
+          continue;
+        }
 
-          if (memoryDecision.selected && hasKind(record.kind, "memory")) {
-            selectedMemoryPluginId = record.id;
-            record.memorySlotSelected = true;
-          }
+        if (memoryDecision.selected && hasKind(record.kind, "memory")) {
+          selectedMemoryPluginId = record.id;
+          record.memorySlotSelected = true;
         }
       }
 
@@ -1741,7 +1710,6 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
         hookPolicy: entry?.hooks,
         registrationMode,
       });
-      const previousAgentHarnesses = listRegisteredAgentHarnesses();
       const previousCompactionProviders = listRegisteredCompactionProviders();
       const previousMemoryEmbeddingProviders = listRegisteredMemoryEmbeddingProviders();
       const previousMemoryFlushPlanResolver = getMemoryFlushPlanResolver();
@@ -1762,7 +1730,6 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
         }
         // Snapshot loads should not replace process-global runtime prompt state.
         if (!shouldActivate) {
-          restoreRegisteredAgentHarnesses(previousAgentHarnesses);
           restoreRegisteredCompactionProviders(previousCompactionProviders);
           restoreRegisteredMemoryEmbeddingProviders(previousMemoryEmbeddingProviders);
           restoreMemoryPluginState({
@@ -1776,7 +1743,6 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
         registry.plugins.push(record);
         seenIds.set(pluginId, candidate.origin);
       } catch (err) {
-        restoreRegisteredAgentHarnesses(previousAgentHarnesses);
         restoreRegisteredCompactionProviders(previousCompactionProviders);
         restoreRegisteredMemoryEmbeddingProviders(previousMemoryEmbeddingProviders);
         restoreMemoryPluginState({
@@ -1834,10 +1800,8 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
 
     if (cacheEnabled) {
       setCachedPluginRegistry(cacheKey, {
-        memoryCapability: getMemoryCapabilityRegistration(),
         memoryCorpusSupplements: listMemoryCorpusSupplements(),
         registry,
-        agentHarnesses: listRegisteredAgentHarnesses(),
         compactionProviders: listRegisteredCompactionProviders(),
         memoryEmbeddingProviders: listRegisteredMemoryEmbeddingProviders(),
         memoryFlushPlanResolver: getMemoryFlushPlanResolver(),
@@ -1865,7 +1829,7 @@ export async function loadOpenClawPluginCliRegistry(
       cache: false,
     });
   const logger = options.logger ?? defaultLogger();
-  const onlyPluginIdSet = createPluginIdScopeSet(onlyPluginIds);
+  const onlyPluginIdSet = onlyPluginIds ? new Set(onlyPluginIds) : null;
   const getJiti = createPluginJitiLoader(options);
   const { registry, registerCli } = createPluginRegistry({
     logger,
@@ -1924,7 +1888,6 @@ export async function loadOpenClawPluginCliRegistry(
   const seenIds = new Map<string, PluginRecord["origin"]>();
   const memorySlot = normalized.slots.memory;
   let selectedMemoryPluginId: string | null = null;
-  const dreamingEngineId = resolveDreamingSidecarEngineId({ cfg, memorySlot });
 
   for (const candidate of orderedCandidates) {
     const manifestRecord = manifestByRoot.get(candidate.rootDir);
@@ -2125,26 +2088,24 @@ export async function loadOpenClawPluginCliRegistry(
     }
     record.kind = definition?.kind ?? record.kind;
 
-    if (pluginId !== dreamingEngineId) {
-      const memoryDecision = resolveMemorySlotDecision({
-        id: record.id,
-        kind: record.kind,
-        slot: memorySlot,
-        selectedId: selectedMemoryPluginId,
-      });
-      if (!memoryDecision.enabled) {
-        record.enabled = false;
-        record.status = "disabled";
-        record.error = memoryDecision.reason;
-        markPluginActivationDisabled(record, memoryDecision.reason);
-        registry.plugins.push(record);
-        seenIds.set(pluginId, candidate.origin);
-        continue;
-      }
-      if (memoryDecision.selected && hasKind(record.kind, "memory")) {
-        selectedMemoryPluginId = record.id;
-        record.memorySlotSelected = true;
-      }
+    const memoryDecision = resolveMemorySlotDecision({
+      id: record.id,
+      kind: record.kind,
+      slot: memorySlot,
+      selectedId: selectedMemoryPluginId,
+    });
+    if (!memoryDecision.enabled) {
+      record.enabled = false;
+      record.status = "disabled";
+      record.error = memoryDecision.reason;
+      markPluginActivationDisabled(record, memoryDecision.reason);
+      registry.plugins.push(record);
+      seenIds.set(pluginId, candidate.origin);
+      continue;
+    }
+    if (memoryDecision.selected && hasKind(record.kind, "memory")) {
+      selectedMemoryPluginId = record.id;
+      record.memorySlotSelected = true;
     }
 
     if (typeof register !== "function") {

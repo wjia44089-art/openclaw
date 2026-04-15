@@ -57,7 +57,7 @@ function normalizeHostnameSet(values?: string[]): Set<string> {
   return new Set(values.map((value) => normalizeHostname(value)).filter(Boolean));
 }
 
-export function normalizeHostnameAllowlist(values?: string[]): string[] {
+function normalizeHostnameAllowlist(values?: string[]): string[] {
   if (!values || values.length === 0) {
     return [];
   }
@@ -87,7 +87,7 @@ function resolveIpv4SpecialUseBlockOptions(policy?: SsrFPolicy): Ipv4SpecialUseB
   };
 }
 
-export function isHostnameAllowedByPattern(hostname: string, pattern: string): boolean {
+function isHostnameAllowedByPattern(hostname: string, pattern: string): boolean {
   if (pattern.startsWith("*.")) {
     const suffix = pattern.slice(2);
     if (!suffix || hostname === suffix) {
@@ -98,7 +98,7 @@ export function isHostnameAllowedByPattern(hostname: string, pattern: string): b
   return hostname === pattern;
 }
 
-export function matchesHostnameAllowlist(hostname: string, allowlist: string[]): boolean {
+function matchesHostnameAllowlist(hostname: string, allowlist: string[]): boolean {
   if (allowlist.length === 0) {
     return true;
   }

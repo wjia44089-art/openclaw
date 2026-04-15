@@ -1,36 +1,20 @@
-import { html, nothing } from "lit";
+import { html } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
-import { resolveCanvasIframeUrl } from "../canvas-url.ts";
-import { resolveEmbedSandbox, type EmbedSandboxMode } from "../embed-sandbox.ts";
 import { icons } from "../icons.ts";
 import { toSanitizedMarkdownHtml } from "../markdown.ts";
-import type { SidebarContent } from "../sidebar-content.ts";
-
-function resolveSidebarCanvasSandbox(
-  content: SidebarContent,
-  embedSandboxMode: EmbedSandboxMode,
-): string {
-  return content.kind === "canvas" ? resolveEmbedSandbox(embedSandboxMode) : "allow-scripts";
-}
 
 export type MarkdownSidebarProps = {
-  content: SidebarContent | null;
+  content: string | null;
   error: string | null;
   onClose: () => void;
   onViewRawText: () => void;
-  canvasHostUrl?: string | null;
-  embedSandboxMode?: EmbedSandboxMode;
-  allowExternalEmbedUrls?: boolean;
 };
 
 export function renderMarkdownSidebar(props: MarkdownSidebarProps) {
-  const content = props.content;
   return html`
     <div class="sidebar-panel">
       <div class="sidebar-header">
-        <div class="sidebar-title">
-          ${content?.kind === "canvas" ? content.title?.trim() || "Render Preview" : "Tool Details"}
-        </div>
+        <div class="sidebar-title">Tool Output</div>
         <button @click=${props.onClose} class="btn" title="Close sidebar">${icons.x}</button>
       </div>
       <div class="sidebar-content">
@@ -41,40 +25,10 @@ export function renderMarkdownSidebar(props: MarkdownSidebarProps) {
                 View Raw Text
               </button>
             `
-          : content
-            ? content.kind === "canvas"
-              ? html`
-                  <div class="chat-tool-card__preview" data-kind="canvas">
-                    <div class="chat-tool-card__preview-panel" data-side="front">
-                      <iframe
-                        class="chat-tool-card__preview-frame"
-                        title=${content.title?.trim() || "Render preview"}
-                        sandbox=${resolveSidebarCanvasSandbox(
-                          content,
-                          props.embedSandboxMode ?? "scripts",
-                        )}
-                        src=${resolveCanvasIframeUrl(
-                          content.entryUrl,
-                          props.canvasHostUrl,
-                          props.allowExternalEmbedUrls ?? false,
-                        ) ?? nothing}
-                        style=${content.preferredHeight
-                          ? `height:${content.preferredHeight}px`
-                          : ""}
-                      ></iframe>
-                    </div>
-                    ${content.rawText?.trim()
-                      ? html`
-                          <div style="margin-top: 12px;">
-                            <button @click=${props.onViewRawText} class="btn">View Raw Text</button>
-                          </div>
-                        `
-                      : nothing}
-                  </div>
-                `
-              : html`<div class="sidebar-markdown">
-                  ${unsafeHTML(toSanitizedMarkdownHtml(content.content))}
-                </div>`
+          : props.content
+            ? html`<div class="sidebar-markdown">
+                ${unsafeHTML(toSanitizedMarkdownHtml(props.content))}
+              </div>`
             : html` <div class="muted">No content available</div> `}
       </div>
     </div>

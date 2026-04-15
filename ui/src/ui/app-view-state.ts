@@ -1,6 +1,5 @@
 import type { EventLogEntry } from "./app-events.ts";
 import type { CompactionStatus, FallbackStatus } from "./app-tool-stream.ts";
-import type { ChatSideResult } from "./chat/side-result.ts";
 import type { CronModelSuggestionsState, CronState } from "./controllers/cron.ts";
 import type { DevicePairingList } from "./controllers/devices.ts";
 import type { ExecApprovalRequest } from "./controllers/exec-approval.ts";
@@ -10,10 +9,8 @@ import type {
   ClawHubSkillDetail,
   SkillMessage,
 } from "./controllers/skills.ts";
-import type { EmbedSandboxMode } from "./embed-sandbox.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import type { Tab } from "./navigation.ts";
-import type { SidebarContent } from "./sidebar-content.ts";
 import type { UiSettings } from "./storage.ts";
 import type { ThemeTransitionContext } from "./theme-transition.ts";
 import type { ResolvedTheme, ThemeMode, ThemeName } from "./theme.ts";
@@ -36,7 +33,6 @@ import type {
   CostUsageSummary,
   SessionUsageTimeSeries,
   SessionsListResult,
-  SessionCompactionCheckpoint,
   SkillStatusReport,
   StatusSummary,
   ToolsCatalogResult,
@@ -65,9 +61,6 @@ export type AppViewState = {
   assistantName: string;
   assistantAvatar: string | null;
   assistantAgentId: string | null;
-  localMediaPreviewRoots: string[];
-  embedSandboxMode: EmbedSandboxMode;
-  allowExternalEmbedUrls: boolean;
   sessionKey: string;
   chatLoading: boolean;
   chatSending: boolean;
@@ -79,8 +72,6 @@ export type AppViewState = {
   chatStream: string | null;
   chatStreamStartedAt: number | null;
   chatRunId: string | null;
-  chatSideResult: ChatSideResult | null;
-  chatSideResultTerminalRuns: Set<string>;
   compactionStatus: CompactionStatus | null;
   fallbackStatus: FallbackStatus | null;
   chatAvatarUrl: string | null;
@@ -95,7 +86,7 @@ export type AppViewState = {
   chatNewMessagesBelow: boolean;
   navDrawerOpen: boolean;
   sidebarOpen: boolean;
-  sidebarContent: SidebarContent | null;
+  sidebarContent: string | null;
   sidebarError: string | null;
   splitRatio: number;
   scrollToBottom: (opts?: { smooth?: boolean }) => void;
@@ -136,17 +127,9 @@ export type AppViewState = {
   dreamingModeSaving: boolean;
   dreamDiaryLoading: boolean;
   dreamDiaryActionLoading: boolean;
-  dreamDiaryActionMessage: { kind: "success" | "error"; text: string } | null;
-  dreamDiaryActionArchivePath: string | null;
   dreamDiaryError: string | null;
   dreamDiaryPath: string | null;
   dreamDiaryContent: string | null;
-  wikiImportInsightsLoading: boolean;
-  wikiImportInsightsError: string | null;
-  wikiImportInsights: import("./controllers/dreaming.js").WikiImportInsights | null;
-  wikiMemoryPalaceLoading: boolean;
-  wikiMemoryPalaceError: string | null;
-  wikiMemoryPalace: import("./controllers/dreaming.js").WikiMemoryPalace | null;
   configFormMode: "form" | "raw";
   configSearchQuery: string;
   configActiveSection: string | null;
@@ -216,9 +199,6 @@ export type AppViewState = {
   sessionsLoading: boolean;
   sessionsResult: SessionsListResult | null;
   sessionsError: string | null;
-  threadsLoading: boolean;
-  threadsResult: SessionsListResult | null;
-  threadsError: string | null;
   sessionsFilterActive: string;
   sessionsFilterLimit: string;
   sessionsIncludeGlobal: boolean;
@@ -231,7 +211,7 @@ export type AppViewState = {
   sessionsPageSize: number;
   sessionsSelectedKeys: Set<string>;
   sessionsExpandedCheckpointKey: string | null;
-  sessionsCheckpointItemsByKey: Record<string, SessionCompactionCheckpoint[]>;
+  sessionsCheckpointItemsByKey: Record<string, import("./types.ts").SessionCompactionCheckpoint[]>;
   sessionsCheckpointLoadingKey: string | null;
   sessionsCheckpointBusyKey: string | null;
   sessionsCheckpointErrorByKey: Record<string, string>;
@@ -421,7 +401,7 @@ export type AppViewState = {
     resetChatScroll: () => void;
     exportLogs: (lines: string[], label: string) => void;
     handleLogsScroll: (event: Event) => void;
-    handleOpenSidebar: (content: SidebarContent) => void;
+    handleOpenSidebar: (content: string) => void;
     handleCloseSidebar: () => void;
     handleSplitRatioChange: (ratio: number) => void;
   };

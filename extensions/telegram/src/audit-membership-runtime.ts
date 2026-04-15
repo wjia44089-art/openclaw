@@ -5,7 +5,7 @@ import type {
   AuditTelegramGroupMembershipParams,
   TelegramGroupMembershipAudit,
   TelegramGroupMembershipAuditEntry,
-} from "./audit.types.js";
+} from "./audit.js";
 import { resolveTelegramApiBase, resolveTelegramFetch } from "./fetch.js";
 import { makeProxyFetch } from "./proxy.js";
 

@@ -202,7 +202,7 @@ export async function processDiscordMessage(
         isDirect: isDirectMessage,
         isGroup: isGuildMessage || isGroupDm,
         isMentionableGroup: isGuildMessage,
-        requireMention: shouldRequireMention,
+        requireMention: Boolean(shouldRequireMention),
         canDetectMention,
         effectiveWasMentioned,
         shouldBypassMention,

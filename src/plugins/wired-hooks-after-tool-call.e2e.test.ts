@@ -18,8 +18,6 @@ vi.mock("../plugins/hook-runner-global.js", () => ({
 
 // Mock agent events (used by handlers)
 vi.mock("../infra/agent-events.js", () => ({
-  emitAgentCommandOutputEvent: vi.fn(),
-  emitAgentItemEvent: vi.fn(),
   emitAgentEvent: vi.fn(),
 }));
 

@@ -5,6 +5,7 @@ import {
   type TaskAuditSeverity,
   type TaskAuditSummary,
 } from "./task-registry.audit.shared.js";
+import { reconcileInspectableTasks } from "./task-registry.reconcile.js";
 import type { TaskRecord } from "./task-registry.types.js";
 
 export type TaskAuditOptions = {
@@ -18,12 +19,6 @@ const DEFAULT_STALE_QUEUED_MS = 10 * 60_000;
 const DEFAULT_STALE_RUNNING_MS = 30 * 60_000;
 export { createEmptyTaskAuditSummary };
 export type { TaskAuditCode, TaskAuditFinding, TaskAuditSeverity, TaskAuditSummary };
-
-let taskAuditTaskProvider: () => TaskRecord[] = () => [];
-
-export function configureTaskAuditTaskProvider(provider: () => TaskRecord[]): void {
-  taskAuditTaskProvider = provider;
-}
 
 function createFinding(params: {
   severity: TaskAuditSeverity;
@@ -88,7 +83,7 @@ function compareFindings(left: TaskAuditFinding, right: TaskAuditFinding): numbe
 }
 
 export function listTaskAuditFindings(options: TaskAuditOptions = {}): TaskAuditFinding[] {
-  const tasks = options.tasks ?? taskAuditTaskProvider();
+  const tasks = options.tasks ?? reconcileInspectableTasks();
   const now = options.now ?? Date.now();
   const staleQueuedMs = options.staleQueuedMs ?? DEFAULT_STALE_QUEUED_MS;
   const staleRunningMs = options.staleRunningMs ?? DEFAULT_STALE_RUNNING_MS;

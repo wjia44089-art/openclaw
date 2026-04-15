@@ -108,7 +108,6 @@ export function matchBoundaryFileOpenFailure<T>(
     case "io":
       return handlers.io ? handlers.io(failure) : handlers.fallback(failure);
   }
-  return handlers.fallback(failure);
 }
 
 function openBoundaryFileResolved(params: {

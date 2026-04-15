@@ -334,7 +334,7 @@ export async function resolveFocusTargetSession(params: {
 
   for (const attempt of attempts) {
     try {
-      const resolved = await callGateway({
+      const resolved = await callGateway<{ key?: string }>({
         method: "sessions.resolve",
         params: attempt,
       });

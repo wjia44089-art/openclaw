@@ -4,7 +4,6 @@ import {
   VALID_EXEC_SECRET_REF_IDS,
 } from "../test-utils/secret-ref-test-vectors.js";
 import { validateConfigObjectRaw } from "./validation.js";
-import { GoogleChatConfigSchema } from "./zod-schema.providers-core.js";
 
 function validateOpenAiApiKeyRef(apiKey: unknown) {
   return validateConfigObjectRaw({
@@ -71,15 +70,19 @@ describe("config secret refs schema", () => {
   });
 
   it("accepts googlechat serviceAccount refs", () => {
-    const result = GoogleChatConfigSchema.safeParse({
-      serviceAccountRef: {
-        source: "file",
-        provider: "filemain",
-        id: "/channels/googlechat/serviceAccount",
+    const result = validateConfigObjectRaw({
+      channels: {
+        googlechat: {
+          serviceAccountRef: {
+            source: "file",
+            provider: "filemain",
+            id: "/channels/googlechat/serviceAccount",
+          },
+        },
       },
     });
 
-    expect(result.success).toBe(true);
+    expect(result.ok).toBe(true);
   });
 
   it("accepts skills entry apiKey refs", () => {

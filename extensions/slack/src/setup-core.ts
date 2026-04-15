@@ -42,7 +42,7 @@ function hasSlackInteractiveRepliesConfig(cfg: OpenClawConfig, accountId: string
   const capabilities = resolveSlackAccount({ cfg, accountId }).config.capabilities;
   if (Array.isArray(capabilities)) {
     return capabilities.some(
-      (entry) => normalizeLowercaseStringOrEmpty(entry) === "interactivereplies",
+      (entry) => normalizeLowercaseStringOrEmpty(String(entry)) === "interactivereplies",
     );
   }
   if (!capabilities || typeof capabilities !== "object") {
@@ -61,7 +61,7 @@ function setSlackInteractiveReplies(
     ? interactiveReplies
       ? [...new Set([...capabilities, "interactiveReplies"])]
       : capabilities.filter(
-          (entry) => normalizeLowercaseStringOrEmpty(entry) !== "interactivereplies",
+          (entry) => normalizeLowercaseStringOrEmpty(String(entry)) !== "interactivereplies",
         )
     : {
         ...((capabilities && typeof capabilities === "object" ? capabilities : {}) as Record<
@@ -257,7 +257,7 @@ export function createSlackSetupWizardBase(handlers: {
     }),
     finalize: async ({ cfg, accountId, options, prompter }) => {
       if (hasSlackInteractiveRepliesConfig(cfg, accountId)) {
-        return undefined;
+        return;
       }
       if (options?.quickstartDefaults) {
         return {

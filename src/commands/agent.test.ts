@@ -2,21 +2,19 @@ import fs from "node:fs";
 import path from "node:path";
 import { beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import { withTempHome as withTempHomeBase } from "../../test/helpers/temp-home.js";
-import "./agent-command.test-mocks.js";
 import "../cron/isolated-agent.mocks.js";
 import { __testing as acpManagerTesting } from "../acp/control-plane/manager.js";
 import { resolveAgentDir, resolveSessionAgentId } from "../agents/agent-scope.js";
 import * as authProfilesModule from "../agents/auth-profiles.js";
-import * as sessionStoreModule from "../agents/command/session-store.runtime.js";
+import * as sessionStoreModule from "../agents/command/session-store.js";
 import { resolveSession } from "../agents/command/session.js";
 import { loadModelCatalog } from "../agents/model-catalog.js";
 import * as modelSelectionModule from "../agents/model-selection.js";
 import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
-import * as configIoModule from "../config/io.js";
-import * as runtimeSnapshotModule from "../config/runtime-snapshot.js";
+import type { OpenClawConfig } from "../config/config.js";
+import * as configModule from "../config/config.js";
+import { clearSessionStoreCacheForTest } from "../config/sessions.js";
 import * as sessionPathsModule from "../config/sessions/paths.js";
-import { clearSessionStoreCacheForTest } from "../config/sessions/store.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
 import {
   emitAgentEvent,
   onAgentEvent,
@@ -29,33 +27,73 @@ import type { RuntimeEnv } from "../runtime.js";
 import { createOutboundTestPlugin, createTestRegistry } from "../test-utils/channel-plugins.js";
 import { agentCommand, agentCommandFromIngress } from "./agent.js";
 
-vi.mock("../agents/auth-profiles.js", () => {
+vi.mock("../logging/subsystem.js", () => {
+  const createMockLogger = () => ({
+    subsystem: "test",
+    isEnabled: vi.fn(() => true),
+    trace: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    fatal: vi.fn(),
+    raw: vi.fn(),
+    child: vi.fn(() => createMockLogger()),
+  });
   return {
+    createSubsystemLogger: vi.fn(() => createMockLogger()),
+  };
+});
+
+vi.mock("../agents/auth-profiles.js", async () => {
+  const actual = await vi.importActual<typeof import("../agents/auth-profiles.js")>(
+    "../agents/auth-profiles.js",
+  );
+  return {
+    ...actual,
     ensureAuthProfileStore: vi.fn(() => ({ version: 1, profiles: {} })),
   };
 });
 
-vi.mock("../agents/auth-profiles/store.js", () => {
-  const createEmptyStore = () => ({ version: 1, profiles: {} });
+vi.mock("../agents/auth-profiles/store.js", async () => {
+  const actual = await vi.importActual<typeof import("../agents/auth-profiles/store.js")>(
+    "../agents/auth-profiles/store.js",
+  );
   return {
-    clearRuntimeAuthProfileStoreSnapshots: vi.fn(),
-    ensureAuthProfileStore: vi.fn(createEmptyStore),
-    ensureAuthProfileStoreForLocalUpdate: vi.fn(createEmptyStore),
-    hasAnyAuthProfileStoreSource: vi.fn(() => false),
-    loadAuthProfileStore: vi.fn(createEmptyStore),
-    loadAuthProfileStoreForRuntime: vi.fn(createEmptyStore),
-    loadAuthProfileStoreForSecretsRuntime: vi.fn(createEmptyStore),
-    replaceRuntimeAuthProfileStoreSnapshots: vi.fn(),
-    saveAuthProfileStore: vi.fn(),
-    updateAuthProfileStoreWithLock: vi.fn(async () => createEmptyStore()),
+    ...actual,
+    ensureAuthProfileStore: vi.fn(() => ({ version: 1, profiles: {} })),
   };
 });
 
-vi.mock("../agents/command/session-store.runtime.js", () => {
+vi.mock("../agents/workspace.js", () => {
+  const resolveDefaultAgentWorkspaceDir = () => "/tmp/openclaw-workspace";
   return {
+    DEFAULT_AGENT_WORKSPACE_DIR: "/tmp/openclaw-workspace",
+    DEFAULT_AGENTS_FILENAME: "AGENTS.md",
+    DEFAULT_IDENTITY_FILENAME: "IDENTITY.md",
+    resolveDefaultAgentWorkspaceDir,
+    ensureAgentWorkspace: vi.fn(async ({ dir }: { dir: string }) => ({ dir })),
+  };
+});
+
+vi.mock("../agents/command/session-store.js", async () => {
+  const actual = await vi.importActual<typeof import("../agents/command/session-store.js")>(
+    "../agents/command/session-store.js",
+  );
+  return {
+    ...actual,
     updateSessionStoreAfterAgentRun: vi.fn(async () => undefined),
   };
 });
+
+vi.mock("../agents/skills.js", () => ({
+  buildWorkspaceSkillSnapshot: vi.fn(() => undefined),
+  loadWorkspaceSkillEntries: vi.fn(() => []),
+}));
+
+vi.mock("../agents/skills/refresh.js", () => ({
+  getSkillsSnapshotVersion: vi.fn(() => 0),
+}));
 
 const runtime: RuntimeEnv = {
   log: vi.fn(),
@@ -65,11 +103,8 @@ const runtime: RuntimeEnv = {
   }),
 };
 
-const configSpy = vi.spyOn(configIoModule, "loadConfig");
-const readConfigFileSnapshotForWriteSpy = vi.spyOn(
-  configIoModule,
-  "readConfigFileSnapshotForWrite",
-);
+const configSpy = vi.spyOn(configModule, "loadConfig");
+const readConfigFileSnapshotForWriteSpy = vi.spyOn(configModule, "readConfigFileSnapshotForWrite");
 
 async function withTempHome<T>(fn: (home: string) => Promise<T>): Promise<T> {
   return withTempHomeBase(fn, { prefix: "openclaw-agent-" });
@@ -271,14 +306,14 @@ beforeEach(() => {
   resetAgentRunContextForTest();
   resetPluginRuntimeStateForTest();
   acpManagerTesting.resetAcpSessionManagerForTests();
-  runtimeSnapshotModule.clearRuntimeConfigSnapshot();
+  configModule.clearRuntimeConfigSnapshot();
   vi.mocked(runEmbeddedPiAgent).mockResolvedValue(createDefaultAgentResult());
   vi.mocked(loadModelCatalog).mockResolvedValue([]);
   vi.mocked(modelSelectionModule.isCliProvider).mockImplementation(() => false);
   readConfigFileSnapshotForWriteSpy.mockResolvedValue({
     snapshot: { valid: false, resolved: {} as OpenClawConfig },
     writeOptions: {},
-  } as Awaited<ReturnType<typeof configIoModule.readConfigFileSnapshotForWrite>>);
+  } as Awaited<ReturnType<typeof configModule.readConfigFileSnapshotForWrite>>);
 });
 
 describe("agentCommand", () => {

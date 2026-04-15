@@ -9,8 +9,8 @@ import {
   resolveModelRefFromString,
 } from "../../agents/model-selection.js";
 import { getChannelPlugin } from "../../channels/plugins/index.js";
+import type { OpenClawConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
-import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalString,
@@ -21,9 +21,6 @@ import type { CommandHandler } from "./commands-types.js";
 
 const PAGE_SIZE_DEFAULT = 20;
 const PAGE_SIZE_MAX = 100;
-type ModelsCommandSessionEntry = Partial<
-  Pick<SessionEntry, "authProfileOverride" | "modelProvider" | "model">
->;
 
 export type ModelsProviderData = {
   byProvider: Map<string, Set<string>>;
@@ -199,7 +196,7 @@ function resolveProviderLabel(params: {
   provider: string;
   cfg: OpenClawConfig;
   agentDir?: string;
-  sessionEntry?: ModelsCommandSessionEntry;
+  sessionEntry?: SessionEntry;
 }): string {
   const authLabel = resolveModelAuthLabel({
     provider: params.provider,
@@ -218,7 +215,7 @@ export function formatModelsAvailableHeader(params: {
   total: number;
   cfg: OpenClawConfig;
   agentDir?: string;
-  sessionEntry?: ModelsCommandSessionEntry;
+  sessionEntry?: SessionEntry;
 }): string {
   const providerLabel = resolveProviderLabel({
     provider: params.provider,
@@ -236,7 +233,7 @@ export async function resolveModelsCommandReply(params: {
   currentModel?: string;
   agentId?: string;
   agentDir?: string;
-  sessionEntry?: ModelsCommandSessionEntry;
+  sessionEntry?: SessionEntry;
 }): Promise<ReplyPayload | null> {
   const body = params.commandBodyNormalized.trim();
   if (!body.startsWith("/models")) {
@@ -387,18 +384,13 @@ export const handleModelsCommand: CommandHandler = async (params, allowTextComma
     return unauthorized;
   }
 
-  const modelsAgentId = params.sessionKey
-    ? resolveSessionAgentId({
-        sessionKey: params.sessionKey,
-        config: params.cfg,
-      })
-    : (params.agentId ?? "main");
-  const currentAgentId = params.agentId ?? "main";
-  const modelsAgentDir =
-    modelsAgentId === currentAgentId && params.agentDir
-      ? params.agentDir
-      : resolveAgentDir(params.cfg, modelsAgentId);
-  const targetSessionEntry = params.sessionStore?.[params.sessionKey] ?? params.sessionEntry;
+  const modelsAgentId =
+    params.agentId ??
+    resolveSessionAgentId({
+      sessionKey: params.sessionKey,
+      config: params.cfg,
+    });
+  const modelsAgentDir = resolveAgentDir(params.cfg, modelsAgentId);
 
   const reply = await resolveModelsCommandReply({
     cfg: params.cfg,
@@ -407,7 +399,7 @@ export const handleModelsCommand: CommandHandler = async (params, allowTextComma
     currentModel: params.model ? `${params.provider}/${params.model}` : undefined,
     agentId: modelsAgentId,
     agentDir: modelsAgentDir,
-    sessionEntry: targetSessionEntry,
+    sessionEntry: params.sessionEntry,
   });
   if (!reply) {
     return null;

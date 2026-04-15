@@ -2,8 +2,8 @@ import type {
   GatewayAuthConfig,
   GatewayBindMode,
   GatewayTailscaleConfig,
+  loadConfig,
 } from "../config/config.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
 import {
   assertGatewayAuthConfigured,
   type ResolvedGatewayAuth,
@@ -38,7 +38,7 @@ export type GatewayRuntimeConfig = {
 };
 
 export async function resolveGatewayRuntimeConfig(params: {
-  cfg: OpenClawConfig;
+  cfg: ReturnType<typeof loadConfig>;
   port: number;
   bind?: GatewayBindMode;
   host?: string;

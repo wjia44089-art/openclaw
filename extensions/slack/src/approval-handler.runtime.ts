@@ -14,10 +14,11 @@ import {
   type ExecApprovalRequest,
 } from "openclaw/plugin-sdk/infra-runtime";
 import { logError, normalizeOptionalString } from "openclaw/plugin-sdk/text-runtime";
+import { slackNativeApprovalAdapter } from "./approval-native.js";
 import {
   isSlackExecApprovalClientEnabled,
-  shouldHandleSlackExecApprovalRequest,
   normalizeSlackApproverId,
+  shouldHandleSlackExecApprovalRequest,
 } from "./exec-approvals.js";
 import { resolveSlackReplyBlocks } from "./reply-blocks.js";
 import { sendMessageSlack } from "./send.js";
@@ -247,11 +248,19 @@ export const slackApprovalNativeRuntime = createChannelApprovalNativeRuntimeAdap
       if (!resolved) {
         return false;
       }
-      return shouldHandleSlackExecApprovalRequest({
-        cfg: params.cfg,
-        accountId: resolved.accountId,
-        request: params.request as ExecApprovalRequest,
-      });
+      return (
+        shouldHandleSlackExecApprovalRequest({
+          cfg: params.cfg,
+          accountId: resolved.accountId,
+          request: params.request as ExecApprovalRequest,
+        }) &&
+        slackNativeApprovalAdapter.native?.describeDeliveryCapabilities({
+          cfg: params.cfg,
+          accountId: resolved.accountId,
+          approvalKind: "exec",
+          request: params.request as ExecApprovalRequest,
+        }).enabled === true
+      );
     },
   },
   presentation: {

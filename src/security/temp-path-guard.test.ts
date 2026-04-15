@@ -192,7 +192,6 @@ describe("temp path guard", () => {
     expect(shouldSkip("src/commands/test-helpers.ts")).toBe(true);
     expect(shouldSkip("src/commands/sessions.test-helpers.ts")).toBe(true);
     expect(shouldSkip("src\\commands\\sessions.test-helpers.ts")).toBe(true);
-    expect(shouldSkip("src/plugins/test-helpers/fs-fixtures.ts")).toBe(true);
   });
 
   it("detects dynamic and ignores static fixtures", () => {

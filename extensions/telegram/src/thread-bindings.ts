@@ -345,12 +345,11 @@ function enqueuePersistBindings(params: {
       await persistBindingsToDisk(params);
     });
   getThreadBindingsState().persistQueueByAccountId.set(params.accountId, next);
-  const cleanup = () => {
+  void next.finally(() => {
     if (getThreadBindingsState().persistQueueByAccountId.get(params.accountId) === next) {
       getThreadBindingsState().persistQueueByAccountId.delete(params.accountId);
     }
-  };
-  next.then(cleanup, cleanup);
+  });
   return next;
 }
 

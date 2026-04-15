@@ -102,10 +102,6 @@ export function createPluginRuntimeMock(overrides: DeepPartial<PluginRuntime> = 
         payloads: [],
         meta: {},
       }) as unknown as PluginRuntime["agent"]["runEmbeddedPiAgent"],
-      runEmbeddedAgent: vi.fn().mockResolvedValue({
-        payloads: [],
-        meta: {},
-      }) as unknown as PluginRuntime["agent"]["runEmbeddedAgent"],
       resolveAgentTimeoutMs: vi.fn(
         () => 30_000,
       ) as unknown as PluginRuntime["agent"]["resolveAgentTimeoutMs"],

@@ -30,12 +30,11 @@ import * as piAi from "@mariozechner/pi-ai";
  * @see src/agents/openai-ws-connection.ts for the connection manager
  */
 import { formatErrorMessage } from "../infra/errors.js";
-import type { ProviderRuntimeModel } from "../plugins/provider-runtime-model.types.js";
 import {
   resolveProviderTransportTurnStateWithPlugin,
   resolveProviderWebSocketSessionPolicyWithPlugin,
 } from "../plugins/provider-runtime.js";
-import type { ProviderTransportTurnState } from "../plugins/types.js";
+import type { ProviderRuntimeModel, ProviderTransportTurnState } from "../plugins/types.js";
 import {
   encodeAssistantTextSignature,
   normalizeAssistantPhase,
@@ -72,7 +71,6 @@ import { mergeTransportMetadata } from "./transport-stream-shared.js";
 
 interface WsSession {
   manager: OpenAIWebSocketManager;
-  managerConfigSignature: string;
   /** Number of messages that were in context.messages at the END of the last streamFn call. */
   lastContextLength: number;
   /** True if the connection has been established at least once. */
@@ -335,30 +333,6 @@ function createWsManager(
           },
         }
       : {}),
-  });
-}
-
-function stringifyStable(value: unknown): string {
-  if (value === null || typeof value !== "object") {
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) {
-    return `[${value.map((entry) => stringifyStable(entry)).join(",")}]`;
-  }
-  const entries = Object.entries(value).toSorted(([left], [right]) => left.localeCompare(right));
-  return `{${entries
-    .map(([key, entry]) => `${JSON.stringify(key)}:${stringifyStable(entry)}`)
-    .join(",")}}`;
-}
-
-function resolveWsManagerConfigSignature(
-  managerOptions: OpenAIWebSocketManagerOptions | undefined,
-  sessionHeaders?: Record<string, string>,
-): string {
-  return stringifyStable({
-    headers: sessionHeaders,
-    request: managerOptions?.request,
-    url: managerOptions?.url,
   });
 }
 
@@ -687,15 +661,10 @@ export function createOpenAIWebSocketStreamFn(
 
       while (true) {
         let session = wsRegistry.get(sessionId);
-        const managerConfigSignature = resolveWsManagerConfigSignature(
-          opts.managerOptions,
-          sessionHeaders,
-        );
         if (!session) {
           const manager = createWsManager(opts.managerOptions, sessionHeaders);
           session = {
             manager,
-            managerConfigSignature,
             lastContextLength: 0,
             everConnected: false,
             warmUpAttempted: false,
@@ -704,13 +673,6 @@ export function createOpenAIWebSocketStreamFn(
             degradeCooldownMs: wsSessionPolicy.degradeCooldownMs,
           };
           wsRegistry.set(sessionId, session);
-        } else if (session.managerConfigSignature !== managerConfigSignature) {
-          resetWsSession({
-            session,
-            createManager: () => createWsManager(opts.managerOptions, sessionHeaders),
-          });
-          session.managerConfigSignature = managerConfigSignature;
-          session.degradeCooldownMs = wsSessionPolicy.degradeCooldownMs;
         }
 
         if (transport !== "websocket" && isWsSessionDegraded(session)) {

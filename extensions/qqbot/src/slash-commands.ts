@@ -109,28 +109,16 @@ export interface QQBotFrameworkCommand {
   handler: (ctx: SlashCommandContext) => SlashCommandResult | Promise<SlashCommandResult>;
 }
 
-function normalizeCommandAllowlistEntry(entry: unknown): string {
-  if (
-    typeof entry === "string" ||
-    typeof entry === "number" ||
-    typeof entry === "boolean" ||
-    typeof entry === "bigint"
-  ) {
-    return `${entry}`
-      .trim()
-      .replace(/^qqbot:\s*/i, "")
-      .trim();
-  }
-  return "";
-}
-
 function hasExplicitCommandAllowlist(accountConfig?: QQBotAccountConfig): boolean {
   const allowFrom = accountConfig?.allowFrom;
   if (!Array.isArray(allowFrom) || allowFrom.length === 0) {
     return false;
   }
   return allowFrom.every((entry) => {
-    const normalized = normalizeCommandAllowlistEntry(entry);
+    const normalized = String(entry)
+      .trim()
+      .replace(/^qqbot:\s*/i, "")
+      .trim();
     return normalized.length > 0 && normalized !== "*";
   });
 }

@@ -9,7 +9,6 @@ import {
   createChannelNativeOriginTargetResolver,
   resolveApprovalRequestSessionConversation,
 } from "openclaw/plugin-sdk/approval-native-runtime";
-import type { ChannelApprovalCapability } from "openclaw/plugin-sdk/channel-contract";
 import type { ExecApprovalRequest, PluginApprovalRequest } from "openclaw/plugin-sdk/infra-runtime";
 import {
   normalizeLowercaseStringOrEmpty,
@@ -196,9 +195,7 @@ function resolveMatrixApproverDmTargets(params: {
 const matrixNativeApprovalCapability = createApproverRestrictedNativeApprovalCapability({
   channel: "matrix",
   channelLabel: "Matrix",
-  describeExecApprovalSetup: ({
-    accountId,
-  }: Parameters<NonNullable<ChannelApprovalCapability["describeExecApprovalSetup"]>>[0]) => {
+  describeExecApprovalSetup: ({ accountId }) => {
     const prefix =
       accountId && accountId !== "default"
         ? `channels.matrix.accounts.${accountId}`
@@ -296,9 +293,7 @@ const matrixNativeAdapter = matrixBaseNativeApprovalAdapter && {
 };
 
 export const matrixApprovalCapability = createChannelApprovalCapability({
-  authorizeActorAction: (
-    params: Parameters<NonNullable<ChannelApprovalCapability["authorizeActorAction"]>>[0],
-  ) => {
+  authorizeActorAction: (params) => {
     if (params.approvalKind !== "plugin") {
       return matrixNativeApprovalCapability.authorizeActorAction?.(params) ?? { authorized: true };
     }
@@ -315,9 +310,7 @@ export const matrixApprovalCapability = createChannelApprovalCapability({
     }
     return matrixApprovalAuth.authorizeActorAction(params);
   },
-  getActionAvailabilityState: (
-    params: Parameters<NonNullable<ChannelApprovalCapability["getActionAvailabilityState"]>>[0],
-  ) => {
+  getActionAvailabilityState: (params) => {
     if (params.approvalKind === "plugin") {
       return availabilityState(
         hasMatrixPluginApprovers({
@@ -332,9 +325,7 @@ export const matrixApprovalCapability = createChannelApprovalCapability({
       }
     );
   },
-  getExecInitiatingSurfaceState: (
-    params: Parameters<NonNullable<ChannelApprovalCapability["getExecInitiatingSurfaceState"]>>[0],
-  ) =>
+  getExecInitiatingSurfaceState: (params) =>
     matrixNativeApprovalCapability.getExecInitiatingSurfaceState?.(params) ??
     ({ kind: "disabled" } as const),
   describeExecApprovalSetup: matrixNativeApprovalCapability.describeExecApprovalSetup,
@@ -343,3 +334,15 @@ export const matrixApprovalCapability = createChannelApprovalCapability({
   native: matrixNativeAdapter,
   render: matrixNativeApprovalCapability.render,
 });
+
+export const matrixNativeApprovalAdapter = {
+  auth: {
+    authorizeActorAction: matrixApprovalCapability.authorizeActorAction,
+    getActionAvailabilityState: matrixApprovalCapability.getActionAvailabilityState,
+    getExecInitiatingSurfaceState: matrixApprovalCapability.getExecInitiatingSurfaceState,
+  },
+  delivery: matrixDeliveryAdapter,
+  nativeRuntime: matrixApprovalCapability.nativeRuntime,
+  render: matrixApprovalCapability.render,
+  native: matrixNativeAdapter,
+};

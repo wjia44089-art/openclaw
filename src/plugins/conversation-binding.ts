@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import type { ReplyPayload } from "../auto-reply/reply-payload.js";
+import type { ReplyPayload } from "../auto-reply/types.js";
 import {
   createConversationBindingRecord,
   resolveConversationBindingRecord,
@@ -18,14 +18,14 @@ import {
   normalizeOptionalLowercaseString,
   normalizeOptionalString,
 } from "../shared/string-coerce.js";
+import { getActivePluginRegistry } from "./runtime.js";
 import type {
   PluginConversationBinding,
   PluginConversationBindingResolvedEvent,
   PluginConversationBindingResolutionDecision,
   PluginConversationBindingRequestParams,
   PluginConversationBindingRequestResult,
-} from "./conversation-binding.types.js";
-import { getActivePluginRegistry } from "./runtime.js";
+} from "./types.js";
 
 const log = createSubsystemLogger("plugins/binding");
 
@@ -341,9 +341,8 @@ function loadApprovalsFromDisk(): PluginBindingApprovalsFile {
     return {
       version: 1,
       approvals: parsed.approvals
-        .filter(
-          (entry): entry is PluginBindingApprovalEntry =>
-            entry !== null && typeof entry === "object",
+        .filter((entry): entry is PluginBindingApprovalEntry =>
+          Boolean(entry && typeof entry === "object"),
         )
         .map((entry) => ({
           pluginRoot: typeof entry.pluginRoot === "string" ? entry.pluginRoot : "",

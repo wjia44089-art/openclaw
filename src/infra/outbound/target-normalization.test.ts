@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../../config/config.js";
 
+const normalizeChannelIdMock = vi.hoisted(() => vi.fn());
 const getChannelPluginMock = vi.hoisted(() => vi.fn());
 const getActivePluginChannelRegistryVersionMock = vi.hoisted(() => vi.fn());
 
@@ -14,8 +15,9 @@ let resolveNormalizedTargetInput: TargetNormalizationModule["resolveNormalizedTa
 let normalizeTargetForProvider: TargetNormalizationModule["normalizeTargetForProvider"];
 let resetTargetNormalizerCacheForTests: TargetNormalizationModule["__testing"]["resetTargetNormalizerCacheForTests"];
 
-vi.mock("../../channels/plugins/registry-loaded-read.js", () => ({
-  getLoadedChannelPluginForRead: (...args: unknown[]) => getChannelPluginMock(...args),
+vi.mock("../../channels/plugins/index.js", () => ({
+  normalizeChannelId: (...args: unknown[]) => normalizeChannelIdMock(...args),
+  getChannelPlugin: (...args: unknown[]) => getChannelPluginMock(...args),
 }));
 
 vi.mock("../../plugins/runtime.js", () => ({
@@ -38,6 +40,7 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
+  normalizeChannelIdMock.mockReset();
   getChannelPluginMock.mockReset();
   getActivePluginChannelRegistryVersionMock.mockReset();
   resetTargetNormalizerCacheForTests();
@@ -58,13 +61,14 @@ describe("normalizeTargetForProvider", () => {
     {
       provider: "unknown",
       setup: () => {
-        getChannelPluginMock.mockReturnValueOnce(undefined);
+        normalizeChannelIdMock.mockReturnValueOnce(null);
       },
       expected: "raw-id",
     },
     {
       provider: "telegram",
       setup: () => {
+        normalizeChannelIdMock.mockReturnValueOnce("telegram");
         getActivePluginChannelRegistryVersionMock.mockReturnValueOnce(1);
         getChannelPluginMock.mockReturnValueOnce(undefined);
       },
@@ -81,6 +85,7 @@ describe("normalizeTargetForProvider", () => {
   it("uses the cached target normalizer until the plugin registry version changes", () => {
     const firstNormalizer = vi.fn((raw: string) => raw.trim().toUpperCase());
     const secondNormalizer = vi.fn((raw: string) => `next:${raw.trim()}`);
+    normalizeChannelIdMock.mockReturnValue("telegram");
     getActivePluginChannelRegistryVersionMock
       .mockReturnValueOnce(10)
       .mockReturnValueOnce(10)
@@ -103,6 +108,7 @@ describe("normalizeTargetForProvider", () => {
   });
 
   it("returns undefined when the provider normalizer resolves to an empty value", () => {
+    normalizeChannelIdMock.mockReturnValueOnce("telegram");
     getActivePluginChannelRegistryVersionMock.mockReturnValueOnce(20);
     getChannelPluginMock.mockReturnValueOnce({
       messaging: {
@@ -120,6 +126,7 @@ describe("resolveNormalizedTargetInput", () => {
   });
 
   it("returns raw and normalized values", () => {
+    normalizeChannelIdMock.mockReturnValueOnce("telegram");
     getActivePluginChannelRegistryVersionMock.mockReturnValueOnce(1);
     getChannelPluginMock.mockReturnValueOnce({
       messaging: {
@@ -188,6 +195,7 @@ describe("maybeResolvePluginMessagingTarget", () => {
   });
 
   it("invokes the plugin resolver with normalized input and defaults source", async () => {
+    normalizeChannelIdMock.mockReturnValueOnce("slack");
     getActivePluginChannelRegistryVersionMock.mockReturnValueOnce(1);
     const resolveTarget = vi.fn().mockResolvedValue({
       to: "channel:C123ABC",

@@ -606,7 +606,7 @@ export async function preflightDiscordMessage(
   // Use the active runtime snapshot for bindings lookup; routing inputs are
   // still payload-derived, but this path should not reparse config from disk.
   const memberRoleIds = Array.isArray(params.data.rawMember?.roles)
-    ? params.data.rawMember.roles
+    ? params.data.rawMember.roles.map((roleId: string) => String(roleId))
     : [];
   const freshCfg = loadConfig();
   const conversationRuntime = await loadConversationRuntime();
@@ -697,9 +697,10 @@ export async function preflightDiscordMessage(
       (message.mentionedRoles?.length ?? 0) > 0 ||
       (message.mentionedEveryone && (!author.bot || sender.isPluralKit))),
   );
-  const hasUserOrRoleMention =
+  const hasUserOrRoleMention = Boolean(
     !isDirectMessage &&
-    ((message.mentionedUsers?.length ?? 0) > 0 || (message.mentionedRoles?.length ?? 0) > 0);
+    ((message.mentionedUsers?.length ?? 0) > 0 || (message.mentionedRoles?.length ?? 0) > 0),
+  );
 
   if (
     isGuildMessage &&
@@ -962,7 +963,7 @@ export async function preflightDiscordMessage(
     },
     policy: {
       isGroup: isGuildMessage,
-      requireMention: shouldRequireMention,
+      requireMention: Boolean(shouldRequireMention),
       allowTextCommands,
       hasControlCommand: hasControlCommandInMessage,
       commandAuthorized,

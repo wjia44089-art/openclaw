@@ -113,7 +113,7 @@ describe("qqbot config", () => {
     expect(parsed.success).toBe(true);
   });
 
-  it("accepts account-level speech overrides as forward-compatible config", () => {
+  it("rejects account-level speech overrides that runtime does not consume", () => {
     const parsed = QQBotConfigSchema.safeParse({
       accounts: {
         bot2: {
@@ -125,7 +125,7 @@ describe("qqbot config", () => {
       },
     });
 
-    expect(parsed.success).toBe(true);
+    expect(parsed.success).toBe(false);
   });
 
   it("preserves top-level media and upgrade config on the default account", () => {

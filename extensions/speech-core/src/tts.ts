@@ -14,15 +14,14 @@ import type {
   OpenClawConfig,
   TtsAutoMode,
   TtsConfig,
+  TtsMode,
   TtsModelOverrideConfig,
   TtsProvider,
 } from "openclaw/plugin-sdk/config-runtime";
 import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
 import { redactSensitiveText } from "openclaw/plugin-sdk/logging-core";
-import {
-  resolveSendableOutboundReplyParts,
-  type ReplyPayload,
-} from "openclaw/plugin-sdk/reply-payload";
+import { resolveSendableOutboundReplyParts } from "openclaw/plugin-sdk/reply-payload";
+import type { ReplyPayload } from "openclaw/plugin-sdk/reply-runtime";
 import { isVerbose, logVerbose } from "openclaw/plugin-sdk/runtime-env";
 import { resolvePreferredOpenClawTmpDir } from "openclaw/plugin-sdk/sandbox";
 import {
@@ -40,10 +39,9 @@ import {
   normalizeSpeechProviderId,
   normalizeTtsAutoMode,
   parseTtsDirectives,
-  type ResolvedTtsConfig,
-  type ResolvedTtsModelOverrides,
   scheduleCleanup,
   summarizeText,
+  type SpeechModelOverridePolicy,
   type SpeechProviderConfig,
   type SpeechProviderOverrides,
   type SpeechVoiceOption,
@@ -51,17 +49,27 @@ import {
   type TtsDirectiveParseResult,
 } from "../api.js";
 
-export type {
-  ResolvedTtsConfig,
-  ResolvedTtsModelOverrides,
-  TtsDirectiveOverrides,
-  TtsDirectiveParseResult,
-};
+export type { TtsDirectiveOverrides, TtsDirectiveParseResult };
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_TTS_MAX_LENGTH = 1500;
 const DEFAULT_TTS_SUMMARIZE = true;
 const DEFAULT_MAX_TEXT_LENGTH = 4096;
+
+export type ResolvedTtsConfig = {
+  auto: TtsAutoMode;
+  mode: TtsMode;
+  provider: TtsProvider;
+  providerSource: "config" | "default";
+  summaryModel?: string;
+  modelOverrides: ResolvedTtsModelOverrides;
+  providerConfigs: Record<string, SpeechProviderConfig>;
+  prefsPath?: string;
+  maxTextLength: number;
+  timeoutMs: number;
+  rawConfig?: TtsConfig;
+  sourceConfig?: OpenClawConfig;
+};
 
 type TtsUserPrefs = {
   tts?: {
@@ -72,6 +80,8 @@ type TtsUserPrefs = {
     summarize?: boolean;
   };
 };
+
+export type ResolvedTtsModelOverrides = SpeechModelOverridePolicy;
 
 export type TtsAttemptReasonCode =
   | "success"
@@ -396,7 +406,7 @@ export function buildTtsSystemPromptHint(cfg: OpenClawConfig): string | undefine
     autoMode === "inbound"
       ? "Only use TTS when the user's last message includes audio/voice."
       : autoMode === "tagged"
-        ? "Only use TTS when you include [[tts:key=value]] directives or a [[tts:text]]...[[/tts:text]] block."
+        ? "Only use TTS when you include [[tts]] or [[tts:text]] tags."
         : undefined;
   return [
     "Voice (TTS) is enabled.",
@@ -583,15 +593,10 @@ export function setLastTtsAttempt(entry: TtsStatusEntry | undefined): void {
   lastTtsAttempt = entry;
 }
 
-const OPUS_CHANNELS = new Set(["telegram", "feishu", "whatsapp", "matrix", "discord"]);
+const OPUS_CHANNELS = new Set(["telegram", "feishu", "whatsapp", "matrix"]);
 
 function resolveChannelId(channel: string | undefined): ChannelId | null {
   return channel ? normalizeChannelId(channel) : null;
-}
-
-function supportsNativeVoiceNoteTts(channel: string | undefined): boolean {
-  const channelId = resolveChannelId(channel);
-  return channelId !== null && OPUS_CHANNELS.has(channelId);
 }
 
 export function resolveTtsProviderOrder(primary: TtsProvider, cfg?: OpenClawConfig): TtsProvider[] {
@@ -802,7 +807,8 @@ export async function synthesizeSpeech(params: {
   }
 
   const { config, providers } = setup;
-  const target = supportsNativeVoiceNoteTts(params.channel) ? "voice-note" : "audio-file";
+  const channelId = resolveChannelId(params.channel);
+  const target = channelId && OPUS_CHANNELS.has(channelId) ? "voice-note" : "audio-file";
 
   const errors: string[] = [];
   const attemptedProviders: string[] = [];
@@ -1155,8 +1161,9 @@ export async function maybeApplyTtsToPayload(params: {
       latencyMs: result.latencyMs,
     };
 
+    const channelId = resolveChannelId(params.channel);
     const shouldVoice =
-      supportsNativeVoiceNoteTts(params.channel) && result.voiceCompatible === true;
+      channelId !== null && OPUS_CHANNELS.has(channelId) && result.voiceCompatible === true;
     return {
       ...nextPayload,
       mediaUrl: result.audioPath,
@@ -1182,7 +1189,6 @@ export async function maybeApplyTtsToPayload(params: {
 export const _test = {
   parseTtsDirectives,
   resolveModelOverridePolicy,
-  supportsNativeVoiceNoteTts,
   summarizeText,
   getResolvedSpeechProviderConfig,
   formatTtsProviderError,

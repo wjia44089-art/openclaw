@@ -22,14 +22,6 @@ import type {
 const DEFAULT_FAL_BASE_URL = "https://fal.run";
 const DEFAULT_FAL_QUEUE_BASE_URL = "https://queue.fal.run";
 const DEFAULT_FAL_VIDEO_MODEL = "fal-ai/minimax/video-01-live";
-const HEYGEN_VIDEO_AGENT_MODEL = "fal-ai/heygen/v2/video-agent";
-const SEEDANCE_2_VIDEO_MODELS = [
-  "bytedance/seedance-2.0/fast/text-to-video",
-  "bytedance/seedance-2.0/fast/image-to-video",
-  "bytedance/seedance-2.0/text-to-video",
-  "bytedance/seedance-2.0/image-to-video",
-] as const;
-const SEEDANCE_2_DURATION_SECONDS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as const;
 const DEFAULT_HTTP_TIMEOUT_MS = 30_000;
 const DEFAULT_OPERATION_TIMEOUT_MS = 600_000;
 const POLL_INTERVAL_MS = 5_000;
@@ -44,7 +36,6 @@ type FalVideoResponse = {
     content_type?: string;
   }>;
   prompt?: string;
-  seed?: number;
 };
 
 type FalQueueResponse = {
@@ -123,38 +114,6 @@ function isFalMiniMaxLiveModel(model: string): boolean {
   return normalizeLowercaseStringOrEmpty(model) === DEFAULT_FAL_VIDEO_MODEL;
 }
 
-function isFalSeedance2Model(model: string): boolean {
-  return SEEDANCE_2_VIDEO_MODELS.includes(model as (typeof SEEDANCE_2_VIDEO_MODELS)[number]);
-}
-
-function isFalHeyGenVideoAgentModel(model: string): boolean {
-  return normalizeLowercaseStringOrEmpty(model) === HEYGEN_VIDEO_AGENT_MODEL;
-}
-
-function resolveFalResolution(resolution: VideoGenerationRequest["resolution"], model: string) {
-  if (!resolution) {
-    return undefined;
-  }
-  if (isFalSeedance2Model(model)) {
-    return resolution.toLowerCase();
-  }
-  return resolution;
-}
-
-function resolveFalDuration(
-  durationSeconds: number | undefined,
-  model: string,
-): number | string | undefined {
-  if (typeof durationSeconds !== "number" || !Number.isFinite(durationSeconds)) {
-    return undefined;
-  }
-  const duration = Math.max(1, Math.round(durationSeconds));
-  if (isFalSeedance2Model(model)) {
-    return String(duration);
-  }
-  return duration;
-}
-
 function buildFalVideoRequestBody(params: {
   req: VideoGenerationRequest;
   model: string;
@@ -173,7 +132,7 @@ function buildFalVideoRequestBody(params: {
   // MiniMax Live on fal currently documents prompt + optional image_url only.
   // Keep the default model conservative so queue requests do not hang behind
   // unsupported knobs such as duration/resolution/aspect-ratio overrides.
-  if (isFalMiniMaxLiveModel(params.model) || isFalHeyGenVideoAgentModel(params.model)) {
+  if (isFalMiniMaxLiveModel(params.model)) {
     return requestBody;
   }
   const aspectRatio = normalizeOptionalString(params.req.aspectRatio);
@@ -184,16 +143,14 @@ function buildFalVideoRequestBody(params: {
   if (size) {
     requestBody.size = size;
   }
-  const resolution = resolveFalResolution(params.req.resolution, params.model);
-  if (resolution) {
-    requestBody.resolution = resolution;
+  if (params.req.resolution) {
+    requestBody.resolution = params.req.resolution;
   }
-  const duration = resolveFalDuration(params.req.durationSeconds, params.model);
-  if (duration) {
-    requestBody.duration = duration;
-  }
-  if (isFalSeedance2Model(params.model) && typeof params.req.audio === "boolean") {
-    requestBody.generate_audio = params.req.audio;
+  if (
+    typeof params.req.durationSeconds === "number" &&
+    Number.isFinite(params.req.durationSeconds)
+  ) {
+    requestBody.duration = Math.max(1, Math.round(params.req.durationSeconds));
   }
   return requestBody;
 }
@@ -290,8 +247,6 @@ export function buildFalVideoGenerationProvider(): VideoGenerationProvider {
     defaultModel: DEFAULT_FAL_VIDEO_MODEL,
     models: [
       DEFAULT_FAL_VIDEO_MODEL,
-      HEYGEN_VIDEO_AGENT_MODEL,
-      ...SEEDANCE_2_VIDEO_MODELS,
       "fal-ai/kling-video/v2.1/master/text-to-video",
       "fal-ai/wan/v2.2-a14b/text-to-video",
       "fal-ai/wan/v2.2-a14b/image-to-video",
@@ -304,25 +259,17 @@ export function buildFalVideoGenerationProvider(): VideoGenerationProvider {
     capabilities: {
       generate: {
         maxVideos: 1,
-        supportedDurationSecondsByModel: Object.fromEntries(
-          SEEDANCE_2_VIDEO_MODELS.map((model) => [model, SEEDANCE_2_DURATION_SECONDS]),
-        ),
         supportsAspectRatio: true,
         supportsResolution: true,
         supportsSize: true,
-        supportsAudio: true,
       },
       imageToVideo: {
         enabled: true,
         maxVideos: 1,
         maxInputImages: 1,
-        supportedDurationSecondsByModel: Object.fromEntries(
-          SEEDANCE_2_VIDEO_MODELS.map((model) => [model, SEEDANCE_2_DURATION_SECONDS]),
-        ),
         supportsAspectRatio: true,
         supportsResolution: true,
         supportsSize: true,
-        supportsAudio: true,
       },
       videoToVideo: {
         enabled: false,
@@ -402,7 +349,6 @@ export function buildFalVideoGenerationProvider(): VideoGenerationProvider {
             ? { requestId: normalizeOptionalString(submitted.request_id) }
             : {}),
           ...(videoPayload.prompt ? { prompt: videoPayload.prompt } : {}),
-          ...(typeof videoPayload.seed === "number" ? { seed: videoPayload.seed } : {}),
         },
       };
     },

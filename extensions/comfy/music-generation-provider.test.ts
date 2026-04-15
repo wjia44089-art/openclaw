@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import { expectExplicitMusicGenerationCapabilities } from "../../test/helpers/media-generation/provider-capability-assertions.js";
 import { buildComfyMusicGenerationProvider } from "./music-generation-provider.js";
 import { _setComfyFetchGuardForTesting } from "./workflow-runtime.js";
 
@@ -13,7 +12,7 @@ describe("comfy music-generation provider", () => {
 
     expect(provider.defaultModel).toBe("workflow");
     expect(provider.models).toEqual(["workflow"]);
-    expectExplicitMusicGenerationCapabilities(provider);
+    expect(provider.capabilities.edit?.maxInputImages).toBe(1);
   });
 
   it("runs a music workflow and returns audio outputs", async () => {

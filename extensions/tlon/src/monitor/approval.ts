@@ -92,7 +92,6 @@ export function formatApprovalRequest(approval: PendingApproval): string {
         `(ID: ${approval.id})`
       );
   }
-  throw new Error("Unsupported approval type");
 }
 
 export type ApprovalResponse = {
@@ -212,7 +211,6 @@ export function formatApprovalConfirmation(
       }
       return `${actionText} group invite from ${approval.requestingShip} to ${approval.groupFlag}.`;
   }
-  throw new Error("Unsupported approval type");
 }
 
 // ============================================================================

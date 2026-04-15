@@ -1,7 +1,6 @@
 import { listChannelPlugins } from "../channels/plugins/index.js";
 import type { OutboundSendDeps } from "../infra/outbound/send-deps.js";
 import { createLazyRuntimeSurface } from "../shared/lazy-runtime.js";
-import type { CliDeps } from "./deps.types.js";
 import { createOutboundSendDepsFromCliSource } from "./outbound-send-mapping.js";
 import { createChannelOutboundRuntimeSend } from "./send-runtime/channel-outbound-send.js";
 
@@ -9,7 +8,7 @@ import { createChannelOutboundRuntimeSend } from "./send-runtime/channel-outboun
  * Lazy-loaded per-channel send functions, keyed by channel ID.
  * Values are proxy functions that dynamically import the real module on first use.
  */
-export type { CliDeps } from "./deps.types.js";
+export type CliDeps = { [channelId: string]: unknown };
 type RuntimeSend = {
   sendMessage: (...args: unknown[]) => Promise<unknown>;
 };

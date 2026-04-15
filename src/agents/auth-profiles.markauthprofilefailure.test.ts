@@ -14,9 +14,10 @@ vi.mock("../plugins/provider-runtime.js", () => ({
 
 import {
   clearRuntimeAuthProfileStoreSnapshots,
+  calculateAuthProfileCooldownMs,
   ensureAuthProfileStore,
-} from "./auth-profiles/store.js";
-import { calculateAuthProfileCooldownMs, markAuthProfileFailure } from "./auth-profiles/usage.js";
+  markAuthProfileFailure,
+} from "./auth-profiles.js";
 
 type AuthProfileStore = ReturnType<typeof ensureAuthProfileStore>;
 

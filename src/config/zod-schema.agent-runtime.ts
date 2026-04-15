@@ -38,7 +38,6 @@ export const HeartbeatSchema = z
     includeSystemPromptSection: z.boolean().optional(),
     ackMaxChars: z.number().int().nonnegative().optional(),
     suppressToolErrorWarnings: z.boolean().optional(),
-    timeoutSeconds: z.number().int().positive().optional(),
     lightContext: z.boolean().optional(),
     isolatedSession: z.boolean().optional(),
   })
@@ -331,12 +330,6 @@ export const ToolsWebFetchSchema = z
     maxRedirects: z.number().int().nonnegative().optional(),
     userAgent: z.string().optional(),
     readability: z.boolean().optional(),
-    ssrfPolicy: z
-      .object({
-        allowRfc2544BenchmarkRange: z.boolean().optional(),
-      })
-      .strict()
-      .optional(),
     // Keep the legacy Firecrawl fetch shape loadable so existing installs can
     // start and then migrate cleanly through doctor.
     firecrawl: z
@@ -485,7 +478,6 @@ const ToolLoopDetectionSchema = z
     enabled: z.boolean().optional(),
     historySize: z.number().int().positive().optional(),
     warningThreshold: z.number().int().positive().optional(),
-    unknownToolThreshold: z.number().int().positive().optional(),
     criticalThreshold: z.number().int().positive().optional(),
     globalCircuitBreakerThreshold: z.number().int().positive().optional(),
     detectors: ToolLoopDetectionDetectorSchema,
@@ -783,14 +775,6 @@ const AgentRuntimeSchema = z
   ])
   .optional();
 
-export const AgentEmbeddedHarnessSchema = z
-  .object({
-    runtime: z.string().optional(),
-    fallback: z.enum(["pi", "none"]).optional(),
-  })
-  .strict()
-  .optional();
-
 export const AgentEntrySchema = z
   .object({
     id: z.string(),
@@ -799,7 +783,6 @@ export const AgentEntrySchema = z
     workspace: z.string().optional(),
     agentDir: z.string().optional(),
     systemPromptOverride: z.string().optional(),
-    embeddedHarness: AgentEmbeddedHarnessSchema,
     model: AgentModelSchema.optional(),
     thinkingDefault: z
       .enum(["off", "minimal", "low", "medium", "high", "xhigh", "adaptive"])
@@ -828,12 +811,6 @@ export const AgentEntrySchema = z
           .optional(),
         thinking: z.string().optional(),
         requireAgentId: z.boolean().optional(),
-      })
-      .strict()
-      .optional(),
-    embeddedPi: z
-      .object({
-        executionContract: z.union([z.literal("default"), z.literal("strict-agentic")]).optional(),
       })
       .strict()
       .optional(),

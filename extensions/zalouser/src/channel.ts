@@ -81,7 +81,7 @@ export const zalouserPlugin: ChannelPlugin<ResolvedZalouserAccount, ZalouserProb
             return null;
           }
           return mapUser({
-            id: parsed.userId,
+            id: String(parsed.userId),
             name: parsed.displayName ?? null,
             avatarUrl: parsed.avatar ?? null,
             raw: parsed,
@@ -93,7 +93,7 @@ export const zalouserPlugin: ChannelPlugin<ResolvedZalouserAccount, ZalouserProb
           const friends = await listZaloFriendsMatching(account.profile, query);
           const rows = friends.map((friend) =>
             mapUser({
-              id: friend.userId,
+              id: String(friend.userId),
               name: friend.displayName ?? null,
               avatarUrl: friend.avatar ?? null,
               raw: friend,
@@ -107,7 +107,7 @@ export const zalouserPlugin: ChannelPlugin<ResolvedZalouserAccount, ZalouserProb
           const groups = await listZaloGroupsMatching(account.profile, query);
           const rows = groups.map((group) =>
             mapGroup({
-              id: `group:${group.groupId}`,
+              id: `group:${String(group.groupId)}`,
               name: group.name ?? null,
               raw: group,
             }),

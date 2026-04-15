@@ -104,8 +104,8 @@ const jwtValidate = vi.hoisted(() => vi.fn().mockResolvedValue(true));
 const loadMSTeamsSdkWithAuth = vi.hoisted(() =>
   vi.fn(async () => ({
     sdk: {
-      ActivityHandler: function ActivityHandler() {},
-      MsalTokenProvider: function MsalTokenProvider() {},
+      ActivityHandler: class {},
+      MsalTokenProvider: class {},
       authorizeJWT:
         () => (_req: unknown, _res: unknown, next: ((err?: unknown) => void) | undefined) =>
           next?.(),

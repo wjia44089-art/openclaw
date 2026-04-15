@@ -5,7 +5,7 @@ import {
 } from "openclaw/plugin-sdk/reply-payload";
 import { resolveRunModelFallbacksOverride } from "../../agents/agent-scope.js";
 import { resolveBootstrapWarningSignaturesSeen } from "../../agents/bootstrap-budget.js";
-import { resolveContextTokensForModel } from "../../agents/context.js";
+import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
 import { runWithModelFallback } from "../../agents/model-fallback.js";
 import { isCliProvider } from "../../agents/model-selection.js";
@@ -102,10 +102,6 @@ export function createFollowupRunner(params: {
           to: originatingTo,
           sessionKey: queued.run.sessionKey,
           accountId: queued.originatingAccountId,
-          requesterSenderId: queued.run.senderId,
-          requesterSenderName: queued.run.senderName,
-          requesterSenderUsername: queued.run.senderUsername,
-          requesterSenderE164: queued.run.senderE164,
           threadId: queued.originatingThreadId,
           cfg: runtimeConfig,
         });
@@ -293,17 +289,11 @@ export function createFollowupRunner(params: {
       const usage = runResult.meta?.agentMeta?.usage;
       const promptTokens = runResult.meta?.agentMeta?.promptTokens;
       const modelUsed = runResult.meta?.agentMeta?.model ?? fallbackModel ?? defaultModel;
-      const providerUsed =
-        runResult.meta?.agentMeta?.provider ?? fallbackProvider ?? queued.run.provider;
       const contextTokensUsed =
-        resolveContextTokensForModel({
-          cfg: queued.run.config,
-          provider: providerUsed,
-          model: modelUsed,
-          contextTokensOverride: agentCfgContextTokens,
-          fallbackContextTokens: sessionEntry?.contextTokens ?? DEFAULT_CONTEXT_TOKENS,
-          allowAsyncLoad: false,
-        }) ?? DEFAULT_CONTEXT_TOKENS;
+        agentCfgContextTokens ??
+        lookupContextTokens(modelUsed) ??
+        sessionEntry?.contextTokens ??
+        DEFAULT_CONTEXT_TOKENS;
 
       if (storePath && sessionKey) {
         await persistRunSessionUsage({
@@ -314,11 +304,11 @@ export function createFollowupRunner(params: {
           lastCallUsage: runResult.meta?.agentMeta?.lastCallUsage,
           promptTokens,
           modelUsed,
-          providerUsed,
+          providerUsed: fallbackProvider,
           contextTokensUsed,
           systemPromptReport: runResult.meta?.systemPromptReport,
           cliSessionBinding: runResult.meta?.agentMeta?.cliSessionBinding,
-          usageIsContextSnapshot: isCliProvider(providerUsed, runtimeConfig),
+          usageIsContextSnapshot: isCliProvider(fallbackProvider ?? run.provider, runtimeConfig),
           logLabel: "followup",
         });
       }

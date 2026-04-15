@@ -7,18 +7,10 @@ const resolveNodeStartupTlsEnvironmentMock = vi.hoisted(() => vi.fn());
 const loadConfigMock = vi.hoisted(() => vi.fn());
 const readConfigFileSnapshotMock = vi.hoisted(() => vi.fn());
 const resolveGatewayPortMock = vi.hoisted(() => vi.fn(() => 18789));
-const writeConfigFileMock = vi.hoisted(() => vi.fn());
+const replaceConfigFileMock = vi.hoisted(() => vi.fn());
 const resolveIsNixModeMock = vi.hoisted(() => vi.fn(() => false));
 const resolveSecretInputRefMock = vi.hoisted(() =>
-  vi.fn((_value?: unknown): { ref: unknown } => ({ ref: undefined })),
-);
-const hasConfiguredSecretInputMock = vi.hoisted(() =>
-  vi.fn((value: unknown): boolean => {
-    if (typeof value === "string" && value.trim()) {
-      return true;
-    }
-    return resolveSecretInputRefMock(value as never)?.ref != null;
-  }),
+  vi.fn((): { ref: unknown } => ({ ref: undefined })),
 );
 const resolveGatewayAuthMock = vi.hoisted(() =>
   vi.fn(() => ({
@@ -65,30 +57,19 @@ vi.mock("../../bootstrap/node-startup-env.js", () => ({
   resolveNodeStartupTlsEnvironment: resolveNodeStartupTlsEnvironmentMock,
 }));
 
-vi.mock("../../config/io.js", () => ({
+vi.mock("../../config/config.js", () => ({
   loadConfig: loadConfigMock,
-  readConfigFileSnapshotForWrite: vi.fn(async () => ({
-    snapshot: await readConfigFileSnapshotMock(),
-    writeOptions: { expectedConfigPath: "/tmp/openclaw.json" },
-  })),
+  readBestEffortConfig: loadConfigMock,
+  readConfigFileSnapshot: readConfigFileSnapshotMock,
+  replaceConfigFile: replaceConfigFileMock,
+  resolveGatewayPort: resolveGatewayPortMock,
 }));
 
 vi.mock("../../config/paths.js", () => ({
-  resolveGatewayPort: resolveGatewayPortMock,
   resolveIsNixMode: resolveIsNixModeMock,
 }));
 
-vi.mock("../../commands/gateway-install-token.persist.runtime.js", () => ({
-  readConfigFileSnapshot: readConfigFileSnapshotMock,
-  readConfigFileSnapshotForWrite: vi.fn(async () => ({
-    snapshot: await readConfigFileSnapshotMock(),
-    writeOptions: { expectedConfigPath: "/tmp/openclaw.json" },
-  })),
-  writeConfigFile: writeConfigFileMock,
-}));
-
 vi.mock("../../config/types.secrets.js", () => ({
-  hasConfiguredSecretInput: hasConfiguredSecretInputMock,
   resolveSecretInputRef: resolveSecretInputRefMock,
 }));
 
@@ -100,7 +81,7 @@ vi.mock("../../secrets/resolve.js", () => ({
   resolveSecretRefValues: resolveSecretRefValuesMock,
 }));
 
-vi.mock("../../commands/random-token.js", () => ({
+vi.mock("../../commands/onboard-helpers.js", () => ({
   randomToken: randomTokenMock,
 }));
 
@@ -176,7 +157,7 @@ describe("runDaemonInstall", () => {
     resolveNodeStartupTlsEnvironmentMock.mockReset();
     readConfigFileSnapshotMock.mockReset();
     resolveGatewayPortMock.mockClear();
-    writeConfigFileMock.mockReset();
+    replaceConfigFileMock.mockReset();
     resolveIsNixModeMock.mockReset();
     resolveSecretInputRefMock.mockReset();
     resolveGatewayAuthMock.mockReset();
@@ -194,12 +175,7 @@ describe("runDaemonInstall", () => {
     actionState.failed.length = 0;
 
     loadConfigMock.mockReturnValue({ gateway: { auth: { mode: "token" } } });
-    readConfigFileSnapshotMock.mockResolvedValue({
-      exists: false,
-      valid: true,
-      config: {},
-      sourceConfig: { gateway: { auth: { mode: "token" } } },
-    });
+    readConfigFileSnapshotMock.mockResolvedValue({ exists: false, valid: true, config: {} });
     resolveGatewayPortMock.mockReturnValue(18789);
     resolveIsNixModeMock.mockReturnValue(false);
     resolveSecretInputRefMock.mockReturnValue({ ref: undefined });
@@ -255,7 +231,7 @@ describe("runDaemonInstall", () => {
     expect(actionState.failed).toEqual([]);
     expect(buildGatewayInstallPlanMock).toHaveBeenCalledTimes(1);
     expectFirstInstallPlanCallOmitsToken();
-    expect(writeConfigFileMock).not.toHaveBeenCalled();
+    expect(replaceConfigFileMock).not.toHaveBeenCalled();
     expect(
       actionState.warnings.some((warning) =>
         warning.includes("gateway.auth.token is SecretRef-managed"),
@@ -283,17 +259,18 @@ describe("runDaemonInstall", () => {
       exists: true,
       valid: true,
       config: { gateway: { auth: { mode: "token" } } },
-      sourceConfig: { gateway: { auth: { mode: "token" } } },
     });
 
     await runDaemonInstall({ json: true });
 
     expect(actionState.failed).toEqual([]);
-    expect(writeConfigFileMock).toHaveBeenCalledTimes(1);
-    const writtenConfig = writeConfigFileMock.mock.calls[0]?.[0] as {
-      gateway?: { auth?: { token?: string } };
+    expect(replaceConfigFileMock).toHaveBeenCalledTimes(1);
+    const writtenConfig = replaceConfigFileMock.mock.calls[0]?.[0] as {
+      nextConfig?: {
+        gateway?: { auth?: { token?: string } };
+      };
     };
-    expect(writtenConfig.gateway?.auth?.token).toBe("minted-token");
+    expect(writtenConfig.nextConfig?.gateway?.auth?.token).toBe("minted-token");
     expect(buildGatewayInstallPlanMock).toHaveBeenCalledWith(
       expect.objectContaining({ port: 18789 }),
     );

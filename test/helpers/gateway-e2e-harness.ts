@@ -14,6 +14,10 @@ import { GATEWAY_CLIENT_MODES, GATEWAY_CLIENT_NAMES } from "../../src/utils/mess
 
 export { extractFirstTextBlock };
 
+type NodeListPayload = {
+  nodes?: Array<{ nodeId?: string; connected?: boolean; paired?: boolean }>;
+};
+
 export type ChatEventPayload = {
   runId?: string;
   sessionKey?: string;
@@ -344,7 +348,7 @@ export async function waitForNodeStatus(
   );
   try {
     while (Date.now() < deadline) {
-      const list = await client.request("node.list", {});
+      const list = await client.request<NodeListPayload>("node.list", {});
       const match = list.nodes?.find((n) => n.nodeId === nodeId);
       if (match?.connected && match?.paired) {
         return;

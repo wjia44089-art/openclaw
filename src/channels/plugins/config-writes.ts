@@ -1,5 +1,6 @@
-import type { OpenClawConfig } from "../../config/types.openclaw.js";
+import type { OpenClawConfig } from "../../config/config.js";
 import { normalizeLowercaseStringOrEmpty } from "../../shared/string-coerce.js";
+import { isInternalMessageChannel } from "../../utils/message-channel.js";
 import {
   authorizeConfigWriteShared,
   canBypassConfigWritePolicyShared,
@@ -11,14 +12,10 @@ import {
   type ConfigWriteScopeLike,
   type ConfigWriteTargetLike,
 } from "./config-write-policy-shared.js";
-import type { ChannelId } from "./types.core.js";
-export type ConfigWriteScope = ConfigWriteScopeLike;
-export type ConfigWriteTarget = ConfigWriteTargetLike;
-export type ConfigWriteAuthorizationResult = ConfigWriteAuthorizationResultLike;
-
-function isInternalConfigWriteMessageChannel(channel?: string | null): boolean {
-  return normalizeLowercaseStringOrEmpty(channel) === "webchat";
-}
+import type { ChannelId } from "./types.js";
+export type ConfigWriteScope = ConfigWriteScopeLike<ChannelId>;
+export type ConfigWriteTarget = ConfigWriteTargetLike<ChannelId>;
+export type ConfigWriteAuthorizationResult = ConfigWriteAuthorizationResultLike<ChannelId>;
 
 export function resolveChannelConfigWrites(params: {
   cfg: OpenClawConfig;
@@ -54,7 +51,7 @@ export function canBypassConfigWritePolicy(params: {
 }): boolean {
   return canBypassConfigWritePolicyShared({
     ...params,
-    isInternalMessageChannel: isInternalConfigWriteMessageChannel,
+    isInternalMessageChannel,
   });
 }
 

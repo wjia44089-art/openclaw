@@ -1,13 +1,16 @@
-import { describe } from "vitest";
-import { assertBundledChannelEntries } from "../../test/helpers/bundled-channel-entry.ts";
+import { describe, expect, it } from "vitest";
 import entry from "./index.js";
 import setupEntry from "./setup-entry.js";
 
 describe("discord bundled entries", () => {
-  assertBundledChannelEntries({
-    entry,
-    expectedId: "discord",
-    expectedName: "Discord",
-    setupEntry,
+  it("declares the channel plugin without importing the broad api barrel", () => {
+    expect(entry.kind).toBe("bundled-channel-entry");
+    expect(entry.id).toBe("discord");
+    expect(entry.name).toBe("Discord");
+  });
+
+  it("declares the setup plugin without importing the broad api barrel", () => {
+    expect(setupEntry.kind).toBe("bundled-channel-setup-entry");
+    expect(typeof setupEntry.loadSetupPlugin).toBe("function");
   });
 });

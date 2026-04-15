@@ -1,17 +1,6 @@
 import { normalizeLowercaseStringOrEmpty } from "../shared/string-coerce.js";
 import type { MsgContext } from "./templating.js";
 
-function sanitizeInlineMediaNoteValue(value: string | undefined): string {
-  const trimmed = value?.trim();
-  if (!trimmed) {
-    return "";
-  }
-  return trimmed
-    .replace(/[\p{Cc}\]]+/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function formatMediaAttachedLine(params: {
   path: string;
   url?: string;
@@ -23,12 +12,10 @@ function formatMediaAttachedLine(params: {
     typeof params.index === "number" && typeof params.total === "number"
       ? `[media attached ${params.index}/${params.total}: `
       : "[media attached: ";
-  const path = sanitizeInlineMediaNoteValue(params.path);
-  const typeRaw = sanitizeInlineMediaNoteValue(params.type);
-  const typePart = typeRaw ? ` (${typeRaw})` : "";
-  const urlRaw = sanitizeInlineMediaNoteValue(params.url);
+  const typePart = params.type?.trim() ? ` (${params.type.trim()})` : "";
+  const urlRaw = params.url?.trim();
   const urlPart = urlRaw ? ` | ${urlRaw}` : "";
-  return `${prefix}${path}${typePart}${urlPart}]`;
+  return `${prefix}${params.path}${typePart}${urlPart}]`;
 }
 
 // Common audio file extensions for transcription detection
@@ -60,48 +47,33 @@ function isAudioPath(path: string | undefined): boolean {
   return false;
 }
 
-function isValidAttachmentIndex(index: number, attachmentCount: number): boolean {
-  return Number.isSafeInteger(index) && index >= 0 && index < attachmentCount;
-}
-
-function collectTranscribedAudioAttachmentIndices(
-  ctx: MsgContext,
-  attachmentCount: number,
-): Set<number> {
-  // Only audio transcription should suppress the raw attachment in prompt notes.
-  // Image/video descriptions are lossy derived context, so the original attachment
-  // must stay available to multimodal models and downstream tools.
+export function buildInboundMediaNote(ctx: MsgContext): string | undefined {
+  // Attachment indices follow MediaPaths/MediaUrls ordering as supplied by the channel.
+  const suppressed = new Set<number>();
   const transcribedAudioIndices = new Set<number>();
   if (Array.isArray(ctx.MediaUnderstanding)) {
     for (const output of ctx.MediaUnderstanding) {
-      if (
-        output.kind === "audio.transcription" &&
-        isValidAttachmentIndex(output.attachmentIndex, attachmentCount)
-      ) {
+      suppressed.add(output.attachmentIndex);
+      if (output.kind === "audio.transcription") {
         transcribedAudioIndices.add(output.attachmentIndex);
       }
     }
   }
   if (Array.isArray(ctx.MediaUnderstandingDecisions)) {
     for (const decision of ctx.MediaUnderstandingDecisions) {
-      if (decision.capability !== "audio" || decision.outcome !== "success") {
+      if (decision.outcome !== "success") {
         continue;
       }
       for (const attachment of decision.attachments) {
-        if (
-          attachment.chosen?.outcome === "success" &&
-          isValidAttachmentIndex(attachment.attachmentIndex, attachmentCount)
-        ) {
-          transcribedAudioIndices.add(attachment.attachmentIndex);
+        if (attachment.chosen?.outcome === "success") {
+          suppressed.add(attachment.attachmentIndex);
+          if (decision.capability === "audio") {
+            transcribedAudioIndices.add(attachment.attachmentIndex);
+          }
         }
       }
     }
   }
-  return transcribedAudioIndices;
-}
-
-export function buildInboundMediaNote(ctx: MsgContext): string | undefined {
-  // Attachment indices follow MediaPaths/MediaUrls ordering as supplied by the channel.
   const pathsFromArray = Array.isArray(ctx.MediaPaths) ? ctx.MediaPaths : undefined;
   const paths =
     pathsFromArray && pathsFromArray.length > 0
@@ -112,8 +84,6 @@ export function buildInboundMediaNote(ctx: MsgContext): string | undefined {
   if (paths.length === 0) {
     return undefined;
   }
-
-  const transcribedAudioIndices = collectTranscribedAudioAttachmentIndices(ctx, paths.length);
 
   const urls =
     Array.isArray(ctx.MediaUrls) && ctx.MediaUrls.length === paths.length
@@ -136,6 +106,9 @@ export function buildInboundMediaNote(ctx: MsgContext): string | undefined {
       index,
     }))
     .filter((entry) => {
+      if (suppressed.has(entry.index)) {
+        return false;
+      }
       // Strip audio attachments when transcription succeeded - the transcript is already
       // available in the context, raw audio binary would only waste tokens (issue #4197)
       // Note: Only trust MIME type from per-entry types array, not fallback ctx.MediaType

@@ -1,69 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { validateConfigObject } from "./validation.js";
-import {
-  BlueBubblesConfigSchema,
-  IMessageConfigSchema,
-  SignalConfigSchema,
-  TelegramConfigSchema,
-} from "./zod-schema.providers-core.js";
-import { WhatsAppConfigSchema } from "./zod-schema.providers-whatsapp.js";
+import { validateConfigObject } from "./config.js";
 
 describe("config schema regressions", () => {
   it("accepts nested telegram groupPolicy overrides", () => {
-    const res = TelegramConfigSchema.safeParse({
-      groups: {
-        "-1001234567890": {
-          groupPolicy: "open",
-          topics: {
-            "42": {
-              groupPolicy: "disabled",
+    const res = validateConfigObject({
+      channels: {
+        telegram: {
+          groups: {
+            "-1001234567890": {
+              groupPolicy: "open",
+              topics: {
+                "42": {
+                  groupPolicy: "disabled",
+                },
+              },
             },
           },
         },
       },
     });
 
-    expect(res.success).toBe(true);
-  });
-
-  it("accepts telegram actions editMessage and createForumTopic", () => {
-    const res = TelegramConfigSchema.safeParse({
-      actions: {
-        editMessage: true,
-        createForumTopic: false,
-      },
-    });
-
-    expect(res.success).toBe(true);
-  });
-
-  it("accepts channels.whatsapp.enabled", () => {
-    const res = WhatsAppConfigSchema.safeParse({
-      enabled: true,
-    });
-
-    expect(res.success).toBe(true);
-  });
-
-  it("accepts signal accountUuid for loop protection", () => {
-    const res = SignalConfigSchema.safeParse({
-      accountUuid: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    });
-
-    expect(res.success).toBe(true);
-  });
-
-  it("accepts BlueBubbles enrichGroupParticipantsFromContacts at channel and account scope", () => {
-    const res = BlueBubblesConfigSchema.safeParse({
-      enrichGroupParticipantsFromContacts: true,
-      accounts: {
-        work: {
-          enrichGroupParticipantsFromContacts: false,
-        },
-      },
-    });
-
-    expect(res.success).toBe(true);
+    expect(res.ok).toBe(true);
   });
 
   it('accepts memorySearch fallback "voyage"', () => {
@@ -147,17 +104,39 @@ describe("config schema regressions", () => {
     expect(res.ok).toBe(true);
   });
 
-  it("accepts agents.defaults.startupContext overrides", () => {
+  it("accepts safe iMessage remoteHost", () => {
     const res = validateConfigObject({
-      agents: {
-        defaults: {
-          startupContext: {
-            enabled: true,
-            applyOn: ["new"],
-            dailyMemoryDays: 3,
-            maxFileBytes: 8192,
-            maxFileChars: 1000,
-            maxTotalChars: 2500,
+      channels: {
+        imessage: {
+          remoteHost: "bot@gateway-host",
+        },
+      },
+    });
+
+    expect(res.ok).toBe(true);
+  });
+
+  it("accepts channels.whatsapp.enabled", () => {
+    const res = validateConfigObject({
+      channels: {
+        whatsapp: {
+          enabled: true,
+        },
+      },
+    });
+
+    expect(res.ok).toBe(true);
+  });
+
+  it("accepts BlueBubbles enrichGroupParticipantsFromContacts at channel and account scope", () => {
+    const res = validateConfigObject({
+      channels: {
+        bluebubbles: {
+          enrichGroupParticipantsFromContacts: true,
+          accounts: {
+            work: {
+              enrichGroupParticipantsFromContacts: false,
+            },
           },
         },
       },
@@ -166,47 +145,32 @@ describe("config schema regressions", () => {
     expect(res.ok).toBe(true);
   });
 
-  it("rejects oversized agents.defaults.startupContext overrides", () => {
+  it("rejects unsafe iMessage remoteHost", () => {
     const res = validateConfigObject({
-      agents: {
-        defaults: {
-          startupContext: {
-            dailyMemoryDays: 99,
-            maxFileBytes: 999_999,
-          },
+      channels: {
+        imessage: {
+          remoteHost: "bot@gateway-host -oProxyCommand=whoami",
         },
       },
     });
 
     expect(res.ok).toBe(false);
-  });
-
-  it("accepts safe iMessage remoteHost", () => {
-    const res = IMessageConfigSchema.safeParse({
-      remoteHost: "bot@gateway-host",
-    });
-
-    expect(res.success).toBe(true);
-  });
-
-  it("rejects unsafe iMessage remoteHost", () => {
-    const res = IMessageConfigSchema.safeParse({
-      remoteHost: "bot@gateway-host -oProxyCommand=whoami",
-    });
-
-    expect(res.success).toBe(false);
-    if (!res.success) {
-      expect(res.error.issues[0]?.path.join(".")).toBe("remoteHost");
+    if (!res.ok) {
+      expect(res.issues[0]?.path).toBe("channels.imessage.remoteHost");
     }
   });
 
   it("accepts iMessage attachment root patterns", () => {
-    const res = IMessageConfigSchema.safeParse({
-      attachmentRoots: ["/Users/*/Library/Messages/Attachments"],
-      remoteAttachmentRoots: ["/Volumes/relay/attachments"],
+    const res = validateConfigObject({
+      channels: {
+        imessage: {
+          attachmentRoots: ["/Users/*/Library/Messages/Attachments"],
+          remoteAttachmentRoots: ["/Volumes/relay/attachments"],
+        },
+      },
     });
 
-    expect(res.success).toBe(true);
+    expect(res.ok).toBe(true);
   });
 
   it("accepts string values for agents defaults model inputs", () => {
@@ -257,13 +221,17 @@ describe("config schema regressions", () => {
   });
 
   it("rejects relative iMessage attachment roots", () => {
-    const res = IMessageConfigSchema.safeParse({
-      attachmentRoots: ["./attachments"],
+    const res = validateConfigObject({
+      channels: {
+        imessage: {
+          attachmentRoots: ["./attachments"],
+        },
+      },
     });
 
-    expect(res.success).toBe(false);
-    if (!res.success) {
-      expect(res.error.issues[0]?.path.join(".")).toBe("attachmentRoots.0");
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.issues[0]?.path).toBe("channels.imessage.attachmentRoots.0");
     }
   });
 
@@ -287,12 +255,25 @@ describe("config schema regressions", () => {
     expect(res.ok).toBe(false);
   });
 
-  it("accepts tools.media.asyncCompletion.directSend", () => {
+  it("accepts signal accountUuid for loop protection", () => {
     const res = validateConfigObject({
-      tools: {
-        media: {
-          asyncCompletion: {
-            directSend: true,
+      channels: {
+        signal: {
+          accountUuid: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        },
+      },
+    });
+
+    expect(res.ok).toBe(true);
+  });
+
+  it("accepts telegram actions editMessage and createForumTopic", () => {
+    const res = validateConfigObject({
+      channels: {
+        telegram: {
+          actions: {
+            editMessage: true,
+            createForumTopic: false,
           },
         },
       },
@@ -300,6 +281,7 @@ describe("config schema regressions", () => {
 
     expect(res.ok).toBe(true);
   });
+
   it("accepts discovery.wideArea.domain for unicast DNS-SD", () => {
     const res = validateConfigObject({
       discovery: {

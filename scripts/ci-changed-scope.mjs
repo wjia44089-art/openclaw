@@ -50,7 +50,7 @@ export function detectChangedScope(changedPaths) {
   let hasNonNativeNonDocs = false;
 
   for (const rawPath of changedPaths) {
-    const path = rawPath.trim();
+    const path = String(rawPath).trim();
     if (!path) {
       continue;
     }

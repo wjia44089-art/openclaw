@@ -3,15 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
+import * as noteModule from "../terminal/note.js";
 import { maybeRepairLegacyCronStore } from "./doctor-cron.js";
-
-type TerminalNote = (message: string, title?: string) => void;
-
-const noteMock = vi.hoisted(() => vi.fn<TerminalNote>());
-
-vi.mock("../terminal/note.js", () => ({
-  note: noteMock,
-}));
 
 let tempRoot: string | null = null;
 
@@ -21,7 +14,7 @@ async function makeTempStorePath() {
 }
 
 afterEach(async () => {
-  noteMock.mockClear();
+  vi.restoreAllMocks();
   if (tempRoot) {
     await fs.rm(tempRoot, { recursive: true, force: true });
     tempRoot = null;
@@ -81,7 +74,7 @@ describe("maybeRepairLegacyCronStore", () => {
     const storePath = await makeTempStorePath();
     await writeCronStore(storePath, [createLegacyCronJob()]);
 
-    const noteSpy = noteMock;
+    const noteSpy = vi.spyOn(noteModule, "note").mockImplementation(() => {});
     const cfg = createCronConfig(storePath);
 
     await maybeRepairLegacyCronStore({
@@ -151,7 +144,7 @@ describe("maybeRepairLegacyCronStore", () => {
       "utf-8",
     );
 
-    const noteSpy = noteMock;
+    const noteSpy = vi.spyOn(noteModule, "note").mockImplementation(() => {});
 
     await maybeRepairLegacyCronStore({
       cfg: {
@@ -178,7 +171,7 @@ describe("maybeRepairLegacyCronStore", () => {
     const storePath = await makeTempStorePath();
     await writeCronStore(storePath, [createLegacyCronJob()]);
 
-    const noteSpy = noteMock;
+    const noteSpy = vi.spyOn(noteModule, "note").mockImplementation(() => {});
     const prompter = makePrompter(false);
 
     await maybeRepairLegacyCronStore({

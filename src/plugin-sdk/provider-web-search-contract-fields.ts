@@ -7,7 +7,7 @@ import {
   setProviderWebSearchPluginConfigValue,
   setTopLevelCredentialValue,
 } from "../agents/tools/web-search-provider-config.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import type { WebSearchProviderPlugin } from "../plugins/types.js";
 
 export type WebSearchProviderContractCredential =
@@ -57,7 +57,6 @@ function createSearchCredentialFields(
         setCredentialValue: () => {},
       };
   }
-  throw new Error("Unsupported web search credential type");
 }
 
 function createConfiguredCredentialFields(

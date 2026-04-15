@@ -251,19 +251,18 @@ flowchart TD
 
     Common log signatures:
 
-    - `cron: scheduler disabled; jobs will not run automatically` → cron is disabled.
-    - `heartbeat skipped` with `reason=quiet-hours` → outside configured active hours.
-    - `heartbeat skipped` with `reason=empty-heartbeat-file` → `HEARTBEAT.md` exists but only contains blank/header-only scaffolding.
-    - `heartbeat skipped` with `reason=no-tasks-due` → `HEARTBEAT.md` task mode is active but none of the task intervals are due yet.
-    - `heartbeat skipped` with `reason=alerts-disabled` → all heartbeat visibility is disabled (`showOk`, `showAlerts`, and `useIndicator` are all off).
-    - `requests-in-flight` → main lane busy; heartbeat wake was deferred.
-    - `unknown accountId` → heartbeat delivery target account does not exist.
+- `cron: scheduler disabled; jobs will not run automatically` → cron is disabled.
+- `heartbeat skipped` with `reason=quiet-hours` → outside configured active hours.
+- `heartbeat skipped` with `reason=empty-heartbeat-file` → `HEARTBEAT.md` exists but only contains blank/header-only scaffolding.
+- `heartbeat skipped` with `reason=no-tasks-due` → `HEARTBEAT.md` task mode is active but none of the task intervals are due yet.
+- `heartbeat skipped` with `reason=alerts-disabled` → all heartbeat visibility is disabled (`showOk`, `showAlerts`, and `useIndicator` are all off).
+- `requests-in-flight` → main lane busy; heartbeat wake was deferred. - `unknown accountId` → heartbeat delivery target account does not exist.
 
-    Deep pages:
+      Deep pages:
 
-    - [/gateway/troubleshooting#cron-and-heartbeat-delivery](/gateway/troubleshooting#cron-and-heartbeat-delivery)
-    - [/automation/cron-jobs#troubleshooting](/automation/cron-jobs#troubleshooting)
-    - [/gateway/heartbeat](/gateway/heartbeat)
+      - [/gateway/troubleshooting#cron-and-heartbeat-delivery](/gateway/troubleshooting#cron-and-heartbeat-delivery)
+      - [/automation/cron-jobs#troubleshooting](/automation/cron-jobs#troubleshooting)
+      - [/gateway/heartbeat](/gateway/heartbeat)
 
     </Accordion>
 
@@ -339,7 +338,7 @@ flowchart TD
 
       - [/tools/exec](/tools/exec)
       - [/tools/exec-approvals](/tools/exec-approvals)
-      - [/gateway/security#what-the-audit-checks-high-level](/gateway/security#what-the-audit-checks-high-level)
+      - [/gateway/security#runtime-expectation-drift](/gateway/security#runtime-expectation-drift)
 
     </Accordion>
 
@@ -377,7 +376,6 @@ flowchart TD
       - [/tools/browser-wsl2-windows-remote-cdp-troubleshooting](/tools/browser-wsl2-windows-remote-cdp-troubleshooting)
 
     </Accordion>
-
   </AccordionGroup>
 
 ## Related

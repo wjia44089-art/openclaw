@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { __testing } from "./provider.js";
 
 describe("resolveSlackBoltInterop", () => {
-  function FakeApp() {}
-  function FakeHTTPReceiver() {}
+  class FakeApp {}
+  class FakeHTTPReceiver {}
 
   it("uses the default import when it already exposes named exports", () => {
     const resolved = __testing.resolveSlackBoltInterop({

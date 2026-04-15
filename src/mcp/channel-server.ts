@@ -82,7 +82,7 @@ export async function serveOpenClawChannelMcp(opts: OpenClawMcpServeOptions = {}
     process.off("SIGINT", shutdown);
     process.off("SIGTERM", shutdown);
     transport["onclose"] = undefined;
-    close().then(resolveClosed, resolveClosed);
+    void close().finally(resolveClosed);
   };
 
   transport["onclose"] = shutdown;

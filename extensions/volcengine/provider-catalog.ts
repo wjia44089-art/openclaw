@@ -5,7 +5,7 @@ import {
   DOUBAO_CODING_BASE_URL,
   DOUBAO_CODING_MODEL_CATALOG,
   DOUBAO_MODEL_CATALOG,
-} from "./models.js";
+} from "./api.js";
 
 export function buildDoubaoProvider(): ModelProviderConfig {
   return {

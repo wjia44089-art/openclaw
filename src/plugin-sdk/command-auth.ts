@@ -3,7 +3,7 @@ import {
   buildCommandsMessagePaginated as buildCommandsMessagePaginatedCompat,
   buildHelpMessage as buildHelpMessageCompat,
 } from "../auto-reply/command-status-builders.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { resolveDmGroupAccessWithLists } from "../security/dm-policy-shared.js";
 export { buildCommandsPaginationKeyboard } from "./telegram-command-ui.js";
 export {
@@ -76,10 +76,6 @@ export {
   listSkillCommandsForWorkspace,
   resolveSkillCommandInvocation,
 } from "../auto-reply/skill-commands.js";
-export {
-  getPluginCommandSpecs,
-  listProviderPluginCommandSpecs,
-} from "../plugins/command-registration.js";
 export type { SkillCommandSpec } from "../agents/skills.js";
 export {
   buildModelsProviderData,

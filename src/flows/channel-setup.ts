@@ -1,14 +1,12 @@
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
-import { listChatChannels } from "../channels/chat-meta.js";
+import { listChannelPluginCatalogEntries } from "../channels/plugins/catalog.js";
 import { resolveChannelDefaultAccountId } from "../channels/plugins/helpers.js";
 import {
   getChannelSetupPlugin,
   listChannelSetupPlugins,
 } from "../channels/plugins/setup-registry.js";
-import type {
-  ChannelSetupPlugin,
-  ChannelSetupWizardAdapter,
-} from "../channels/plugins/setup-wizard-types.js";
+import type { ChannelSetupPlugin } from "../channels/plugins/setup-wizard-types.js";
+import { listChatChannels } from "../channels/registry.js";
 import { formatCliCommand } from "../cli/command-format.js";
 import {
   resolveChannelSetupEntries,
@@ -19,7 +17,6 @@ import {
   loadChannelSetupPluginRegistrySnapshotForChannel,
 } from "../commands/channel-setup/plugin-install.js";
 import { resolveChannelSetupWizardAdapterForPlugin } from "../commands/channel-setup/registry.js";
-import { listTrustedChannelPluginCatalogEntries } from "../commands/channel-setup/trusted-catalog.js";
 import type {
   ChannelSetupConfiguredResult,
   ChannelSetupResult,
@@ -28,7 +25,7 @@ import type {
 } from "../commands/channel-setup/types.js";
 import type { ChannelChoice } from "../commands/onboard-types.js";
 import { isChannelConfigured } from "../config/channel-configured.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import { enablePluginInConfig } from "../plugins/enable.js";
 import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "../routing/session-key.js";
@@ -78,28 +75,6 @@ export async function runCollectedChannelOnboardingPostWriteHooks(params: {
       );
     }
   }
-}
-
-export function createChannelOnboardingPostWriteHook(params: {
-  accountId?: string;
-  adapter?: Pick<ChannelSetupWizardAdapter, "afterConfigWritten">;
-  channel: ChannelChoice;
-  previousCfg: OpenClawConfig;
-}): ChannelOnboardingPostWriteHook | undefined {
-  if (!params.accountId || !params.adapter?.afterConfigWritten) {
-    return undefined;
-  }
-  return {
-    channel: params.channel,
-    accountId: params.accountId,
-    run: async ({ cfg, runtime }) =>
-      await params.adapter?.afterConfigWritten?.({
-        previousCfg: params.previousCfg,
-        cfg,
-        accountId: params.accountId!,
-        runtime,
-      }),
-  };
 }
 
 // Channel-specific prompts moved into setup flow adapters.
@@ -169,13 +144,10 @@ export async function setupChannels(
     }
     return resolveChannelSetupWizardAdapterForPlugin(getChannelSetupPlugin(channel));
   };
-  const preloadConfiguredExternalPlugins = async () => {
+  const preloadConfiguredExternalPlugins = () => {
     // Keep setup memory bounded by snapshot-loading only configured external plugins.
     const workspaceDir = resolveWorkspaceDir();
-    const preloadTasks: Promise<unknown>[] = [];
-    // Security: keep trusted workspace overrides eligible during setup while
-    // falling back from untrusted workspace shadows to the non-workspace entry.
-    for (const entry of listTrustedChannelPluginCatalogEntries({ cfg: next, workspaceDir })) {
+    for (const entry of listChannelPluginCatalogEntries({ workspaceDir })) {
       const channel = entry.id as ChannelChoice;
       if (getVisibleChannelPlugin(channel)) {
         continue;
@@ -185,11 +157,10 @@ export async function setupChannels(
       if (!explicitlyEnabled && !isChannelConfigured(next, channel)) {
         continue;
       }
-      preloadTasks.push(loadScopedChannelPlugin(channel, entry.pluginId));
+      void loadScopedChannelPlugin(channel, entry.pluginId);
     }
-    await Promise.all(preloadTasks);
   };
-  await preloadConfiguredExternalPlugins();
+  preloadConfiguredExternalPlugins();
 
   const {
     installedPlugins,
@@ -363,14 +334,18 @@ export async function setupChannels(
     const adapter = getVisibleSetupFlowAdapter(channel);
     if (result.accountId) {
       recordAccount(channel, result.accountId);
-      const postWriteHook = createChannelOnboardingPostWriteHook({
-        accountId: result.accountId,
-        adapter,
-        channel,
-        previousCfg,
-      });
-      if (postWriteHook) {
-        options?.onPostWriteHook?.(postWriteHook);
+      if (adapter?.afterConfigWritten) {
+        options?.onPostWriteHook?.({
+          channel,
+          accountId: result.accountId,
+          run: async ({ cfg, runtime }) =>
+            await adapter.afterConfigWritten?.({
+              previousCfg,
+              cfg,
+              accountId: result.accountId!,
+              runtime,
+            }),
+        });
       }
     }
     addSelection(channel);

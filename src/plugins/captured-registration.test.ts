@@ -18,10 +18,6 @@ describe("captured plugin registration", () => {
           label: "Captured Provider",
           auth: [],
         });
-        api.registerTextTransforms({
-          input: [{ from: /red basket/g, to: "blue basket" }],
-          output: [{ from: /blue basket/g, to: "red basket" }],
-        });
         api.registerChannel({
           plugin: {
             id: "captured-channel",
@@ -51,8 +47,6 @@ describe("captured plugin registration", () => {
 
     expect(captured.tools.map((tool) => tool.name)).toEqual(["captured-tool"]);
     expect(captured.providers.map((provider) => provider.id)).toEqual(["captured-provider"]);
-    expect(captured.textTransforms).toHaveLength(1);
-    expect(captured.textTransforms[0]?.input).toHaveLength(1);
     expect(captured.api.registerMemoryEmbeddingProvider).toBeTypeOf("function");
   });
 });

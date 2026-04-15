@@ -1,12 +1,11 @@
 import type { StreamFn } from "@mariozechner/pi-agent-core";
 import { readStringValue } from "../shared/string-coerce.js";
-import { normalizeOpenAIReasoningEffort } from "./openai-reasoning-effort.js";
 import type {
   FunctionToolDefinition,
   InputItem,
   ResponseCreateEvent,
   WarmUpEvent,
-} from "./openai-ws-types.js";
+} from "./openai-ws-connection.js";
 import { resolveOpenAITextVerbosity } from "./pi-embedded-runner/openai-stream-wrappers.js";
 import { resolveProviderRequestPolicyConfig } from "./provider-request-config.js";
 import { stripSystemPromptCacheBoundary } from "./system-prompt-cache-boundary.js";
@@ -78,7 +77,7 @@ export function buildOpenAIWebSocketResponseCreatePayload(params: {
   if (reasoningEffort !== "none" && (reasoningEffort || streamOpts?.reasoningSummary)) {
     const reasoning: { effort?: string; summary?: string } = {};
     if (reasoningEffort !== undefined) {
-      reasoning.effort = normalizeOpenAIReasoningEffort(reasoningEffort);
+      reasoning.effort = reasoningEffort;
     }
     if (streamOpts?.reasoningSummary !== undefined) {
       reasoning.summary = streamOpts.reasoningSummary;

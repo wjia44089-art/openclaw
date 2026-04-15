@@ -1,5 +1,62 @@
 # 🦞 OpenClaw — Personal AI Assistant
 
+## RISC-V 64-bit Fork
+
+This fork ports OpenClaw stable releases to the **RISC-V 64-bit (RVA23 Profile)** architecture, targeting SoCs like the SpacemiT K3.
+
+Not every upstream release will have a corresponding riscv64 branch. Ported branches follow the naming pattern `riscv-v<upstream-version>` (e.g., `riscv-v2026.4.9`).
+
+The long-term goal is to upstream riscv64 support into the main OpenClaw project. Feedback, bug reports, and contributions are welcome.
+
+> Run into a problem? Please open an [issue](https://github.com/dengxifeng/openclaw/issues).
+
+### Tested Environments
+
+| SoC | OS | Node.js |
+| --- | --- | --- |
+| SpacemiT K3 | Bianbu | [v22.22.0](https://archive.spacemit.com/nodejs/k3/v22.22.0/node-v22.22.0-linux-riscv64.tar.xz) |
+
+### Notices
+
+Starting from v2026.3.23, the separate `@dengxifeng/openclaw` npm package is **no longer published**. Since v2026.3.22, OpenClaw migrated to a formal plugin SDK model where all extensions import from the host package by name (`openclaw/plugin-sdk/*`); renaming the package to `@dengxifeng/openclaw` would break this host-plugin contract and make all plugins incompatible. The new approach keeps the original `openclaw` package name, uses a version suffix (`-riscv64.N`) to identify the architecture variant, and adds an `isCompatibleArchUpdate()` guard to prevent accidental cross-architecture updates.
+
+As a result, the riscv64 build is now distributed as a pre-built `.tgz` tarball instead of through the npm registry.
+
+### Prerequisites
+
+System dependencies:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+    git curl ca-certificates build-essential pkg-config \
+    cmake ninja-build python3 python3-pip \
+    libopenblas-dev
+```
+
+Install [nvm](https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script), then use it to install Node 22 with the SpacemiT mirror:
+
+```bash
+NVM_NODEJS_ORG_MIRROR=https://archive.spacemit.com/nodejs/k3 nvm install 22
+```
+
+### Installation
+
+Download the `.tgz` tarball from the [SpacemiT mirror](https://archive.spacemit.com/openclaw/k3/) and install with npm:
+
+```bash
+npm install -g https://github.com/dengxifeng/openclaw/releases/download/v2026.4.9-riscv64.1/openclaw-2026.4.9-riscv64.1.tgz
+openclaw onboard --install-daemon
+```
+
+To upgrade, run the same `npm install -g` command with the new tarball URL.
+
+### Porting Notes
+
+See [docs/riscv64-porting-notes.md](docs/riscv64-porting-notes.md) for a detailed summary of all riscv64 adaptations.
+
+---
+
 <p align="center">
     <picture>
         <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/openclaw/openclaw/main/docs/assets/openclaw-logo-text-dark.svg">
@@ -99,6 +156,8 @@ Model note: while many providers and models are supported, prefer a current flag
 ## Install (recommended)
 
 Runtime: **Node 24 (recommended) or Node 22.16+**.
+
+> **RISC-V 64 support**: This release includes experimental RISC-V 64 support. See [RISC-V porting notes](docs/riscv64-porting-notes.md) for platform-specific details and limitations.
 
 ```bash
 npm install -g openclaw@latest
@@ -325,7 +384,6 @@ Send these in WhatsApp/Telegram/Slack/Google Chat/Microsoft Teams/WebChat (group
 - `/compact` — compact session context (summary)
 - `/think <level>` — off|minimal|low|medium|high|xhigh (GPT-5.2 + Codex models only)
 - `/verbose on|off`
-- `/trace on|off` — plugin trace/debug lines only
 - `/usage off|tokens|full` — per-response usage footer
 - `/restart` — restart the gateway (owner-only in groups)
 - `/activation mention|always` — group activation toggle (groups only)

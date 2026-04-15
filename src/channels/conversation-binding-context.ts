@@ -1,4 +1,4 @@
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { resolveConversationIdFromTargets } from "../infra/outbound/conversation-id.js";
 import { getActivePluginChannelRegistry } from "../plugins/runtime.js";
 import {
@@ -7,7 +7,7 @@ import {
   normalizeOptionalString,
 } from "../shared/string-coerce.js";
 import { parseExplicitTargetForChannel } from "./plugins/target-parsing.js";
-import type { ChannelPlugin } from "./plugins/types.plugin.js";
+import type { ChannelPlugin } from "./plugins/types.js";
 import { normalizeAnyChannelId, normalizeChannelId } from "./registry.js";
 
 export type ConversationBindingContext = {
@@ -160,23 +160,16 @@ export function resolveConversationBindingContext(
     fallbackTo: params.fallbackTo ?? undefined,
   });
   if (resolvedByProvider?.conversationId) {
-    const providerConversationId = normalizeOptionalString(resolvedByProvider.conversationId);
-    if (!providerConversationId) {
-      return null;
-    }
-    const providerParentConversationId = normalizeOptionalString(
-      resolvedByProvider.parentConversationId,
-    );
     const resolvedParentConversationId =
       shouldDefaultParentConversationToSelf(loadedPlugin) &&
       !threadId &&
-      !providerParentConversationId
-        ? providerConversationId
-        : providerParentConversationId;
+      !resolvedByProvider.parentConversationId
+        ? resolvedByProvider.conversationId
+        : resolvedByProvider.parentConversationId;
     return {
       channel,
       accountId,
-      conversationId: providerConversationId,
+      conversationId: resolvedByProvider.conversationId,
       ...(resolvedParentConversationId
         ? { parentConversationId: resolvedParentConversationId }
         : {}),
@@ -197,18 +190,13 @@ export function resolveConversationBindingContext(
     }),
   });
   if (focusedBinding?.conversationId) {
-    const focusedConversationId = normalizeOptionalString(focusedBinding.conversationId);
-    if (!focusedConversationId) {
-      return null;
-    }
-    const focusedParentConversationId = normalizeOptionalString(
-      focusedBinding.parentConversationId,
-    );
     return {
       channel,
       accountId,
-      conversationId: focusedConversationId,
-      ...(focusedParentConversationId ? { parentConversationId: focusedParentConversationId } : {}),
+      conversationId: focusedBinding.conversationId,
+      ...(focusedBinding.parentConversationId
+        ? { parentConversationId: focusedBinding.parentConversationId }
+        : {}),
       ...(threadId ? { threadId } : {}),
     };
   }

@@ -1,17 +1,14 @@
 import path from "node:path";
 import { isPathInside } from "../../infra/path-guards.js";
-import type {
-  SandboxBackendCommandParams,
-  SandboxBackendCommandResult,
-  SandboxFsBridgeContext,
-} from "./backend-handle.types.js";
+import type { SandboxBackendCommandParams, SandboxBackendCommandResult } from "./backend.js";
 import { SANDBOX_PINNED_MUTATION_PYTHON } from "./fs-bridge-mutation-helper.js";
 import { createWritableRenameTargetResolver } from "./fs-bridge-rename-targets.js";
-import type { SandboxFsBridge, SandboxFsStat, SandboxResolvedPath } from "./fs-bridge.types.js";
+import type { SandboxFsBridge, SandboxFsStat, SandboxResolvedPath } from "./fs-bridge.js";
 import {
   isPathInsideContainerRoot,
   normalizeContainerPath as normalizeSandboxContainerPath,
 } from "./path-utils.js";
+import type { SandboxContext } from "./types.js";
 
 type ResolvedRemotePath = SandboxResolvedPath & {
   writable: boolean;
@@ -32,7 +29,7 @@ export type RemoteShellSandboxHandle = {
 };
 
 export function createRemoteShellSandboxFsBridge(params: {
-  sandbox: SandboxFsBridgeContext;
+  sandbox: SandboxContext;
   runtime: RemoteShellSandboxHandle;
 }): SandboxFsBridge {
   return new RemoteShellSandboxFsBridge(params.sandbox, params.runtime);
@@ -45,7 +42,7 @@ class RemoteShellSandboxFsBridge implements SandboxFsBridge {
   );
 
   constructor(
-    private readonly sandbox: SandboxFsBridgeContext,
+    private readonly sandbox: SandboxContext,
     private readonly runtime: RemoteShellSandboxHandle,
   ) {}
 

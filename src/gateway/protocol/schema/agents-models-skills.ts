@@ -6,7 +6,6 @@ export const ModelChoiceSchema = Type.Object(
     id: NonEmptyString,
     name: NonEmptyString,
     provider: NonEmptyString,
-    alias: Type.Optional(NonEmptyString),
     contextWindow: Type.Optional(Type.Integer({ minimum: 1 })),
     reasoning: Type.Optional(Type.Boolean()),
   },
@@ -59,7 +58,6 @@ export const AgentsCreateParamsSchema = Type.Object(
   {
     name: NonEmptyString,
     workspace: NonEmptyString,
-    model: Type.Optional(NonEmptyString),
     emoji: Type.Optional(Type.String()),
     avatar: Type.Optional(Type.String()),
   },
@@ -72,7 +70,6 @@ export const AgentsCreateResultSchema = Type.Object(
     agentId: NonEmptyString,
     name: NonEmptyString,
     workspace: NonEmptyString,
-    model: Type.Optional(NonEmptyString),
   },
   { additionalProperties: false },
 );
@@ -83,7 +80,6 @@ export const AgentsUpdateParamsSchema = Type.Object(
     name: Type.Optional(NonEmptyString),
     workspace: Type.Optional(NonEmptyString),
     model: Type.Optional(NonEmptyString),
-    emoji: Type.Optional(Type.String()),
     avatar: Type.Optional(Type.String()),
   },
   { additionalProperties: false },

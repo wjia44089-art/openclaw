@@ -375,6 +375,30 @@ export function compareSemverStrings(a: string | null, b: string | null): number
   );
 }
 
+export function isCompatibleArchUpdate(
+  currentVersion: string,
+  targetVersion: string | null,
+): boolean {
+  // If current version contains "riscv64" in prerelease, target must also contain "riscv64"
+  const currentParsed = parseComparableSemver(currentVersion, { normalizeLegacyDotBeta: true });
+  if (!currentParsed) {
+    return true;
+  }
+  const currentPrerelease = currentParsed.prerelease ?? "";
+  if (!currentPrerelease.includes("riscv64")) {
+    return true;
+  }
+  if (!targetVersion) {
+    return false;
+  }
+  const targetParsed = parseComparableSemver(targetVersion, { normalizeLegacyDotBeta: true });
+  if (!targetParsed) {
+    return false;
+  }
+  const targetPrerelease = targetParsed.prerelease ?? "";
+  return targetPrerelease.includes("riscv64");
+}
+
 export async function checkUpdateStatus(params: {
   root: string | null;
   timeoutMs?: number;

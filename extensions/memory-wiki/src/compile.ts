@@ -289,7 +289,6 @@ function formatFreshnessLabel(freshness: WikiFreshness): string {
     case "unknown":
       return freshness.reason;
   }
-  throw new Error("Unsupported wiki freshness level");
 }
 
 function formatClaimIdentity(claim: WikiClaimHealth): string {
@@ -762,7 +761,6 @@ function rankFreshnessLevel(level: WikiFreshnessLevel): number {
     case "unknown":
       return 0;
   }
-  throw new Error("Unsupported wiki freshness level");
 }
 
 function sortClaims(page: WikiPageSummary): WikiClaim[] {

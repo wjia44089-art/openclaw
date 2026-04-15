@@ -85,10 +85,7 @@ function parseExecDirectiveArgs(raw: string): Omit<
     return { key, value };
   };
 
-  for (;;) {
-    if (i >= len) {
-      break;
-    }
+  while (i < len) {
     const token = takeToken();
     if (!token) {
       break;

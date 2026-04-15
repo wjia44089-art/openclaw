@@ -5,8 +5,7 @@ import {
 import { normalizeOptionalString } from "../../shared/string-coerce.js";
 import { CHAT_CHANNEL_ORDER, type ChatChannelId } from "../registry.js";
 import { listBundledChannelSetupPlugins } from "./bundled.js";
-import type { ChannelPlugin } from "./types.plugin.js";
-import type { ChannelId } from "./types.public.js";
+import type { ChannelId, ChannelPlugin } from "./types.js";
 
 type CachedChannelSetupPlugins = {
   registryVersion: number;

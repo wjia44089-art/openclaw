@@ -14,8 +14,9 @@ import {
   autoPrepareLegacyMatrixCrypto,
   detectLegacyMatrixCrypto,
   detectLegacyMatrixState,
+  hasActionableMatrixMigration,
+  hasPendingMatrixMigration,
   maybeCreateMatrixMigrationSnapshot,
-  resolveMatrixMigrationStatus,
 } from "./matrix-migration.runtime.js";
 import { isRecord } from "./record-shared.js";
 
@@ -134,13 +135,17 @@ export async function applyMatrixDoctorRepair(params: {
 }): Promise<{ changes: string[]; warnings: string[] }> {
   const changes: string[] = [];
   const warnings: string[] = [];
-  const migrationStatus = resolveMatrixMigrationStatus({
+  const pendingMatrixMigration = hasPendingMatrixMigration({
+    cfg: params.cfg,
+    env: params.env,
+  });
+  const actionableMatrixMigration = hasActionableMatrixMigration({
     cfg: params.cfg,
     env: params.env,
   });
 
   let matrixSnapshotReady = true;
-  if (migrationStatus.actionable) {
+  if (actionableMatrixMigration) {
     try {
       const snapshot = await maybeCreateMatrixMigrationSnapshot({
         trigger: "doctor-fix",
@@ -158,7 +163,7 @@ export async function applyMatrixDoctorRepair(params: {
         '- Skipping Matrix migration changes for now. Resolve the snapshot failure, then rerun "openclaw doctor --fix".',
       );
     }
-  } else if (migrationStatus.pending) {
+  } else if (pendingMatrixMigration) {
     warnings.push(
       "- Matrix migration warnings are present, but no on-disk Matrix mutation is actionable yet. No pre-migration snapshot was needed.",
     );
@@ -219,6 +224,15 @@ export async function runMatrixDoctorSequence(params: {
     return { changeNotes, warningNotes };
   }
 
+  const legacyState = detectLegacyMatrixState({
+    cfg: params.cfg,
+    env: params.env,
+  });
+  const legacyCrypto = detectLegacyMatrixCrypto({
+    cfg: params.cfg,
+    env: params.env,
+  });
+
   if (params.shouldRepair) {
     const repair = await applyMatrixDoctorRepair({
       cfg: params.cfg,
@@ -226,24 +240,16 @@ export async function runMatrixDoctorSequence(params: {
     });
     changeNotes.push(...repair.changes);
     warningNotes.push(...repair.warnings);
-  } else {
-    const migrationStatus = resolveMatrixMigrationStatus({
-      cfg: params.cfg,
-      env: params.env,
-    });
-    if (migrationStatus.legacyState) {
-      if ("warning" in migrationStatus.legacyState) {
-        warningNotes.push(`- ${migrationStatus.legacyState.warning}`);
-      } else {
-        warningNotes.push(formatMatrixLegacyStatePreview(migrationStatus.legacyState));
-      }
+  } else if (legacyState) {
+    if ("warning" in legacyState) {
+      warningNotes.push(`- ${legacyState.warning}`);
+    } else {
+      warningNotes.push(formatMatrixLegacyStatePreview(legacyState));
     }
-    if (
-      migrationStatus.legacyCrypto.warnings.length > 0 ||
-      migrationStatus.legacyCrypto.plans.length > 0
-    ) {
-      warningNotes.push(...formatMatrixLegacyCryptoPreview(migrationStatus.legacyCrypto));
-    }
+  }
+
+  if (!params.shouldRepair && (legacyCrypto.warnings.length > 0 || legacyCrypto.plans.length > 0)) {
+    warningNotes.push(...formatMatrixLegacyCryptoPreview(legacyCrypto));
   }
 
   return { changeNotes, warningNotes };

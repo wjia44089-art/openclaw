@@ -37,11 +37,7 @@ describe("twilioApiRequest", () => {
         },
       }),
     );
-    const requestBody = init?.body;
-    if (!(requestBody instanceof URLSearchParams)) {
-      throw new Error("expected URLSearchParams request body");
-    }
-    expect(requestBody.toString()).toBe(
+    expect(String(init?.body)).toBe(
       "To=%2B14155550123&StatusCallbackEvent=initiated&StatusCallbackEvent=completed",
     );
   });

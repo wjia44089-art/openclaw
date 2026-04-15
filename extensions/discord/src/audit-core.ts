@@ -50,7 +50,7 @@ export function listConfiguredGuildChannelKeys(
       continue;
     }
     for (const [key, value] of Object.entries(channelsRaw)) {
-      const channelId = normalizeOptionalString(key) ?? "";
+      const channelId = normalizeOptionalString(String(key)) ?? "";
       if (!channelId) {
         continue;
       }

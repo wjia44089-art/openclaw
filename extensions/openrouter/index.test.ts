@@ -1,21 +1,45 @@
 import { describe, expect, it, vi } from "vitest";
 import { registerSingleProviderPlugin } from "../../test/helpers/plugins/plugin-registration.js";
-import { expectPassthroughReplayPolicy } from "../../test/helpers/provider-replay-policy.ts";
 import openrouterPlugin from "./index.js";
 
 describe("openrouter provider hooks", () => {
   it("owns passthrough-gemini replay policy for Gemini-backed models", async () => {
-    await expectPassthroughReplayPolicy({
-      plugin: openrouterPlugin,
-      providerId: "openrouter",
-      modelId: "gemini-2.5-pro",
-      sanitizeThoughtSignatures: true,
+    const provider = await registerSingleProviderPlugin(openrouterPlugin);
+
+    expect(
+      provider.buildReplayPolicy?.({
+        provider: "openrouter",
+        modelApi: "openai-completions",
+        modelId: "gemini-2.5-pro",
+      } as never),
+    ).toMatchObject({
+      applyAssistantFirstOrderingFix: false,
+      validateGeminiTurns: false,
+      validateAnthropicTurns: false,
+      sanitizeThoughtSignatures: {
+        allowBase64Only: true,
+        includeCamelCase: true,
+      },
     });
-    await expectPassthroughReplayPolicy({
-      plugin: openrouterPlugin,
-      providerId: "openrouter",
-      modelId: "openai/gpt-5.4",
+
+    expect(
+      provider.buildReplayPolicy?.({
+        provider: "openrouter",
+        modelApi: "openai-completions",
+        modelId: "openai/gpt-5.4",
+      } as never),
+    ).toMatchObject({
+      applyAssistantFirstOrderingFix: false,
+      validateGeminiTurns: false,
+      validateAnthropicTurns: false,
     });
+    expect(
+      provider.buildReplayPolicy?.({
+        provider: "openrouter",
+        modelApi: "openai-completions",
+        modelId: "openai/gpt-5.4",
+      } as never),
+    ).not.toHaveProperty("sanitizeThoughtSignatures");
   });
 
   it("owns native reasoning output mode", async () => {
@@ -49,7 +73,7 @@ describe("openrouter provider hooks", () => {
       thinkingLevel: "high",
     } as never);
 
-    void wrapped?.(
+    wrapped?.(
       {
         provider: "openrouter",
         api: "openai-completions",

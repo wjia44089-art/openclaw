@@ -10,22 +10,17 @@ export async function runDoctorConfigWithInput<T>(params: {
     confirm: () => Promise<boolean>;
   }) => Promise<T>;
 }) {
-  return withTempHome(
-    async (home) => {
-      const configDir = path.join(home, ".openclaw");
-      await fs.mkdir(configDir, { recursive: true });
-      await fs.writeFile(
-        path.join(configDir, "openclaw.json"),
-        JSON.stringify(params.config, null, 2),
-        "utf-8",
-      );
-      return params.run({
-        options: { nonInteractive: true, repair: params.repair },
-        confirm: async () => false,
-      });
-    },
-    {
-      skipSessionCleanup: true,
-    },
-  );
+  return withTempHome(async (home) => {
+    const configDir = path.join(home, ".openclaw");
+    await fs.mkdir(configDir, { recursive: true });
+    await fs.writeFile(
+      path.join(configDir, "openclaw.json"),
+      JSON.stringify(params.config, null, 2),
+      "utf-8",
+    );
+    return params.run({
+      options: { nonInteractive: true, repair: params.repair },
+      confirm: async () => false,
+    });
+  });
 }

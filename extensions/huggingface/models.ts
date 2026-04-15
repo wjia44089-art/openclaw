@@ -73,7 +73,7 @@ export const HUGGINGFACE_MODEL_CATALOG: ModelDefinitionConfig[] = [
 ];
 
 export function isHuggingfacePolicyLocked(modelRef: string): boolean {
-  const ref = modelRef.trim();
+  const ref = String(modelRef).trim();
   return HUGGINGFACE_POLICY_SUFFIXES.some((suffix) => ref.endsWith(`:${suffix}`) || ref === suffix);
 }
 

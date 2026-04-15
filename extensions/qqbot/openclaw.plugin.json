@@ -7,7 +7,7 @@
   "skills": ["./skills"],
   "configSchema": {
     "type": "object",
-    "additionalProperties": true,
+    "additionalProperties": false,
     "$defs": {
       "audioFormatPolicy": {
         "type": "object",
@@ -77,7 +77,7 @@
       },
       "account": {
         "type": "object",
-        "additionalProperties": true,
+        "additionalProperties": false,
         "properties": {
           "enabled": { "type": "boolean" },
           "name": { "type": "string" },
@@ -100,24 +100,6 @@
           "upgradeMode": {
             "type": "string",
             "enum": ["doc", "hot-reload"]
-          },
-          "streaming": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "object",
-                "additionalProperties": true,
-                "properties": {
-                  "mode": {
-                    "type": "string",
-                    "enum": ["off", "partial"],
-                    "default": "partial"
-                  }
-                }
-              }
-            ]
           }
         }
       }
@@ -146,24 +128,6 @@
       "upgradeMode": {
         "type": "string",
         "enum": ["doc", "hot-reload"]
-      },
-      "streaming": {
-        "anyOf": [
-          {
-            "type": "boolean"
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "mode": {
-                "type": "string",
-                "enum": ["off", "partial"],
-                "default": "partial"
-              }
-            }
-          }
-        ]
       },
       "accounts": {
         "type": "object",

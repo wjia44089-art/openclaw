@@ -1,14 +1,10 @@
 import { createEmptyPluginRegistry } from "./registry-empty.js";
-import type { PluginRegistry } from "./registry-types.js";
+import type { PluginRegistry } from "./registry.js";
 import {
   PLUGIN_REGISTRY_STATE,
   type RegistryState,
   type RegistrySurfaceState,
 } from "./runtime-state.js";
-
-function asPluginRegistry(registry: RegistryState["activeRegistry"]): PluginRegistry | null {
-  return registry;
-}
 
 const state: RegistryState = (() => {
   const globalState = globalThis as typeof globalThis & {
@@ -45,7 +41,7 @@ export function recordImportedPluginId(pluginId: string): void {
 
 function installSurfaceRegistry(
   surface: RegistrySurfaceState,
-  registry: RegistryState["activeRegistry"],
+  registry: PluginRegistry | null,
   pinned: boolean,
 ) {
   if (surface.registry === registry && surface.pinned === pinned) {
@@ -58,7 +54,7 @@ function installSurfaceRegistry(
 
 function syncTrackedSurface(
   surface: RegistrySurfaceState,
-  registry: RegistryState["activeRegistry"],
+  registry: PluginRegistry | null,
   refreshVersion = false,
 ) {
   if (surface.pinned) {
@@ -89,7 +85,7 @@ export function setActivePluginRegistry(
 }
 
 export function getActivePluginRegistry(): PluginRegistry | null {
-  return asPluginRegistry(state.activeRegistry);
+  return state.activeRegistry;
 }
 
 export function getActivePluginRegistryWorkspaceDir(): string | undefined {
@@ -103,7 +99,7 @@ export function requireActivePluginRegistry(): PluginRegistry {
     syncTrackedSurface(state.httpRoute, state.activeRegistry);
     syncTrackedSurface(state.channel, state.activeRegistry);
   }
-  return asPluginRegistry(state.activeRegistry)!;
+  return state.activeRegistry;
 }
 
 export function pinActivePluginHttpRouteRegistry(registry: PluginRegistry) {
@@ -118,7 +114,7 @@ export function releasePinnedPluginHttpRouteRegistry(registry?: PluginRegistry) 
 }
 
 export function getActivePluginHttpRouteRegistry(): PluginRegistry | null {
-  return asPluginRegistry(state.httpRoute.registry ?? state.activeRegistry);
+  return state.httpRoute.registry ?? state.activeRegistry;
 }
 
 export function getActivePluginHttpRouteRegistryVersion(): number {
@@ -167,7 +163,7 @@ export function releasePinnedPluginChannelRegistry(registry?: PluginRegistry) {
  *  When pinned, this returns the startup registry regardless of subsequent
  *  `setActivePluginRegistry` calls. */
 export function getActivePluginChannelRegistry(): PluginRegistry | null {
-  return asPluginRegistry(state.channel.registry ?? state.activeRegistry);
+  return state.channel.registry ?? state.activeRegistry;
 }
 
 export function getActivePluginChannelRegistryVersion(): number {
@@ -223,9 +219,9 @@ function collectLoadedPluginIds(
  */
 export function listImportedRuntimePluginIds(): string[] {
   const imported = new Set(state.importedPluginIds);
-  collectLoadedPluginIds(asPluginRegistry(state.activeRegistry), imported);
-  collectLoadedPluginIds(asPluginRegistry(state.channel.registry), imported);
-  collectLoadedPluginIds(asPluginRegistry(state.httpRoute.registry), imported);
+  collectLoadedPluginIds(state.activeRegistry, imported);
+  collectLoadedPluginIds(state.channel.registry, imported);
+  collectLoadedPluginIds(state.httpRoute.registry, imported);
   return [...imported].toSorted((left, right) => left.localeCompare(right));
 }
 

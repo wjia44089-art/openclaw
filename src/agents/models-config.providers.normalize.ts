@@ -1,17 +1,17 @@
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { ensureAuthProfileStore } from "./auth-profiles/store.js";
 import {
   normalizeProviderSpecificConfig,
   resolveProviderConfigApiKeyResolver,
 } from "./models-config.providers.policy.js";
-import type { ProviderConfig, SecretDefaults } from "./models-config.providers.secret-helpers.js";
+import type { ProviderConfig, SecretDefaults } from "./models-config.providers.secrets.js";
 import {
   normalizeConfiguredProviderApiKey,
   normalizeHeaderValues,
   normalizeResolvedEnvApiKey,
   resolveApiKeyFromProfiles,
   resolveMissingProviderApiKey,
-} from "./models-config.providers.secret-helpers.js";
+} from "./models-config.providers.secrets.js";
 import { enforceSourceManagedProviderSecrets } from "./models-config.providers.source-managed.js";
 
 type ModelsConfig = NonNullable<OpenClawConfig["models"]>;

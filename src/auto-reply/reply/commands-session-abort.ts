@@ -1,3 +1,4 @@
+import { abortEmbeddedPiRun } from "../../agents/pi-embedded.js";
 import type { SessionEntry } from "../../config/sessions.js";
 import { logVerbose } from "../../globals.js";
 import { createInternalHookEvent, triggerInternalHook } from "../../hooks/internal-hooks.js";
@@ -26,11 +27,6 @@ type AbortTarget = {
   sessionId?: string;
 };
 
-async function abortEmbeddedPiRunForSession(sessionId: string): Promise<void> {
-  const { abortEmbeddedPiRun } = await import("../../agents/pi-embedded-runner/runs.js");
-  abortEmbeddedPiRun(sessionId);
-}
-
 function resolveAbortTarget(params: {
   ctx: { CommandTargetSessionKey?: string | null };
   sessionKey?: string;
@@ -47,11 +43,7 @@ function resolveAbortTarget(params: {
       sessionId: replyRunRegistry.resolveSessionId(key) ?? entry.sessionId,
     };
   }
-  if (
-    params.sessionEntry &&
-    params.sessionKey &&
-    (!targetSessionKey || targetSessionKey === params.sessionKey)
-  ) {
+  if (params.sessionEntry && params.sessionKey) {
     return {
       entry: params.sessionEntry,
       key: params.sessionKey,
@@ -94,7 +86,7 @@ async function applyAbortTarget(params: {
     replyRunRegistry.abort(abortTarget.key);
   }
   if (abortTarget.sessionId) {
-    await abortEmbeddedPiRunForSession(abortTarget.sessionId);
+    abortEmbeddedPiRun(abortTarget.sessionId);
   }
 
   const persisted = await persistAbortTargetEntry({
@@ -157,7 +149,7 @@ export const handleStopCommand: CommandHandler = async (params, allowTextCommand
     "stop",
     abortTarget.key ?? params.sessionKey ?? "",
     {
-      sessionEntry: abortTarget.entry,
+      sessionEntry: abortTarget.entry ?? params.sessionEntry,
       sessionId: abortTarget.sessionId,
       commandSource: params.command.surface,
       senderId: params.command.senderId,

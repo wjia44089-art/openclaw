@@ -1,4 +1,4 @@
-import type { OpenClawConfig } from "../config/types.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { logVerbose } from "../globals.js";
 import type {
   PluginWebFetchProviderEntry,

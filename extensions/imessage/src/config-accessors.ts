@@ -16,6 +16,6 @@ export function resolveIMessageConfigDefaultTo(params: {
   if (defaultTo == null) {
     return undefined;
   }
-  const normalized = defaultTo.trim();
+  const normalized = String(defaultTo).trim();
   return normalized || undefined;
 }

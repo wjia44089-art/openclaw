@@ -135,8 +135,7 @@ export const whatsappPlugin: ChannelPlugin<ResolvedWhatsAppAccount> =
         describeMessageTool: ({ cfg, accountId }) =>
           describeWhatsAppMessageActions({ cfg, accountId }),
         supportsAction: ({ action }) => action === "react",
-        resolveExecutionMode: ({ action }) => (action === "react" ? "gateway" : "local"),
-        handleAction: async ({ action, params, cfg, accountId, requesterSenderId, toolContext }) =>
+        handleAction: async ({ action, params, cfg, accountId, toolContext }) =>
           await (
             await loadWhatsAppChannelReactAction()
           ).handleWhatsAppReactAction({
@@ -144,7 +143,6 @@ export const whatsappPlugin: ChannelPlugin<ResolvedWhatsAppAccount> =
             params,
             cfg,
             accountId,
-            requesterSenderId,
             toolContext,
           }),
       },

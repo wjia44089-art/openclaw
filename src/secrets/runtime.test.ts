@@ -1,10 +1,28 @@
-import { describe, expect, it } from "vitest";
-import { asConfig, setupSecretsRuntimeSnapshotTestHooks } from "./runtime.test-support.ts";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import type { OpenClawConfig } from "../config/config.js";
+
+function asConfig(value: unknown): OpenClawConfig {
+  return value as OpenClawConfig;
+}
 
 const EMPTY_LOADABLE_PLUGIN_ORIGINS = new Map();
-const { prepareSecretsRuntimeSnapshot } = setupSecretsRuntimeSnapshotTestHooks();
+let clearConfigCache: typeof import("../config/config.js").clearConfigCache;
+let clearRuntimeConfigSnapshot: typeof import("../config/config.js").clearRuntimeConfigSnapshot;
+let clearSecretsRuntimeSnapshot: typeof import("./runtime.js").clearSecretsRuntimeSnapshot;
+let prepareSecretsRuntimeSnapshot: typeof import("./runtime.js").prepareSecretsRuntimeSnapshot;
 
 describe("secrets runtime snapshot", () => {
+  beforeAll(async () => {
+    ({ clearConfigCache, clearRuntimeConfigSnapshot } = await import("../config/config.js"));
+    ({ clearSecretsRuntimeSnapshot, prepareSecretsRuntimeSnapshot } = await import("./runtime.js"));
+  });
+
+  afterEach(() => {
+    clearSecretsRuntimeSnapshot();
+    clearRuntimeConfigSnapshot();
+    clearConfigCache();
+  });
+
   it("resolves sandbox ssh secret refs for active ssh backends", async () => {
     const snapshot = await prepareSecretsRuntimeSnapshot({
       config: asConfig({

@@ -102,26 +102,8 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.unstubAllEnvs();
-  for (const key of [
-    "OPENCLAW_DEBUG_PROXY_ENABLED",
-    "OPENCLAW_DEBUG_PROXY_URL",
-    "ALL_PROXY",
-    "all_proxy",
-    "HTTP_PROXY",
-    "http_proxy",
-    "HTTPS_PROXY",
-    "https_proxy",
-    "NO_PROXY",
-    "no_proxy",
-  ]) {
-    vi.stubEnv(key, "");
-  }
   loggerInfo.mockReset();
   loggerDebug.mockReset();
-});
-
-afterEach(() => {
-  vi.unstubAllEnvs();
 });
 
 function resolveTelegramFetchOrThrow(
@@ -338,7 +320,7 @@ describe("resolveTelegramFetch", () => {
   });
 
   it("uses EnvHttpProxyAgent dispatcher when proxy env is configured", async () => {
-    vi.stubEnv("https_proxy", "http://127.0.0.1:7890");
+    vi.stubEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
     undiciFetch.mockResolvedValue({ ok: true } as Response);
 
     const resolved = resolveTelegramFetchOrThrow(undefined, {
@@ -368,24 +350,8 @@ describe("resolveTelegramFetch", () => {
     );
   });
 
-  it("uses the OpenClaw debug proxy URL when no explicit proxy fetch is provided", async () => {
-    vi.stubEnv("OPENCLAW_DEBUG_PROXY_ENABLED", "1");
-    vi.stubEnv("OPENCLAW_DEBUG_PROXY_URL", "http://127.0.0.1:7777");
-    undiciFetch.mockResolvedValue({ ok: true } as Response);
-
-    const resolved = resolveTelegramFetch(undefined);
-    await resolved("https://api.telegram.org/botTOKEN/getMe");
-
-    expect(ProxyAgentCtor).toHaveBeenCalledTimes(1);
-    expect(ProxyAgentCtor).toHaveBeenCalledWith(
-      expect.objectContaining({
-        uri: "http://127.0.0.1:7777",
-      }),
-    );
-  });
-
   it("pins env-proxy transport policy onto proxyTls for proxied HTTPS requests", async () => {
-    vi.stubEnv("https_proxy", "http://127.0.0.1:7890");
+    vi.stubEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
     undiciFetch.mockResolvedValue({ ok: true } as Response);
 
     const resolved = resolveTelegramFetchOrThrow(undefined, {
@@ -516,7 +482,7 @@ describe("resolveTelegramFetch", () => {
   });
 
   it("does not blind-retry when sticky IPv4 fallback is disallowed for env proxy paths", async () => {
-    vi.stubEnv("https_proxy", "http://127.0.0.1:7890");
+    vi.stubEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
     primeStickyFallbackRetry("EHOSTUNREACH", 1);
 
     const resolved = resolveTelegramFetchOrThrow(undefined, {
@@ -567,7 +533,7 @@ describe("resolveTelegramFetch", () => {
   });
 
   it("arms sticky IPv4 fallback when env proxy init falls back to direct Agent", async () => {
-    vi.stubEnv("https_proxy", "http://127.0.0.1:7890");
+    vi.stubEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
     EnvHttpProxyAgentCtor.mockImplementationOnce(function ThrowingEnvProxyAgent() {
       throw new Error("invalid proxy config");
     });
@@ -585,8 +551,8 @@ describe("resolveTelegramFetch", () => {
   });
 
   it("arms sticky IPv4 fallback when NO_PROXY bypasses telegram under env proxy", async () => {
-    vi.stubEnv("https_proxy", "http://127.0.0.1:7890");
-    vi.stubEnv("no_proxy", "api.telegram.org");
+    vi.stubEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
+    vi.stubEnv("NO_PROXY", "api.telegram.org");
     await runDefaultStickyIpv4FallbackProbe();
 
     expect(undiciFetch).toHaveBeenCalledTimes(3);
@@ -601,7 +567,7 @@ describe("resolveTelegramFetch", () => {
   });
 
   it("uses no_proxy over NO_PROXY when deciding env-proxy bypass", async () => {
-    vi.stubEnv("https_proxy", "http://127.0.0.1:7890");
+    vi.stubEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
     vi.stubEnv("NO_PROXY", "");
     vi.stubEnv("no_proxy", "api.telegram.org");
     await runDefaultStickyIpv4FallbackProbe();
@@ -611,7 +577,7 @@ describe("resolveTelegramFetch", () => {
   });
 
   it("matches whitespace and wildcard no_proxy entries like EnvHttpProxyAgent", async () => {
-    vi.stubEnv("https_proxy", "http://127.0.0.1:7890");
+    vi.stubEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
     vi.stubEnv("no_proxy", "localhost *.telegram.org");
     await runDefaultStickyIpv4FallbackProbe();
 
@@ -638,7 +604,7 @@ describe("resolveTelegramFetch", () => {
   });
 
   it("falls back to Agent when env proxy dispatcher initialization fails", async () => {
-    vi.stubEnv("https_proxy", "http://127.0.0.1:7890");
+    vi.stubEnv("HTTPS_PROXY", "http://127.0.0.1:7890");
     EnvHttpProxyAgentCtor.mockImplementationOnce(function ThrowingEnvProxyAgent() {
       throw new Error("invalid proxy config");
     });

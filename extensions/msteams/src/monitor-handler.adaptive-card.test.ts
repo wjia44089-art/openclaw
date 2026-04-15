@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig, PluginRuntime, RuntimeEnv } from "../runtime-api.js";
-import type { MSTeamsConversationStore } from "./conversation-store.js";
 import {
   type MSTeamsActivityHandler,
   type MSTeamsMessageHandlerDeps,
@@ -84,13 +83,8 @@ function createDeps(): MSTeamsMessageHandlerDeps {
     textLimit: 4000,
     mediaMaxBytes: 1024 * 1024,
     conversationStore: {
-      get: vi.fn(async () => null),
       upsert: vi.fn(async () => undefined),
-      list: vi.fn(async () => []),
-      remove: vi.fn(async () => false),
-      findPreferredDmByUserId: vi.fn(async () => null),
-      findByUserId: vi.fn(async () => null),
-    } satisfies MSTeamsConversationStore,
+    } as unknown as MSTeamsMessageHandlerDeps["conversationStore"],
     pollStore: {
       recordVote: vi.fn(async () => null),
     } as unknown as MSTeamsMessageHandlerDeps["pollStore"],

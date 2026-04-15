@@ -66,7 +66,7 @@ function normalizeClaimTextKey(text: string): string {
 
 function normalizeTextKey(text: string): string {
   return normalizeLowercaseStringOrEmpty(text)
-    .replace(/[^\p{L}\p{N}\p{M}]+/gu, " ")
+    .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ");
 }
 

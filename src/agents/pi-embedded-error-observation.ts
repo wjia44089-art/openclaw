@@ -3,12 +3,7 @@ import { redactIdentifier } from "../logging/redact-identifier.js";
 import { getDefaultRedactPatterns, redactSensitiveText } from "../logging/redact.js";
 import { normalizeOptionalString } from "../shared/string-coerce.js";
 import { sanitizeForConsole } from "./console-sanitize.js";
-import {
-  classifyProviderRuntimeFailureKind,
-  getApiErrorPayloadFingerprint,
-  parseApiErrorInfo,
-  type ProviderRuntimeFailureKind,
-} from "./pi-embedded-helpers.js";
+import { getApiErrorPayloadFingerprint, parseApiErrorInfo } from "./pi-embedded-helpers.js";
 import { stableStringify } from "./stable-stringify.js";
 
 export { sanitizeForConsole } from "./console-sanitize.js";
@@ -105,15 +100,11 @@ function buildObservationFingerprint(params: {
   return getApiErrorPayloadFingerprint(params.raw);
 }
 
-export function buildApiErrorObservationFields(
-  rawError?: string,
-  opts?: { provider?: string },
-): {
+export function buildApiErrorObservationFields(rawError?: string): {
   rawErrorPreview?: string;
   rawErrorHash?: string;
   rawErrorFingerprint?: string;
   httpCode?: string;
-  providerRuntimeFailureKind?: ProviderRuntimeFailureKind;
   providerErrorType?: string;
   providerErrorMessagePreview?: string;
   requestIdHash?: string;
@@ -147,11 +138,6 @@ export function buildApiErrorObservationFields(
         ? redactIdentifier(rawFingerprint, { len: 12 })
         : undefined,
       httpCode: parsed?.httpCode,
-      providerRuntimeFailureKind: classifyProviderRuntimeFailureKind({
-        status: parsed?.httpCode ? Number(parsed.httpCode) : undefined,
-        message: trimmed,
-        provider: opts?.provider,
-      }),
       providerErrorType: parsed?.type,
       providerErrorMessagePreview: truncateForObservation(
         redactedProviderMessage,
@@ -164,26 +150,21 @@ export function buildApiErrorObservationFields(
   }
 }
 
-export function buildTextObservationFields(
-  text?: string,
-  opts?: { provider?: string },
-): {
+export function buildTextObservationFields(text?: string): {
   textPreview?: string;
   textHash?: string;
   textFingerprint?: string;
   httpCode?: string;
-  providerRuntimeFailureKind?: ProviderRuntimeFailureKind;
   providerErrorType?: string;
   providerErrorMessagePreview?: string;
   requestIdHash?: string;
 } {
-  const observed = buildApiErrorObservationFields(text, opts);
+  const observed = buildApiErrorObservationFields(text);
   return {
     textPreview: observed.rawErrorPreview,
     textHash: observed.rawErrorHash,
     textFingerprint: observed.rawErrorFingerprint,
     httpCode: observed.httpCode,
-    providerRuntimeFailureKind: observed.providerRuntimeFailureKind,
     providerErrorType: observed.providerErrorType,
     providerErrorMessagePreview: observed.providerErrorMessagePreview,
     requestIdHash: observed.requestIdHash,

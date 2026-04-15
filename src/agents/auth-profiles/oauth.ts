@@ -4,8 +4,7 @@ import {
   type OAuthCredentials,
   type OAuthProvider,
 } from "@mariozechner/pi-ai/oauth";
-import { loadConfig } from "../../config/config.js";
-import type { OpenClawConfig } from "../../config/types.openclaw.js";
+import { loadConfig, type OpenClawConfig } from "../../config/config.js";
 import { coerceSecretRef } from "../../config/types.secrets.js";
 import { formatErrorMessage } from "../../infra/errors.js";
 import { withFileLock } from "../../infra/file-lock.js";
@@ -309,7 +308,7 @@ async function refreshOAuthTokenWithLock(params: {
 
     const oauthCreds: Record<string, OAuthCredentials> = { [cred.provider]: cred };
     const result =
-      cred.provider === "chutes"
+      String(cred.provider) === "chutes"
         ? await (async () => {
             const newCredentials = await refreshChutesTokens({
               credential: cred,

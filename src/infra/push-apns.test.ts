@@ -7,9 +7,9 @@ import {
   sendApnsExecApprovalResolvedWake,
 } from "./push-apns.js";
 
-const testAuthPrivateKey = generateKeyPairSync("ec", {
-  namedCurve: "prime256v1",
-}).privateKey.export({ format: "pem", type: "pkcs8" });
+const testAuthPrivateKey = generateKeyPairSync("ec", { namedCurve: "prime256v1" })
+  .privateKey.export({ format: "pem", type: "pkcs8" })
+  .toString();
 
 function createDirectApnsSendFixture(params: {
   nodeId: string;

@@ -58,11 +58,11 @@ vi.mock("./gateway-supervisor.js", () => ({
 }));
 
 vi.mock("./listeners.js", () => ({
-  DiscordMessageListener: function DiscordMessageListener() {},
-  DiscordPresenceListener: function DiscordPresenceListener() {},
-  DiscordReactionListener: function DiscordReactionListener() {},
-  DiscordReactionRemoveListener: function DiscordReactionRemoveListener() {},
-  DiscordThreadUpdateListener: function DiscordThreadUpdateListener() {},
+  DiscordMessageListener: class DiscordMessageListener {},
+  DiscordPresenceListener: class DiscordPresenceListener {},
+  DiscordReactionListener: class DiscordReactionListener {},
+  DiscordReactionRemoveListener: class DiscordReactionRemoveListener {},
+  DiscordThreadUpdateListener: class DiscordThreadUpdateListener {},
   registerDiscordListener: vi.fn(),
 }));
 

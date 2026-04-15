@@ -1,7 +1,7 @@
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { coerceSecretRef, type SecretRef } from "../config/types.secrets.js";
 import { secretRefKey } from "./ref-contract.js";
-import type { SecretRefResolveCache } from "./resolve-types.js";
+import type { SecretRefResolveCache } from "./resolve.js";
 import { assertExpectedResolvedSecretValue } from "./secret-value.js";
 import { isRecord } from "./shared.js";
 
@@ -40,7 +40,6 @@ export type ResolverContext = {
 };
 
 export type SecretDefaults = NonNullable<OpenClawConfig["secrets"]>["defaults"];
-export type { SecretRefResolveCache } from "./resolve-types.js";
 
 export function createResolverContext(params: {
   sourceConfig: OpenClawConfig;

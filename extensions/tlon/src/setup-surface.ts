@@ -66,7 +66,7 @@ export const tlonSetupWizard = createTlonSetupWizardBase({
       next = applyTlonSetupConfig({
         cfg: next,
         accountId,
-        input: { groupChannels: parseList(entry ?? "") },
+        input: { groupChannels: parseList(String(entry ?? "")) },
       });
     }
 
@@ -85,7 +85,7 @@ export const tlonSetupWizard = createTlonSetupWizardBase({
         cfg: next,
         accountId,
         input: {
-          dmAllowlist: parseList(entry ?? "").map((ship) => normalizeShip(ship)),
+          dmAllowlist: parseList(String(entry ?? "")).map((ship) => normalizeShip(ship)),
         },
       });
     }

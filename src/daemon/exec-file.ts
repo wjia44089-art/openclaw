@@ -11,17 +11,17 @@ export async function execFileUtf8(
     execFile(command, args, { ...options, encoding: "utf8" }, (error, stdout, stderr) => {
       if (!error) {
         resolve({
-          stdout: stdout ?? "",
-          stderr: stderr ?? "",
+          stdout: String(stdout ?? ""),
+          stderr: String(stderr ?? ""),
           code: 0,
         });
         return;
       }
 
       const e = error as { code?: unknown; message?: unknown };
-      const stderrText = stderr ?? "";
+      const stderrText = String(stderr ?? "");
       resolve({
-        stdout: stdout ?? "",
+        stdout: String(stdout ?? ""),
         stderr:
           stderrText ||
           (typeof e.message === "string" ? e.message : typeof error === "string" ? error : ""),

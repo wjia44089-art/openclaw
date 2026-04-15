@@ -70,24 +70,6 @@ function primeAccountClientMocks(params?: {
   return { mainAuth, opsAuth, mainClient, opsClient };
 }
 
-function createPendingSharedStartup(mainAuth = authFor("main")) {
-  let resolveStartup: (() => void) | undefined;
-  const mainClient = {
-    ...createMockClient("main"),
-    start: vi.fn(
-      async () =>
-        await new Promise<void>((resolve) => {
-          resolveStartup = resolve;
-        }),
-    ),
-  };
-
-  resolveMatrixAuthMock.mockResolvedValue(mainAuth);
-  createMatrixClientMock.mockResolvedValue(mainClient);
-
-  return { mainClient, resolveStartup: () => resolveStartup?.() };
-}
-
 describe("resolveSharedMatrixClient", () => {
   beforeAll(async () => {
     ({
@@ -252,11 +234,25 @@ describe("resolveSharedMatrixClient", () => {
   });
 
   it("lets a later waiter abort while shared startup continues for the owner", async () => {
-    const { mainClient, resolveStartup } = createPendingSharedStartup();
+    const mainAuth = authFor("main");
+    let resolveStartup: (() => void) | undefined;
+    const mainClient = {
+      ...createMockClient("main"),
+      start: vi.fn(
+        async () =>
+          await new Promise<void>((resolve) => {
+            resolveStartup = resolve;
+          }),
+      ),
+    };
+
+    resolveMatrixAuthMock.mockResolvedValue(mainAuth);
+    createMatrixClientMock.mockResolvedValue(mainClient);
 
     const ownerPromise = resolveSharedMatrixClient({ accountId: "main" });
     await vi.waitFor(() => {
       expect(mainClient.start).toHaveBeenCalledTimes(1);
+      expect(resolveStartup).toEqual(expect.any(Function));
     });
 
     const abortController = new AbortController();
@@ -271,16 +267,30 @@ describe("resolveSharedMatrixClient", () => {
       name: "AbortError",
     });
 
-    resolveStartup();
+    resolveStartup?.();
     await expect(ownerPromise).resolves.toBe(mainClient);
   });
 
   it("keeps the shared startup lock while an aborted waiter exits early", async () => {
-    const { mainClient, resolveStartup } = createPendingSharedStartup();
+    const mainAuth = authFor("main");
+    let resolveStartup: (() => void) | undefined;
+    const mainClient = {
+      ...createMockClient("main"),
+      start: vi.fn(
+        async () =>
+          await new Promise<void>((resolve) => {
+            resolveStartup = resolve;
+          }),
+      ),
+    };
+
+    resolveMatrixAuthMock.mockResolvedValue(mainAuth);
+    createMatrixClientMock.mockResolvedValue(mainClient);
 
     const ownerPromise = resolveSharedMatrixClient({ accountId: "main" });
     await vi.waitFor(() => {
       expect(mainClient.start).toHaveBeenCalledTimes(1);
+      expect(resolveStartup).toEqual(expect.any(Function));
     });
 
     const abortController = new AbortController();
@@ -297,7 +307,7 @@ describe("resolveSharedMatrixClient", () => {
     const followerPromise = resolveSharedMatrixClient({ accountId: "main" });
     expect(mainClient.start).toHaveBeenCalledTimes(1);
 
-    resolveStartup();
+    resolveStartup?.();
     await expect(ownerPromise).resolves.toBe(mainClient);
     await expect(followerPromise).resolves.toBe(mainClient);
     expect(mainClient.start).toHaveBeenCalledTimes(1);

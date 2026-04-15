@@ -3,7 +3,6 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applyExtraParamsToAgentMock,
   contextEngineCompactMock,
-  createOpenClawCodingToolsMock,
   ensureRuntimePluginsLoaded,
   estimateTokensMock,
   getMemorySearchManagerMock,
@@ -24,7 +23,7 @@ import {
 } from "./compact.hooks.harness.js";
 
 let compactEmbeddedPiSessionDirect: typeof import("./compact.js").compactEmbeddedPiSessionDirect;
-let compactEmbeddedPiSession: typeof import("./compact.queued.js").compactEmbeddedPiSession;
+let compactEmbeddedPiSession: typeof import("./compact.js").compactEmbeddedPiSession;
 let compactTesting: typeof import("./compact.js").__testing;
 let onSessionTranscriptUpdate: typeof import("../../sessions/transcript-events.js").onSessionTranscriptUpdate;
 
@@ -264,27 +263,6 @@ describe("compactEmbeddedPiSessionDirect hooks", () => {
         api: "responses",
       }),
       "/tmp/workspace",
-    );
-  });
-
-  it("preserves full sender identity when building compaction tools", async () => {
-    await compactEmbeddedPiSessionDirect({
-      sessionId: "session-1",
-      sessionFile: "/tmp/session.jsonl",
-      workspaceDir: "/tmp/workspace",
-      senderId: "sender-1",
-      senderName: "Alice",
-      senderUsername: "alice_u",
-      senderE164: "+15551234567",
-    });
-
-    expect(createOpenClawCodingToolsMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        senderId: "sender-1",
-        senderName: "Alice",
-        senderUsername: "alice_u",
-        senderE164: "+15551234567",
-      }),
     );
   });
 

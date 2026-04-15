@@ -13,8 +13,8 @@ const LIVE_RUNTIME_STATE_GUARDS: Record<
     forbidden: readonly string[];
   }
 > = {
-  [bundledPluginFile("whatsapp", "src/connection-controller-registry.ts")]: {
-    required: ["globalThis", 'Symbol.for("openclaw.whatsapp.connectionControllerRegistry")'],
+  [bundledPluginFile("whatsapp", "src/active-listener.ts")]: {
+    required: ["globalThis", 'Symbol.for("openclaw.whatsapp.activeListenerState")'],
     forbidden: ["resolveGlobalSingleton"],
   },
 };

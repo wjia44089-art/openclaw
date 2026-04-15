@@ -1,12 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import { URL } from "node:url";
-import { isWindowsDrivePath } from "../infra/archive-path.js";
-import {
-  assertNoWindowsNetworkPath,
-  hasEncodedFileUrlSeparator,
-  safeFileURLToPath,
-} from "../infra/local-file-access.js";
+import { assertNoWindowsNetworkPath, safeFileURLToPath } from "../infra/local-file-access.js";
 import { assertNoPathAliasEscape, type PathAliasPolicy } from "../infra/path-alias-guards.js";
 import { isPathInside } from "../infra/path-guards.js";
 import { resolvePreferredOpenClawTmpDir } from "../infra/tmp-openclaw-dir.js";
@@ -35,17 +30,8 @@ function expandPath(filePath: string): string {
   return normalized;
 }
 
-/** True when the path is absolute for the current platform or a Windows drive path (e.g. C:\\...), even if path.isAbsolute is false under POSIX rules. */
-function hostPathLooksAbsolute(expanded: string): boolean {
-  return path.isAbsolute(expanded) || isWindowsDrivePath(expanded);
-}
-
 function resolveToCwd(filePath: string, cwd: string): string {
   const expanded = expandPath(filePath);
-  // Drive-letter paths first: on Unix path.isAbsolute is false for C:/...; on Windows we still normalize.
-  if (isWindowsDrivePath(expanded)) {
-    return path.win32.normalize(expanded);
-  }
   if (path.isAbsolute(expanded)) {
     return expanded;
   }
@@ -66,7 +52,7 @@ export function resolveSandboxPath(params: { filePath: string; cwd: string; root
   if (!relative || relative === "") {
     return { resolved, relative: "" };
   }
-  if (relative.startsWith("..") || path.isAbsolute(relative) || isWindowsDrivePath(relative)) {
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
     throw new Error(`Path escapes sandbox root (${shortPath(rootResolved)}): ${params.filePath}`);
   }
   return { resolved, relative };
@@ -165,21 +151,9 @@ function mapContainerWorkspaceFileUrl(params: {
   if (parsed.protocol !== "file:") {
     return undefined;
   }
-  const host = parsed.hostname.trim().toLowerCase();
-  if (host && host !== "localhost") {
-    return undefined;
-  }
-  if (hasEncodedFileUrlSeparator(parsed.pathname)) {
-    return undefined;
-  }
   // Sandbox paths are Linux-style (/workspace/*). Parse the URL path directly so
   // Windows hosts can still accept file:///workspace/... media references.
-  let normalizedPathname: string;
-  try {
-    normalizedPathname = decodeURIComponent(parsed.pathname).replace(/\\/g, "/");
-  } catch {
-    return undefined;
-  }
+  const normalizedPathname = decodeURIComponent(parsed.pathname).replace(/\\/g, "/");
   if (
     normalizedPathname !== SANDBOX_CONTAINER_WORKDIR &&
     !normalizedPathname.startsWith(`${SANDBOX_CONTAINER_WORKDIR}/`)
@@ -215,7 +189,7 @@ async function resolveAllowedTmpMediaPath(params: {
   candidate: string;
   sandboxRoot: string;
 }): Promise<string | undefined> {
-  const candidateIsAbsolute = hostPathLooksAbsolute(expandPath(params.candidate));
+  const candidateIsAbsolute = path.isAbsolute(expandPath(params.candidate));
   if (!candidateIsAbsolute) {
     return undefined;
   }

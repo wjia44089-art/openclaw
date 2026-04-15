@@ -1,13 +1,11 @@
 import { DEFAULT_CONTEXT_TOKENS } from "../agents/defaults.js";
+import { normalizeProviderSpecificConfig } from "../agents/models-config.providers.policy.js";
 import { normalizeProviderId } from "../agents/provider-id.js";
+import { applyProviderConfigDefaultsWithPlugin } from "../plugins/provider-runtime.js";
 import { DEFAULT_AGENT_MAX_CONCURRENT, DEFAULT_SUBAGENT_MAX_CONCURRENT } from "./agent-limits.js";
-import {
-  applyProviderConfigDefaultsForConfig,
-  normalizeProviderConfigForConfigDefaults,
-} from "./provider-policy.js";
 import { normalizeTalkConfig } from "./talk.js";
+import type { OpenClawConfig } from "./types.js";
 import type { ModelDefinitionConfig } from "./types.models.js";
-import type { OpenClawConfig } from "./types.openclaw.js";
 
 type WarnState = { warned: boolean };
 
@@ -141,10 +139,7 @@ export function applyModelDefaults(cfg: OpenClawConfig): OpenClawConfig {
   if (providerConfig) {
     const nextProviders = { ...providerConfig };
     for (const [providerId, provider] of Object.entries(providerConfig)) {
-      const normalizedProvider = normalizeProviderConfigForConfigDefaults({
-        provider: providerId,
-        providerConfig: provider,
-      });
+      const normalizedProvider = normalizeProviderSpecificConfig(providerId, provider);
       const models = normalizedProvider.models;
       if (!Array.isArray(models) || models.length === 0) {
         if (normalizedProvider !== provider) {
@@ -344,10 +339,13 @@ export function applyContextPruningDefaults(cfg: OpenClawConfig): OpenClawConfig
     return cfg;
   }
   return (
-    applyProviderConfigDefaultsForConfig({
+    applyProviderConfigDefaultsWithPlugin({
       provider: "anthropic",
-      config: cfg,
-      env: process.env,
+      context: {
+        provider: "anthropic",
+        config: cfg,
+        env: process.env,
+      },
     }) ?? cfg
   );
 }

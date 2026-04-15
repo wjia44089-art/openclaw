@@ -320,24 +320,24 @@ function mergeConfig(
       ...query,
       minScore,
       hybrid: {
-        enabled: hybrid.enabled,
+        enabled: Boolean(hybrid.enabled),
         vectorWeight: normalizedVectorWeight,
         textWeight: normalizedTextWeight,
         candidateMultiplier,
         mmr: {
-          enabled: hybrid.mmr.enabled,
+          enabled: Boolean(hybrid.mmr.enabled),
           lambda: Number.isFinite(hybrid.mmr.lambda)
             ? Math.max(0, Math.min(1, hybrid.mmr.lambda))
             : DEFAULT_MMR_LAMBDA,
         },
         temporalDecay: {
-          enabled: hybrid.temporalDecay.enabled,
+          enabled: Boolean(hybrid.temporalDecay.enabled),
           halfLifeDays: temporalDecayHalfLifeDays,
         },
       },
     },
     cache: {
-      enabled: cache.enabled,
+      enabled: Boolean(cache.enabled),
       maxEntries:
         typeof cache.maxEntries === "number" && Number.isFinite(cache.maxEntries)
           ? Math.max(1, Math.floor(cache.maxEntries))

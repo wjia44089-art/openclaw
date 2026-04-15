@@ -97,7 +97,7 @@ describe("xai stream wrappers", () => {
     let capturedModelId = "";
     let capturedPayload: XaiTestPayload | undefined;
     const baseStreamFn: StreamFn = (model, _context, options) => {
-      capturedModelId = model.id;
+      capturedModelId = String(model.id);
       const payload: XaiTestPayload = {
         reasoning: { effort: "high" },
         tools: [

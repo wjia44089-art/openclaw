@@ -1,6 +1,6 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import type { OpenClawConfig } from "../config/config.js";
 import type { PluginWebSearchProviderEntry } from "../plugins/types.js";
-import { asConfig, setupSecretsRuntimeSnapshotTestHooks } from "./runtime.test-support.ts";
 
 const { resolvePluginWebSearchProvidersMock } = vi.hoisted(() => ({
   resolvePluginWebSearchProvidersMock: vi.fn<() => PluginWebSearchProviderEntry[]>(() => [
@@ -39,14 +39,32 @@ vi.mock("../plugins/web-search-providers.runtime.js", () => ({
   resolvePluginWebSearchProviders: resolvePluginWebSearchProvidersMock,
 }));
 
+function asConfig(value: unknown): OpenClawConfig {
+  return value as OpenClawConfig;
+}
+
+let clearConfigCache: typeof import("../config/config.js").clearConfigCache;
+let clearRuntimeConfigSnapshot: typeof import("../config/config.js").clearRuntimeConfigSnapshot;
 let activateSecretsRuntimeSnapshot: typeof import("./runtime.js").activateSecretsRuntimeSnapshot;
+let clearSecretsRuntimeSnapshot: typeof import("./runtime.js").clearSecretsRuntimeSnapshot;
 let getActiveRuntimeWebToolsMetadata: typeof import("./runtime.js").getActiveRuntimeWebToolsMetadata;
-const { prepareSecretsRuntimeSnapshot } = setupSecretsRuntimeSnapshotTestHooks();
+let prepareSecretsRuntimeSnapshot: typeof import("./runtime.js").prepareSecretsRuntimeSnapshot;
 
 describe("runtime web tools state", () => {
   beforeAll(async () => {
-    ({ activateSecretsRuntimeSnapshot, getActiveRuntimeWebToolsMetadata } =
-      await import("./runtime.js"));
+    ({ clearConfigCache, clearRuntimeConfigSnapshot } = await import("../config/config.js"));
+    ({
+      activateSecretsRuntimeSnapshot,
+      clearSecretsRuntimeSnapshot,
+      getActiveRuntimeWebToolsMetadata,
+      prepareSecretsRuntimeSnapshot,
+    } = await import("./runtime.js"));
+  });
+
+  afterEach(() => {
+    clearSecretsRuntimeSnapshot();
+    clearRuntimeConfigSnapshot();
+    clearConfigCache();
   });
 
   it("exposes active runtime web tool metadata as a defensive clone", async () => {

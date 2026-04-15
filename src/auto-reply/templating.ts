@@ -1,13 +1,14 @@
+import type { ChannelId } from "../channels/plugins/types.js";
 import type {
   MediaUnderstandingDecision,
   MediaUnderstandingOutput,
 } from "../media-understanding/types.js";
 import type { InputProvenance } from "../sessions/input-provenance.js";
-import type { CommandArgs } from "./commands-args.types.js";
+import type { CommandArgs } from "./commands-registry.types.js";
 import type { ReplyThreadingPolicy } from "./types.js";
 
 /** Valid message channels for routing. */
-export type OriginatingChannelType = string & { readonly __originatingChannelBrand?: never };
+export type OriginatingChannelType = ChannelId;
 
 export type StickerContextMetadata = {
   cachedDescription?: string;
@@ -167,8 +168,6 @@ export type MsgContext = {
   NativeDirectUserId?: string;
   /** Telegram forum supergroup marker. */
   IsForum?: boolean;
-  /** Human-readable Telegram forum topic name (cached from service messages). */
-  TopicName?: string;
   /** Warning: DM has topics enabled but this message is not in a topic. */
   TopicRequiredButMissing?: boolean;
   /**

@@ -11,30 +11,13 @@ export type ConversationRefShape = {
   parentConversationId?: string;
 };
 
-type ConversationTargetRefShape = {
-  conversationId: string;
-  parentConversationId?: string | null;
-};
-
-export function normalizeConversationTargetRef<T extends ConversationTargetRefShape>(ref: T): T {
-  const conversationId = normalizeOptionalString(ref.conversationId) ?? "";
-  const parentConversationId = normalizeOptionalString(ref.parentConversationId);
-  const { parentConversationId: _ignoredParentConversationId, ...rest } = ref;
-  return {
-    ...rest,
-    conversationId,
-    ...(parentConversationId && parentConversationId !== conversationId
-      ? { parentConversationId }
-      : {}),
-  } as T;
-}
-
 export function normalizeConversationRef<T extends ConversationRefShape>(ref: T): T {
-  const normalizedTarget = normalizeConversationTargetRef(ref);
   return {
-    ...normalizedTarget,
+    ...ref,
     channel: normalizeLowercaseStringOrEmpty(ref.channel),
     accountId: normalizeAccountId(ref.accountId),
+    conversationId: normalizeOptionalString(ref.conversationId) ?? "",
+    parentConversationId: normalizeOptionalString(ref.parentConversationId),
   };
 }
 

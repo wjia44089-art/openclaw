@@ -1,8 +1,8 @@
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
+import { normalizePluginsConfig, resolveEffectiveEnableState } from "../plugins/config-state.js";
 import { loadPluginManifestRegistry } from "../plugins/manifest-registry.js";
 import type { PluginManifestRecord } from "../plugins/manifest-registry.js";
-import type { PluginOrigin } from "../plugins/plugin-origin.types.js";
-import { normalizeOptionalLowercaseString } from "../shared/string-coerce.js";
+import type { PluginOrigin } from "../plugins/types.js";
 import { normalizeProviderId } from "./provider-id.js";
 
 export type ProviderAuthAliasLookupParams = {
@@ -16,8 +16,6 @@ type ProviderAuthAliasCandidate = {
   origin?: PluginOrigin;
   target: string;
 };
-
-type PluginEntriesConfig = NonNullable<NonNullable<OpenClawConfig["plugins"]>["entries"]>;
 
 const PROVIDER_AUTH_ALIAS_ORIGIN_PRIORITY: Readonly<Record<PluginOrigin, number>> = {
   config: 0,
@@ -33,56 +31,6 @@ function resolveProviderAuthAliasOriginPriority(origin: PluginOrigin | undefined
   return PROVIDER_AUTH_ALIAS_ORIGIN_PRIORITY[origin] ?? Number.MAX_SAFE_INTEGER;
 }
 
-function normalizePluginConfigId(id: unknown): string {
-  return normalizeOptionalLowercaseString(id) ?? "";
-}
-
-function hasPluginId(list: unknown, pluginId: string): boolean {
-  return Array.isArray(list) && list.some((entry) => normalizePluginConfigId(entry) === pluginId);
-}
-
-function findPluginEntry(
-  entries: PluginEntriesConfig | undefined,
-  pluginId: string,
-): { enabled?: boolean } | undefined {
-  if (!entries || typeof entries !== "object" || Array.isArray(entries)) {
-    return undefined;
-  }
-  for (const [key, value] of Object.entries(entries)) {
-    if (normalizePluginConfigId(key) !== pluginId) {
-      continue;
-    }
-    return value && typeof value === "object" && !Array.isArray(value)
-      ? (value as { enabled?: boolean })
-      : {};
-  }
-  return undefined;
-}
-
-function isWorkspacePluginTrustedForAuthAliases(
-  plugin: PluginManifestRecord,
-  config: OpenClawConfig | undefined,
-): boolean {
-  const pluginsConfig = config?.plugins;
-  if (pluginsConfig?.enabled === false) {
-    return false;
-  }
-
-  const pluginId = normalizePluginConfigId(plugin.id);
-  if (!pluginId || hasPluginId(pluginsConfig?.deny, pluginId)) {
-    return false;
-  }
-
-  const entry = findPluginEntry(pluginsConfig?.entries, pluginId);
-  if (entry?.enabled === false) {
-    return false;
-  }
-  if (entry?.enabled === true || hasPluginId(pluginsConfig?.allow, pluginId)) {
-    return true;
-  }
-  return normalizePluginConfigId(pluginsConfig?.slots?.contextEngine) === pluginId;
-}
-
 function shouldUsePluginAuthAliases(
   plugin: PluginManifestRecord,
   params: ProviderAuthAliasLookupParams | undefined,
@@ -90,7 +38,13 @@ function shouldUsePluginAuthAliases(
   if (plugin.origin !== "workspace" || params?.includeUntrustedWorkspacePlugins === true) {
     return true;
   }
-  return isWorkspacePluginTrustedForAuthAliases(plugin, params?.config);
+  const normalizedConfig = normalizePluginsConfig(params?.config?.plugins);
+  return resolveEffectiveEnableState({
+    id: plugin.id,
+    origin: plugin.origin,
+    config: normalizedConfig,
+    rootConfig: params?.config,
+  }).enabled;
 }
 
 export function resolveProviderAuthAliasMap(

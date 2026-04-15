@@ -5,41 +5,12 @@ import * as taskExecutor from "../../tasks/task-executor.js";
 import { findTaskByRunId, resetTaskRegistryForTests } from "../../tasks/task-registry.js";
 import { setupCronServiceSuite, writeCronStoreSnapshot } from "../service.test-harness.js";
 import type { CronJob } from "../types.js";
-import { run, start, stop, update } from "./ops.js";
+import { run, start, stop } from "./ops.js";
 import { createCronServiceState } from "./state.js";
 
 const { logger, makeStorePath } = setupCronServiceSuite({
   prefix: "cron-service-ops-seam",
 });
-
-function withStateDirForStorePath(storePath: string) {
-  const stateRoot = path.dirname(path.dirname(storePath));
-  const originalStateDir = process.env.OPENCLAW_STATE_DIR;
-  process.env.OPENCLAW_STATE_DIR = stateRoot;
-  resetTaskRegistryForTests();
-  return () => {
-    if (originalStateDir === undefined) {
-      delete process.env.OPENCLAW_STATE_DIR;
-    } else {
-      process.env.OPENCLAW_STATE_DIR = originalStateDir;
-    }
-    resetTaskRegistryForTests();
-  };
-}
-
-function createTimedOutIsolatedCronState(params: { storePath: string; now: number }) {
-  return createCronServiceState({
-    storePath: params.storePath,
-    cronEnabled: true,
-    log: logger,
-    nowMs: () => params.now,
-    enqueueSystemEvent: vi.fn(),
-    requestHeartbeatNow: vi.fn(),
-    runIsolatedAgentJob: vi.fn(async () => {
-      throw new Error("cron: job execution timed out");
-    }),
-  });
-}
 
 function createInterruptedMainJob(now: number): CronJob {
   return {
@@ -147,17 +118,27 @@ describe("cron service ops seam coverage", () => {
 
   it("records timed out manual runs as timed_out in the shared task registry", async () => {
     const { storePath } = await makeStorePath();
+    const stateRoot = path.dirname(path.dirname(storePath));
     const now = Date.parse("2026-03-23T12:00:00.000Z");
-    const restoreStateDir = withStateDirForStorePath(storePath);
+    const originalStateDir = process.env.OPENCLAW_STATE_DIR;
+    process.env.OPENCLAW_STATE_DIR = stateRoot;
+    resetTaskRegistryForTests();
 
     await writeCronStoreSnapshot({
       storePath,
       jobs: [createDueIsolatedJob(now)],
     });
 
-    const state = createTimedOutIsolatedCronState({
+    const state = createCronServiceState({
       storePath,
-      now,
+      cronEnabled: true,
+      log: logger,
+      nowMs: () => now,
+      enqueueSystemEvent: vi.fn(),
+      requestHeartbeatNow: vi.fn(),
+      runIsolatedAgentJob: vi.fn(async () => {
+        throw new Error("cron: job execution timed out");
+      }),
     });
 
     await run(state, "isolated-timeout");
@@ -168,7 +149,12 @@ describe("cron service ops seam coverage", () => {
       sourceId: "isolated-timeout",
     });
 
-    restoreStateDir();
+    if (originalStateDir === undefined) {
+      delete process.env.OPENCLAW_STATE_DIR;
+    } else {
+      process.env.OPENCLAW_STATE_DIR = originalStateDir;
+    }
+    resetTaskRegistryForTests();
   });
 
   it("keeps manual cron runs progressing when task ledger creation fails", async () => {
@@ -261,97 +247,29 @@ describe("cron service ops seam coverage", () => {
     resetTaskRegistryForTests();
   });
 
-  it("non-schedule edit preserves nextRunAtMs (#63499)", async () => {
-    const { storePath } = await makeStorePath();
-    const now = Date.parse("2026-04-09T08:00:00.000Z");
-    const originalNextRunAtMs = Date.parse("2026-04-10T09:00:00.000Z");
-
-    await writeCronStoreSnapshot({
-      storePath,
-      jobs: [
-        {
-          id: "daily-report",
-          name: "daily report",
-          enabled: true,
-          createdAtMs: now - 86_400_000,
-          updatedAtMs: now - 3_600_000,
-          schedule: { kind: "cron", expr: "0 9 * * *", tz: "Asia/Shanghai" },
-          sessionTarget: "main",
-          wakeMode: "next-heartbeat",
-          payload: { kind: "systemEvent", text: "daily" },
-          state: { nextRunAtMs: originalNextRunAtMs },
-        },
-      ],
-    });
-
-    const state = createCronServiceState({
-      storePath,
-      cronEnabled: true,
-      log: logger,
-      nowMs: () => now,
-      enqueueSystemEvent: vi.fn(),
-      requestHeartbeatNow: vi.fn(),
-      runIsolatedAgentJob: vi.fn(async () => ({ status: "ok" as const })),
-    });
-
-    const updated = await update(state, "daily-report", { description: "edited" });
-
-    expect(updated.description).toBe("edited");
-    expect(updated.state.nextRunAtMs).toBe(originalNextRunAtMs);
-  });
-
-  it("repairs nextRunAtMs=0 on non-schedule edit (#63499)", async () => {
-    const { storePath } = await makeStorePath();
-    const now = Date.parse("2026-04-09T08:00:00.000Z");
-
-    await writeCronStoreSnapshot({
-      storePath,
-      jobs: [
-        {
-          id: "broken-job",
-          name: "broken",
-          enabled: true,
-          createdAtMs: now - 86_400_000,
-          updatedAtMs: now - 3_600_000,
-          schedule: { kind: "cron", expr: "0 9 * * *", tz: "UTC" },
-          sessionTarget: "main",
-          wakeMode: "next-heartbeat",
-          payload: { kind: "systemEvent", text: "test" },
-          state: { nextRunAtMs: 0 },
-        },
-      ],
-    });
-
-    const state = createCronServiceState({
-      storePath,
-      cronEnabled: true,
-      log: logger,
-      nowMs: () => now,
-      enqueueSystemEvent: vi.fn(),
-      requestHeartbeatNow: vi.fn(),
-      runIsolatedAgentJob: vi.fn(async () => ({ status: "ok" as const })),
-    });
-
-    const updated = await update(state, "broken-job", { description: "fixed" });
-
-    expect(updated.description).toBe("fixed");
-    expect(updated.state.nextRunAtMs).toBeGreaterThan(0);
-    expect(updated.state.nextRunAtMs).toBeGreaterThan(now);
-  });
-
   it("records startup catch-up timeouts as timed_out in the shared task registry", async () => {
     const { storePath } = await makeStorePath();
+    const stateRoot = path.dirname(path.dirname(storePath));
     const now = Date.parse("2026-03-23T12:00:00.000Z");
-    const restoreStateDir = withStateDirForStorePath(storePath);
+    const originalStateDir = process.env.OPENCLAW_STATE_DIR;
+    process.env.OPENCLAW_STATE_DIR = stateRoot;
+    resetTaskRegistryForTests();
 
     await writeCronStoreSnapshot({
       storePath,
       jobs: [createMissedIsolatedJob(now)],
     });
 
-    const state = createTimedOutIsolatedCronState({
+    const state = createCronServiceState({
       storePath,
-      now,
+      cronEnabled: true,
+      log: logger,
+      nowMs: () => now,
+      enqueueSystemEvent: vi.fn(),
+      requestHeartbeatNow: vi.fn(),
+      runIsolatedAgentJob: vi.fn(async () => {
+        throw new Error("cron: job execution timed out");
+      }),
     });
 
     await start(state);
@@ -362,7 +280,12 @@ describe("cron service ops seam coverage", () => {
       sourceId: "startup-timeout",
     });
 
-    restoreStateDir();
+    if (originalStateDir === undefined) {
+      delete process.env.OPENCLAW_STATE_DIR;
+    } else {
+      process.env.OPENCLAW_STATE_DIR = originalStateDir;
+    }
+    resetTaskRegistryForTests();
     stop(state);
   });
 });

@@ -1,1 +1,1 @@
-export { loadConfig } from "../../config/io.js";
+export { loadConfig } from "../../config/config.js";

@@ -171,22 +171,14 @@ async function fetchChromeVersion(
   const ctrl = new AbortController();
   const t = setTimeout(ctrl.abort.bind(ctrl), timeoutMs);
   try {
+    await assertCdpEndpointAllowed(cdpUrl, ssrfPolicy);
     const versionUrl = appendCdpPath(cdpUrl, "/json/version");
-    const { response, release } = await fetchCdpChecked(
-      versionUrl,
-      timeoutMs,
-      { signal: ctrl.signal },
-      ssrfPolicy,
-    );
-    try {
-      const data = (await response.json()) as ChromeVersion;
-      if (!data || typeof data !== "object") {
-        return null;
-      }
-      return data;
-    } finally {
-      await release();
+    const res = await fetchCdpChecked(versionUrl, timeoutMs, { signal: ctrl.signal });
+    const data = (await res.json()) as ChromeVersion;
+    if (!data || typeof data !== "object") {
+      return null;
     }
+    return data;
   } catch {
     return null;
   } finally {

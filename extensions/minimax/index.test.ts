@@ -8,15 +8,6 @@ import {
 import { registerMinimaxProviders } from "./provider-registration.js";
 import { createMiniMaxWebSearchProvider } from "./src/minimax-web-search-provider.js";
 
-vi.mock("./oauth.runtime.js", () => ({
-  loginMiniMaxPortalOAuth: vi.fn(async () => ({
-    access: "minimax-oauth-access-token",
-    refresh: "minimax-oauth-refresh-token",
-    expires: Date.now() + 60_000,
-    resourceUrl: "https://api.minimax.io/anthropic",
-  })),
-}));
-
 const minimaxProviderPlugin = {
   register(api: Parameters<typeof registerMinimaxProviders>[0]) {
     registerMinimaxProviders(api);
@@ -101,7 +92,7 @@ describe("minimax provider hooks", () => {
 
     let resolvedApiModelId = "";
     const captureApiModel: StreamFn = (model) => {
-      resolvedApiModelId = model.id ?? "";
+      resolvedApiModelId = String(model.id ?? "");
       return {} as ReturnType<StreamFn>;
     };
     const wrappedApiStream = apiProvider.wrapStreamFn?.({
@@ -123,7 +114,7 @@ describe("minimax provider hooks", () => {
 
     let resolvedPortalModelId = "";
     const capturePortalModel: StreamFn = (model) => {
-      resolvedPortalModelId = model.id ?? "";
+      resolvedPortalModelId = String(model.id ?? "");
       return {} as ReturnType<StreamFn>;
     };
     const wrappedPortalStream = portalProvider.wrapStreamFn?.({
@@ -194,33 +185,5 @@ describe("minimax provider hooks", () => {
 
     expect(resolveOAuthToken).toHaveBeenCalledWith({ provider: "minimax-portal" });
     expect(resolveApiKeyFromConfigAndStore).not.toHaveBeenCalled();
-  });
-
-  it("writes api and authHeader into the MiniMax portal OAuth config patch", async () => {
-    const { providers } = await registerProviderPlugin({
-      plugin: minimaxProviderPlugin,
-      id: "minimax",
-      name: "MiniMax Provider",
-    });
-    const portalProvider = requireRegisteredProvider(providers, "minimax-portal");
-    const oauthMethod = portalProvider.auth.find((method) => method.id === "oauth");
-
-    expect(oauthMethod).toBeDefined();
-
-    const result = await oauthMethod?.run({
-      prompter: {
-        progress() {
-          return { stop() {} };
-        },
-        note: vi.fn(async () => undefined),
-      },
-      openUrl: vi.fn(async () => undefined),
-    } as never);
-
-    expect(result?.configPatch?.models?.providers?.["minimax-portal"]).toMatchObject({
-      baseUrl: "https://api.minimax.io/anthropic",
-      api: "anthropic-messages",
-      authHeader: true,
-    });
   });
 });

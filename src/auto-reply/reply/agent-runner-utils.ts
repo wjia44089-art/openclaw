@@ -1,9 +1,6 @@
 import { resolveRunModelFallbacksOverride } from "../../agents/agent-scope.js";
 import { getChannelPlugin } from "../../channels/plugins/index.js";
-import type {
-  ChannelId,
-  ChannelThreadingToolContext,
-} from "../../channels/plugins/types.public.js";
+import type { ChannelId, ChannelThreadingToolContext } from "../../channels/plugins/types.js";
 import { normalizeAnyChannelId, normalizeChannelId } from "../../channels/registry.js";
 import { resolveCommandSecretRefsViaGateway } from "../../cli/command-secret-gateway.js";
 import { getAgentRuntimeCommandSecretTargetIds } from "../../cli/command-secret-targets.js";
@@ -107,7 +104,7 @@ export function buildThreadingToolContext(params: {
 }
 
 export const isBunFetchSocketError = (message?: string) =>
-  message ? BUN_FETCH_SOCKET_ERROR_RE.test(message) : false;
+  Boolean(message && BUN_FETCH_SOCKET_ERROR_RE.test(message));
 
 export const formatBunFetchSocketError = (message: string) => {
   const trimmed = message.trim();
@@ -124,13 +121,15 @@ export const resolveEnforceFinalTag = (
   provider: string,
   model = run.model,
 ) =>
-  (run.skipProviderRuntimeHints ? false : undefined) ??
-  (run.enforceFinalTag ||
-    isReasoningTagProvider(provider, {
-      config: run.config,
-      workspaceDir: run.workspaceDir,
-      modelId: model,
-    }));
+  Boolean(
+    (run.skipProviderRuntimeHints ? false : undefined) ??
+    (run.enforceFinalTag ||
+      isReasoningTagProvider(provider, {
+        config: run.config,
+        workspaceDir: run.workspaceDir,
+        modelId: model,
+      })),
+  );
 
 export function resolveModelFallbackOptions(run: FollowupRun["run"]) {
   const config = run.config;

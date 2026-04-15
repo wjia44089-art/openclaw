@@ -7,7 +7,6 @@ import {
 } from "../auto-reply/tokens.js";
 import { loadConfig } from "../config/config.js";
 import { type AgentEventPayload, getAgentRunContext } from "../infra/agent-events.js";
-import { detectErrorKind, type ErrorKind } from "../infra/errors.js";
 import { resolveHeartbeatVisibility } from "../infra/heartbeat-visibility.js";
 import { stripInlineDirectiveTagsForDisplay } from "../utils/directive-tags.js";
 import {
@@ -438,20 +437,6 @@ export type ChatEventBroadcast = (
 
 export type NodeSendToSession = (sessionKey: string, event: string, payload: unknown) => void;
 
-const CHAT_ERROR_KINDS = new Set<ErrorKind>([
-  "refusal",
-  "timeout",
-  "rate_limit",
-  "context_length",
-  "unknown",
-]);
-
-function readChatErrorKind(value: unknown): ErrorKind | undefined {
-  return typeof value === "string" && CHAT_ERROR_KINDS.has(value as ErrorKind)
-    ? (value as ErrorKind)
-    : undefined;
-}
-
 export type AgentEventHandlerOptions = {
   broadcast: ChatEventBroadcast;
   broadcastToConnIds: (
@@ -546,7 +531,6 @@ export function createAgentEventHandler({
       thinkingLevel: row?.thinkingLevel,
       fastMode: row?.fastMode,
       verboseLevel: row?.verboseLevel,
-      traceLevel: row?.traceLevel,
       reasoningLevel: row?.reasoningLevel,
       elevatedLevel: row?.elevatedLevel,
       sendPolicy: row?.sendPolicy,
@@ -599,8 +583,6 @@ export function createAgentEventHandler({
       if (!isAborted) {
         const evtStopReason =
           typeof evt.data?.stopReason === "string" ? evt.data.stopReason : undefined;
-        const evtErrorKind =
-          readChatErrorKind(evt.data?.errorKind) ?? detectErrorKind(evt.data?.error);
         if (chatLink) {
           const finished = chatRunState.registry.shift(evt.runId);
           if (!finished) {
@@ -616,7 +598,6 @@ export function createAgentEventHandler({
               lifecyclePhase === "error" ? "error" : "done",
               evt.data?.error,
               evtStopReason,
-              evtErrorKind,
             );
           }
         } else if (!(opts?.skipChatErrorFinal && lifecyclePhase === "error")) {
@@ -628,7 +609,6 @@ export function createAgentEventHandler({
             lifecyclePhase === "error" ? "error" : "done",
             evt.data?.error,
             evtStopReason,
-            evtErrorKind,
           );
         }
       } else {
@@ -811,7 +791,6 @@ export function createAgentEventHandler({
     jobState: "done" | "error",
     error?: unknown,
     stopReason?: string,
-    errorKind?: ErrorKind,
   ) => {
     const { text, shouldSuppressSilent } = resolveBufferedChatTextState(clientRunId, sourceRunId);
     // Flush any throttled delta so streaming clients receive the complete text
@@ -849,7 +828,6 @@ export function createAgentEventHandler({
       seq,
       state: "error" as const,
       errorMessage: error ? formatForLog(error) : undefined,
-      ...(errorKind && { errorKind }),
     };
     broadcast("chat", payload);
     nodeSendToSession(sessionKey, "chat", payload);

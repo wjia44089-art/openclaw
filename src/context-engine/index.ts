@@ -19,8 +19,7 @@ export {
 } from "./registry.js";
 export type { ContextEngineFactory } from "./registry.js";
 
-export { LegacyContextEngine } from "./legacy.js";
-export { registerLegacyContextEngine } from "./legacy.registration.js";
+export { LegacyContextEngine, registerLegacyContextEngine } from "./legacy.js";
 export { delegateCompactionToRuntime } from "./delegate.js";
 
 export { ensureContextEnginesInitialized } from "./init.js";

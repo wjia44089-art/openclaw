@@ -241,7 +241,7 @@ export function createBlockReplyPipeline(params: {
     enqueue,
     flush,
     stop,
-    hasBuffered: () => coalescer?.hasBuffered() || bufferedPayloads.length > 0,
+    hasBuffered: () => Boolean(coalescer?.hasBuffered() || bufferedPayloads.length > 0),
     didStream: () => didStream,
     isAborted: () => aborted,
     hasSentPayload: (payload) => {

@@ -1,4 +1,4 @@
-import { extensionForMime } from "openclaw/plugin-sdk/media-mime";
+import { extensionForMime } from "openclaw/plugin-sdk/msteams";
 import type {
   GeneratedMusicAsset,
   MusicGenerationProvider,

@@ -1,35 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { collectChannelDoctorCompatibilityMutations } from "./channel-doctor.js";
 
 const mocks = vi.hoisted(() => ({
-  getChannelPlugin: vi.fn(),
-  getBundledChannelPlugin: vi.fn(),
   listChannelPlugins: vi.fn(),
   listBundledChannelPlugins: vi.fn(),
 }));
 
 vi.mock("../../../channels/plugins/registry.js", () => ({
-  getChannelPlugin: (...args: Parameters<typeof mocks.getChannelPlugin>) =>
-    mocks.getChannelPlugin(...args),
   listChannelPlugins: (...args: Parameters<typeof mocks.listChannelPlugins>) =>
     mocks.listChannelPlugins(...args),
 }));
 
 vi.mock("../../../channels/plugins/bundled.js", () => ({
-  getBundledChannelPlugin: (...args: Parameters<typeof mocks.getBundledChannelPlugin>) =>
-    mocks.getBundledChannelPlugin(...args),
   listBundledChannelPlugins: (...args: Parameters<typeof mocks.listBundledChannelPlugins>) =>
     mocks.listBundledChannelPlugins(...args),
 }));
 
+let collectChannelDoctorCompatibilityMutations: typeof import("./channel-doctor.js").collectChannelDoctorCompatibilityMutations;
+
 describe("channel doctor compatibility mutations", () => {
-  beforeEach(() => {
-    mocks.getChannelPlugin.mockReset();
-    mocks.getBundledChannelPlugin.mockReset();
+  beforeEach(async () => {
+    vi.resetModules();
+    ({ collectChannelDoctorCompatibilityMutations } = await import("./channel-doctor.js"));
     mocks.listChannelPlugins.mockReset();
     mocks.listBundledChannelPlugins.mockReset();
-    mocks.getChannelPlugin.mockReturnValue(undefined);
-    mocks.getBundledChannelPlugin.mockReturnValue(undefined);
     mocks.listChannelPlugins.mockReturnValue([]);
     mocks.listBundledChannelPlugins.mockReturnValue([]);
   });
@@ -47,14 +40,21 @@ describe("channel doctor compatibility mutations", () => {
       config: cfg,
       changes: ["matrix"],
     }));
-    mocks.getBundledChannelPlugin.mockImplementation((id: string) =>
-      id === "matrix"
-        ? {
-            id: "matrix",
-            doctor: { normalizeCompatibilityConfig },
-          }
-        : undefined,
-    );
+    mocks.listBundledChannelPlugins.mockReturnValue([
+      {
+        id: "matrix",
+        doctor: { normalizeCompatibilityConfig },
+      },
+      {
+        id: "discord",
+        doctor: {
+          normalizeCompatibilityConfig: vi.fn(() => ({
+            config: {},
+            changes: ["discord"],
+          })),
+        },
+      },
+    ]);
 
     const cfg = {
       channels: {
@@ -68,9 +68,6 @@ describe("channel doctor compatibility mutations", () => {
 
     expect(result).toHaveLength(1);
     expect(normalizeCompatibilityConfig).toHaveBeenCalledTimes(1);
-    expect(mocks.getChannelPlugin).toHaveBeenCalledWith("matrix");
-    expect(mocks.getBundledChannelPlugin).toHaveBeenCalledWith("matrix");
-    expect(mocks.getBundledChannelPlugin).not.toHaveBeenCalledWith("discord");
-    expect(mocks.listBundledChannelPlugins).not.toHaveBeenCalled();
+    expect(mocks.listBundledChannelPlugins).toHaveBeenCalledTimes(1);
   });
 });

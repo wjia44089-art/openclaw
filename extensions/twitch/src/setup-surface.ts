@@ -94,12 +94,12 @@ export async function promptToken(
     }
   }
 
-  return (
+  return String(
     await prompter.text({
       message: "Twitch OAuth token (oauth:...)",
       initialValue: envToken ?? "",
       validate: (value) => {
-        const raw = value?.trim() ?? "";
+        const raw = String(value ?? "").trim();
         if (!raw) {
           return "Required";
         }
@@ -108,7 +108,7 @@ export async function promptToken(
         }
         return undefined;
       },
-    })
+    }),
   ).trim();
 }
 
@@ -116,12 +116,12 @@ export async function promptUsername(
   prompter: WizardPrompter,
   account: TwitchAccountConfig | null,
 ): Promise<string> {
-  return (
+  return String(
     await prompter.text({
       message: "Twitch bot username",
       initialValue: account?.username ?? "",
       validate: (value) => (value?.trim() ? undefined : "Required"),
-    })
+    }),
   ).trim();
 }
 
@@ -129,12 +129,12 @@ export async function promptClientId(
   prompter: WizardPrompter,
   account: TwitchAccountConfig | null,
 ): Promise<string> {
-  return (
+  return String(
     await prompter.text({
       message: "Twitch Client ID",
       initialValue: account?.clientId ?? "",
       validate: (value) => (value?.trim() ? undefined : "Required"),
-    })
+    }),
   ).trim();
 }
 
@@ -142,12 +142,12 @@ export async function promptChannelName(
   prompter: WizardPrompter,
   account: TwitchAccountConfig | null,
 ): Promise<string> {
-  return (
+  return String(
     await prompter.text({
       message: "Channel to join",
       initialValue: account?.channel ?? "",
       validate: (value) => (value?.trim() ? undefined : "Required"),
-    })
+    }),
   ).trim();
 }
 
@@ -165,21 +165,21 @@ export async function promptRefreshTokenSetup(
   }
 
   const clientSecret =
-    (
+    String(
       await prompter.text({
         message: "Twitch Client Secret (for token refresh)",
         initialValue: account?.clientSecret ?? "",
         validate: (value) => (value?.trim() ? undefined : "Required"),
-      })
+      }),
     ).trim() || undefined;
 
   const refreshToken =
-    (
+    String(
       await prompter.text({
         message: "Twitch Refresh Token",
         initialValue: account?.refreshToken ?? "",
         validate: (value) => (value?.trim() ? undefined : "Required"),
-      })
+      }),
     ).trim() || undefined;
 
   return { clientSecret, refreshToken };
@@ -288,10 +288,10 @@ const twitchDmPolicy: ChannelSetupDmPolicy = {
     const entry = await prompter.text({
       message: "Twitch allowFrom (user IDs, one per line, recommended for security)",
       placeholder: "123456789",
-      initialValue: existingAllowFrom[0] || undefined,
+      initialValue: existingAllowFrom[0] ? String(existingAllowFrom[0]) : undefined,
     });
 
-    const allowFrom = (entry ?? "")
+    const allowFrom = String(entry ?? "")
       .split(/[\n,;]+/g)
       .map((s) => s.trim())
       .filter(Boolean);

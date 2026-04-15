@@ -219,7 +219,6 @@ export async function getStatusSummary(
           thinkingLevel: entry?.thinkingLevel,
           fastMode: entry?.fastMode,
           verboseLevel: entry?.verboseLevel,
-          traceLevel: entry?.traceLevel,
           reasoningLevel: entry?.reasoningLevel,
           elevatedLevel: entry?.elevatedLevel,
           systemSent: entry?.systemSent,

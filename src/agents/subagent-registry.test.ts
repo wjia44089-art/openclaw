@@ -141,7 +141,6 @@ describe("subagent registry seam flow", () => {
     mod.__testing.setDepsForTest({
       callGateway: mocks.callGateway,
       captureSubagentCompletionReply: mocks.captureSubagentCompletionReply,
-      cleanupBrowserSessionsForLifecycleEnd: async () => {},
       onAgentEvent: mocks.onAgentEvent,
       persistSubagentRunsToDisk: mocks.persistSubagentRunsToDisk,
       resolveAgentTimeoutMs: mocks.resolveAgentTimeoutMs,

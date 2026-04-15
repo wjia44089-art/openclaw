@@ -1,3 +1,5 @@
+import QRCodeModule from "qrcode-terminal/vendor/QRCode/index.js";
+import QRErrorCorrectLevelModule from "qrcode-terminal/vendor/QRCode/QRErrorCorrectLevel.js";
 import { encodePngRgba, fillPixel } from "./png-encode.ts";
 
 type QRCodeConstructor = new (
@@ -10,26 +12,10 @@ type QRCodeConstructor = new (
   isDark: (row: number, col: number) => boolean;
 };
 
-let qrCodeRuntimePromise: Promise<{
-  QRCode: QRCodeConstructor;
-  QRErrorCorrectLevel: Record<string, unknown>;
-}> | null = null;
+const QRCode = QRCodeModule as QRCodeConstructor;
+const QRErrorCorrectLevel = QRErrorCorrectLevelModule;
 
-async function loadQrCodeRuntime() {
-  if (!qrCodeRuntimePromise) {
-    qrCodeRuntimePromise = Promise.all([
-      import("qrcode-terminal/vendor/QRCode/index.js"),
-      import("qrcode-terminal/vendor/QRCode/QRErrorCorrectLevel.js"),
-    ]).then(([qrCodeModule, errorCorrectLevelModule]) => ({
-      QRCode: qrCodeModule.default as QRCodeConstructor,
-      QRErrorCorrectLevel: errorCorrectLevelModule.default,
-    }));
-  }
-  return await qrCodeRuntimePromise;
-}
-
-async function createQrMatrix(input: string) {
-  const { QRCode, QRErrorCorrectLevel } = await loadQrCodeRuntime();
+function createQrMatrix(input: string) {
   const qr = new QRCode(-1, QRErrorCorrectLevel.L);
   qr.addData(input);
   qr.make();
@@ -41,7 +27,7 @@ export async function renderQrPngBase64(
   opts: { scale?: number; marginModules?: number } = {},
 ): Promise<string> {
   const { scale = 6, marginModules = 4 } = opts;
-  const qr = await createQrMatrix(input);
+  const qr = createQrMatrix(input);
   const modules = qr.getModuleCount();
   const size = (modules + marginModules * 2) * scale;
 

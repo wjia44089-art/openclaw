@@ -11,15 +11,10 @@ import {
 } from "./manager-provider-state.js";
 
 const DEFAULT_OLLAMA_EMBEDDING_MODEL = "nomic-embed-text";
-const DEFAULT_LMSTUDIO_EMBEDDING_MODEL = "text-embedding-nomic-embed-text-v1.5";
 
 vi.mock("./embeddings.js", () => ({
   resolveEmbeddingProviderFallbackModel: (providerId: string, fallbackSourceModel: string) =>
-    providerId === "ollama"
-      ? DEFAULT_OLLAMA_EMBEDDING_MODEL
-      : providerId === "lmstudio"
-        ? DEFAULT_LMSTUDIO_EMBEDDING_MODEL
-        : fallbackSourceModel,
+    providerId === "ollama" ? DEFAULT_OLLAMA_EMBEDDING_MODEL : fallbackSourceModel,
 }));
 
 type EmbeddingProvider = {
@@ -45,7 +40,7 @@ function createProvider(id: string): EmbeddingProvider {
 
 function createSettings(params: {
   provider: "openai" | "mistral";
-  fallback?: "none" | "mistral" | "ollama" | "lmstudio";
+  fallback?: "none" | "mistral" | "ollama";
 }): ResolvedMemorySearchConfig {
   return {
     provider: params.provider,
@@ -134,17 +129,5 @@ describe("memory manager mistral provider wiring", () => {
     expect(request.provider).toBe("gemini");
     expect(request.model).toBe("gemini-embedding-2-preview");
     expect(request.outputDimensionality).toBe(1536);
-  });
-
-  it("uses default lmstudio model when activating lmstudio fallback", async () => {
-    const request = resolveMemoryFallbackProviderRequest({
-      cfg: {} as OpenClawConfig,
-      settings: createSettings({ provider: "openai", fallback: "lmstudio" }),
-      currentProviderId: "openai",
-    });
-
-    expect(request?.provider).toBe("lmstudio");
-    expect(request?.model).toBe(DEFAULT_LMSTUDIO_EMBEDDING_MODEL);
-    expect(request?.fallback).toBe("none");
   });
 });

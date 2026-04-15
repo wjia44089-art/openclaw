@@ -1,11 +1,16 @@
-import { hasAnyAuthProfileStoreSource } from "../../agents/auth-profiles/source-check.js";
 import type { SkillSnapshot } from "../../agents/skills.js";
 import type { ThinkLevel } from "../../auto-reply/thinking.js";
 import type { CliDeps } from "../../cli/outbound-send-deps.js";
+import type { OpenClawConfig } from "../../config/config.js";
 import type { AgentDefaultsConfig } from "../../config/types.agent-defaults.js";
-import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { resolveCronDeliveryPlan } from "../delivery-plan.js";
-import type { CronJob, CronRunTelemetry } from "../types.js";
+import type { CronJob, CronRunOutcome, CronRunTelemetry } from "../types.js";
+import {
+  dispatchCronDelivery,
+  matchesMessagingToolDeliveryTarget,
+  resolveCronDeliveryBestEffort,
+} from "./delivery-dispatch.js";
+import { resolveDeliveryTarget } from "./delivery-target.js";
 import {
   isHeartbeatOnlyResponse,
   resolveCronPayloadOutcome,
@@ -13,6 +18,7 @@ import {
 } from "./helpers.js";
 import { resolveCronModelSelection } from "./model-selection.js";
 import { buildCronAgentDefaultsConfig } from "./run-config.js";
+import { executeCronRun, type CronExecutionResult } from "./run-executor.js";
 import {
   createPersistCronSessionEntry,
   markCronSessionPreRun,
@@ -23,12 +29,16 @@ import {
 } from "./run-session-state.js";
 import {
   DEFAULT_CONTEXT_TOKENS,
+  buildSafeExternalPrompt,
   deriveSessionTotalTokens,
+  detectSuspiciousPatterns,
   ensureAgentWorkspace,
   hasNonzeroUsage,
   isCliProvider,
   isExternalHookSession,
+  loadModelCatalog,
   logWarn,
+  lookupContextTokens,
   mapHookExternalContentSource,
   normalizeAgentId,
   normalizeThinkLevel,
@@ -39,12 +49,11 @@ import {
   resolveCronStyleNow,
   resolveDefaultAgentId,
   resolveHookExternalContentSource,
-  resolveSessionTranscriptPath,
+  resolveSessionAuthProfileOverride,
   resolveThinkingDefault,
   setSessionRuntimeModel,
   supportsXHighThinking,
 } from "./run.runtime.js";
-import type { RunCronAgentTurnResult } from "./run.types.js";
 import { resolveCronAgentSessionKey } from "./session-key.js";
 import { resolveCronSession } from "./session.js";
 import { resolveCronSkillsSnapshot } from "./skills-snapshot.js";
@@ -52,72 +61,36 @@ import { resolveCronSkillsSnapshot } from "./skills-snapshot.js";
 let sessionStoreRuntimePromise:
   | Promise<typeof import("../../config/sessions/store.runtime.js")>
   | undefined;
-let cronExecutorRuntimePromise: Promise<typeof import("./run-executor.runtime.js")> | undefined;
-let cronExternalContentRuntimePromise:
-  | Promise<typeof import("./run-external-content.runtime.js")>
-  | undefined;
-let cronAuthProfileRuntimePromise:
-  | Promise<typeof import("./run-auth-profile.runtime.js")>
-  | undefined;
-let cronContextRuntimePromise: Promise<typeof import("./run-context.runtime.js")> | undefined;
-let cronModelCatalogRuntimePromise:
-  | Promise<typeof import("./run-model-catalog.runtime.js")>
-  | undefined;
-let cronDeliveryRuntimePromise: Promise<typeof import("./run-delivery.runtime.js")> | undefined;
 
 async function loadSessionStoreRuntime() {
   sessionStoreRuntimePromise ??= import("../../config/sessions/store.runtime.js");
   return await sessionStoreRuntimePromise;
 }
 
-async function loadCronExecutorRuntime() {
-  cronExecutorRuntimePromise ??= import("./run-executor.runtime.js");
-  return await cronExecutorRuntimePromise;
-}
-
-async function loadCronExternalContentRuntime() {
-  cronExternalContentRuntimePromise ??= import("./run-external-content.runtime.js");
-  return await cronExternalContentRuntimePromise;
-}
-
-async function loadCronAuthProfileRuntime() {
-  cronAuthProfileRuntimePromise ??= import("./run-auth-profile.runtime.js");
-  return await cronAuthProfileRuntimePromise;
-}
-
-async function loadCronContextRuntime() {
-  cronContextRuntimePromise ??= import("./run-context.runtime.js");
-  return await cronContextRuntimePromise;
-}
-
-async function loadCronModelCatalogRuntime() {
-  cronModelCatalogRuntimePromise ??= import("./run-model-catalog.runtime.js");
-  return await cronModelCatalogRuntimePromise;
-}
-
-async function loadCronDeliveryRuntime() {
-  cronDeliveryRuntimePromise ??= import("./run-delivery.runtime.js");
-  return await cronDeliveryRuntimePromise;
-}
-
-function hasConfiguredAuthProfiles(cfg: OpenClawConfig): boolean {
-  return (
-    Boolean(cfg.auth?.profiles && Object.keys(cfg.auth.profiles).length > 0) ||
-    Boolean(cfg.auth?.order && Object.keys(cfg.auth.order).length > 0)
-  );
-}
-
 function resolveNonNegativeNumber(value: number | undefined): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
-export type { RunCronAgentTurnResult } from "./run.types.js";
+export type RunCronAgentTurnResult = {
+  /** Last non-empty agent text output (not truncated). */
+  outputText?: string;
+  /**
+   * `true` when the isolated runner already handled the run's user-visible
+   * delivery outcome. Cron-owned callers use this for cron delivery or
+   * explicit suppression; shared callers may also use it for a matching
+   * message-tool send that already reached the target.
+   */
+  delivered?: boolean;
+  /**
+   * `true` when cron attempted announce/direct delivery for this run.
+   * This is tracked separately from `delivered` because some announce paths
+   * cannot guarantee a final delivery ack synchronously.
+   */
+  deliveryAttempted?: boolean;
+} & CronRunOutcome &
+  CronRunTelemetry;
 
-type CronExecutionRuntime = typeof import("./run-executor.runtime.js");
-type CronExecutionResult = Awaited<ReturnType<CronExecutionRuntime["executeCronRun"]>>;
-type CronModelCatalogRuntime = typeof import("./run-model-catalog.runtime.js");
-type CronDeliveryRuntime = typeof import("./run-delivery.runtime.js");
-type ResolvedCronDeliveryTarget = Awaited<ReturnType<CronDeliveryRuntime["resolveDeliveryTarget"]>>;
+type ResolvedCronDeliveryTarget = Awaited<ReturnType<typeof resolveDeliveryTarget>>;
 
 type IsolatedDeliveryContract = "cron-owned" | "shared";
 
@@ -166,7 +139,6 @@ async function resolveCronDeliveryContext(params: {
       }),
     };
   }
-  const { resolveDeliveryTarget } = await loadCronDeliveryRuntime();
   const resolvedDelivery = await resolveDeliveryTarget(params.cfg, params.agentId, {
     channel: deliveryPlan.channel ?? "last",
     to: deliveryPlan.to,
@@ -240,7 +212,7 @@ type PreparedCronRunContext = {
   persistSessionEntry: PersistCronSessionEntry;
   withRunSession: WithRunSession;
   agentPayload: Extract<CronJob["payload"], { kind: "agentTurn" }> | null;
-  resolvedDelivery: ResolvedCronDeliveryTarget;
+  resolvedDelivery: Awaited<ReturnType<typeof resolveDeliveryTarget>>;
   deliveryRequested: boolean;
   toolPolicy: ReturnType<typeof resolveCronToolPolicy>;
   skillsSnapshot: SkillSnapshot;
@@ -278,14 +250,10 @@ async function prepareCronRunContext(params: {
     ...input.cfg,
     agents: Object.assign({}, input.cfg.agents, { defaults: agentCfg }),
   };
-  let catalog: Awaited<ReturnType<CronModelCatalogRuntime["loadModelCatalog"]>> | undefined;
+  let catalog: Awaited<ReturnType<typeof loadModelCatalog>> | undefined;
   const loadCatalog = async () => {
     if (!catalog) {
-      catalog = await (
-        await loadCronModelCatalogRuntime()
-      ).loadModelCatalog({
-        config: cfgWithAgentDefaults,
-      });
+      catalog = await loadModelCatalog({ config: cfgWithAgentDefaults });
     }
     return catalog;
   };
@@ -320,9 +288,6 @@ async function prepareCronRunContext(params: {
     forceNew: input.job.sessionTarget === "isolated",
   });
   const runSessionId = cronSession.sessionEntry.sessionId;
-  if (!cronSession.sessionEntry.sessionFile?.trim()) {
-    cronSession.sessionEntry.sessionFile = resolveSessionTranscriptPath(runSessionId, agentId);
-  }
   const runSessionKey = baseSessionKey.startsWith("cron:")
     ? `${agentSessionKey}:run:${runSessionId}`
     : agentSessionKey;
@@ -415,7 +380,6 @@ async function prepareCronRunContext(params: {
   let commandBody: string;
 
   if (isExternalHook) {
-    const { detectSuspiciousPatterns } = await loadCronExternalContentRuntime();
     const suspiciousPatterns = detectSuspiciousPatterns(input.message);
     if (suspiciousPatterns.length > 0) {
       logWarn(
@@ -426,7 +390,6 @@ async function prepareCronRunContext(params: {
   }
 
   if (shouldWrapExternal) {
-    const { buildSafeExternalPrompt } = await loadCronExternalContentRuntime();
     const hookType = mapHookExternalContentSource(hookExternalContentSource ?? "webhook");
     const safeContent = buildSafeExternalPrompt({
       content: input.message,
@@ -441,7 +404,7 @@ async function prepareCronRunContext(params: {
   }
   commandBody = appendCronDeliveryInstruction({ commandBody, deliveryRequested });
 
-  const skillsSnapshot = await resolveCronSkillsSnapshot({
+  const skillsSnapshot = resolveCronSkillsSnapshot({
     workspaceDir,
     config: cfgWithAgentDefaults,
     agentId,
@@ -462,26 +425,17 @@ async function prepareCronRunContext(params: {
   } catch (err) {
     logWarn(`[cron:${input.job.id}] Failed to persist pre-run session entry: ${String(err)}`);
   }
-  const hasSessionAuthProfileOverride = Boolean(
-    cronSession.sessionEntry.authProfileOverride?.trim(),
-  );
-  const authProfileId =
-    !hasSessionAuthProfileOverride &&
-    !hasConfiguredAuthProfiles(cfgWithAgentDefaults) &&
-    !hasAnyAuthProfileStoreSource(agentDir)
-      ? undefined
-      : await (
-          await loadCronAuthProfileRuntime()
-        ).resolveSessionAuthProfileOverride({
-          cfg: cfgWithAgentDefaults,
-          provider,
-          agentDir,
-          sessionEntry: cronSession.sessionEntry,
-          sessionStore: cronSession.store,
-          sessionKey: agentSessionKey,
-          storePath: cronSession.storePath,
-          isNewSession: cronSession.isNewSession && input.job.sessionTarget !== "isolated",
-        });
+
+  const authProfileId = await resolveSessionAuthProfileOverride({
+    cfg: cfgWithAgentDefaults,
+    provider,
+    agentDir,
+    sessionEntry: cronSession.sessionEntry,
+    sessionStore: cronSession.store,
+    sessionKey: agentSessionKey,
+    storePath: cronSession.storePath,
+    isNewSession: cronSession.isNewSession,
+  });
   const liveSelection: CronLiveSelection = {
     provider,
     model,
@@ -545,9 +499,7 @@ async function finalizeCronRun(params: {
     execution.liveSelection.provider;
   const contextTokens =
     resolvePositiveContextTokens(prepared.agentCfg?.contextTokens) ??
-    (await loadCronContextRuntime()).lookupContextTokens(modelUsed, {
-      allowAsyncLoad: false,
-    }) ??
+    lookupContextTokens(modelUsed, { allowAsyncLoad: false }) ??
     resolvePositiveContextTokens(prepared.cronSession.sessionEntry.contextTokens) ??
     DEFAULT_CONTEXT_TOKENS;
 
@@ -627,8 +579,6 @@ async function finalizeCronRun(params: {
   } = resolveCronPayloadOutcome({
     payloads,
     runLevelError: finalRunResult.meta?.error,
-    finalAssistantVisibleText: finalRunResult.meta?.finalAssistantVisibleText,
-    preferFinalAssistantVisibleText: prepared.resolvedDelivery.channel === "telegram",
   });
   const resolveRunOutcome = (result?: { delivered?: boolean; deliveryAttempted?: boolean }) =>
     prepared.withRunSession({
@@ -646,11 +596,6 @@ async function finalizeCronRun(params: {
   const skipHeartbeatDelivery =
     prepared.deliveryRequested &&
     isHeartbeatOnlyResponse(payloads, resolveHeartbeatAckMaxChars(prepared.agentCfg));
-  const {
-    dispatchCronDelivery,
-    matchesMessagingToolDeliveryTarget,
-    resolveCronDeliveryBestEffort,
-  } = await loadCronDeliveryRuntime();
   const skipMessagingToolDelivery =
     (prepared.input.deliveryContract ?? "cron-owned") === "shared" &&
     prepared.deliveryRequested &&
@@ -738,7 +683,6 @@ export async function runCronIsolatedAgentTurn(params: {
   }
 
   try {
-    const { executeCronRun } = await loadCronExecutorRuntime();
     const execution = await executeCronRun({
       cfg: params.cfg,
       cfgWithAgentDefaults: prepared.context.cfgWithAgentDefaults,

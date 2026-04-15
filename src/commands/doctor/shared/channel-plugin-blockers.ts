@@ -1,5 +1,5 @@
 import { listPotentialConfiguredChannelIds } from "../../../channels/config-presence.js";
-import type { OpenClawConfig } from "../../../config/types.openclaw.js";
+import type { OpenClawConfig } from "../../../config/config.js";
 import {
   normalizePluginsConfig,
   resolveEffectivePluginActivationState,

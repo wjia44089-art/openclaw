@@ -6,16 +6,8 @@ export function hasModelSwitchContinuityEvidence(text: string) {
     lower.includes("handoff") || lower.includes("model switch") || lower.includes("switched");
   const mentionsKickoffTask =
     lower.includes("qa_kickoff_task") ||
-    lower.includes("qa/scenarios/index.md") ||
-    lower.includes("scenario pack") ||
     lower.includes("kickoff task") ||
-    lower.includes("kickoff note") ||
-    lower.includes("qa mission") ||
-    (lower.includes("source and docs") &&
-      lower.includes("qa-channel scenarios") &&
-      lower.includes("worked") &&
-      lower.includes("blocked") &&
-      lower.includes("follow-up"));
+    lower.includes("qa mission");
   const hasScopeLeak =
     lower.includes("subagent-handoff") ||
     lower.includes("delegated task") ||

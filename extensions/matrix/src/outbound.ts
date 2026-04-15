@@ -62,7 +62,8 @@ export const matrixOutbound: ChannelOutboundAdapter = {
     };
   },
   sendPoll: async ({ cfg, to, poll, threadId, accountId }) => {
-    const resolvedThreadId = threadId !== undefined && threadId !== null ? threadId : undefined;
+    const resolvedThreadId =
+      threadId !== undefined && threadId !== null ? String(threadId) : undefined;
     const result = await sendPollMatrix(to, poll, {
       cfg,
       threadId: resolvedThreadId,

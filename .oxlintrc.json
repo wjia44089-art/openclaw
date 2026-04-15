@@ -8,23 +8,19 @@
   },
   "rules": {
     "curly": "error",
-    "eslint-plugin-unicorn/prefer-array-find": "error",
+    "eslint-plugin-unicorn/prefer-array-find": "off",
     "eslint/no-await-in-loop": "off",
-    "eslint/no-new": "error",
+    "eslint/no-new": "off",
     "eslint/no-shadow": "off",
-    "eslint/no-unmodified-loop-condition": "error",
-    "eslint-plugin-unicorn/prefer-set-size": "error",
-    "oxc/no-accumulating-spread": "error",
+    "eslint/no-unmodified-loop-condition": "off",
+    "oxc/no-accumulating-spread": "off",
     "oxc/no-async-endpoint-handlers": "off",
     "oxc/no-map-spread": "off",
-    "typescript/consistent-return": "error",
     "typescript/no-explicit-any": "error",
-    "typescript/no-extraneous-class": "error",
-    "typescript/no-unnecessary-type-conversion": "error",
+    "typescript/no-extraneous-class": "off",
     "typescript/no-unsafe-type-assertion": "off",
     "unicorn/consistent-function-scoping": "off",
-    "unicorn/prefer-set-size": "error",
-    "unicorn/require-post-message-target-origin": "error"
+    "unicorn/require-post-message-target-origin": "off"
   },
   "ignorePatterns": [
     "assets/",
@@ -58,7 +54,13 @@
         "**/*test-support.ts"
       ],
       "rules": {
+        "typescript/await-thenable": "off",
+        "typescript/no-base-to-string": "off",
         "typescript/no-explicit-any": "off",
+        "typescript/no-floating-promises": "off",
+        "typescript/no-misused-spread": "off",
+        "typescript/no-redundant-type-constituents": "off",
+        "typescript/no-unnecessary-template-expression": "off",
         "typescript/unbound-method": "off",
         "eslint/no-unsafe-optional-chaining": "off"
       }

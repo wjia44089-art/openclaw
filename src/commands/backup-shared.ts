@@ -55,7 +55,6 @@ function backupAssetPriority(kind: BackupAssetKind): number {
     case "workspace":
       return 3;
   }
-  throw new Error("Unsupported backup asset kind");
 }
 
 export function buildBackupArchiveRoot(nowMs = Date.now()): string {

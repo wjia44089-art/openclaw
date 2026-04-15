@@ -128,5 +128,4 @@ export async function handleDiscordModerationAction(
       return jsonResult({ ok: true });
     }
   }
-  throw new Error("Unsupported Discord moderation action");
 }

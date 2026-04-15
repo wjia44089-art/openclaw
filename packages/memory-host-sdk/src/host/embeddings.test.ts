@@ -264,8 +264,6 @@ describe("embedding provider remote overrides", () => {
   });
 
   it("fails fast when Gemini remote apiKey is an unresolved SecretRef", async () => {
-    vi.stubEnv("GEMINI_API_KEY", "");
-
     await expect(
       createEmbeddingProvider({
         config: {} as never,

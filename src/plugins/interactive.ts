@@ -3,9 +3,7 @@ import {
   type InteractiveRegistrationResult,
 } from "./interactive-registry.js";
 import {
-  claimPluginInteractiveCallbackDedupe,
-  commitPluginInteractiveCallbackDedupe,
-  releasePluginInteractiveCallbackDedupe,
+  getPluginInteractiveCallbackDedupeState,
   type RegisteredInteractiveHandler,
 } from "./interactive-state.js";
 
@@ -42,32 +40,27 @@ export async function dispatchPluginInteractiveHandler<
     match: PluginInteractiveMatch<TRegistration>,
   ) => Promise<{ handled?: boolean } | void> | { handled?: boolean } | void;
 }): Promise<InteractiveDispatchResult> {
+  const callbackDedupe = getPluginInteractiveCallbackDedupeState();
   const match = resolvePluginInteractiveNamespaceMatch(params.channel, params.data);
   if (!match) {
     return { matched: false, handled: false, duplicate: false };
   }
 
   const dedupeKey = params.dedupeId?.trim();
-  if (dedupeKey && !claimPluginInteractiveCallbackDedupe(dedupeKey)) {
+  if (dedupeKey && callbackDedupe.peek(dedupeKey)) {
     return { matched: true, handled: true, duplicate: true };
   }
 
-  try {
-    await params.onMatched?.();
-    const resolved = await params.invoke(match as PluginInteractiveMatch<TRegistration>);
-    if (dedupeKey) {
-      commitPluginInteractiveCallbackDedupe(dedupeKey);
-    }
+  await params.onMatched?.();
 
-    return {
-      matched: true,
-      handled: resolved?.handled ?? true,
-      duplicate: false,
-    };
-  } catch (error) {
-    if (dedupeKey) {
-      releasePluginInteractiveCallbackDedupe(dedupeKey);
-    }
-    throw error;
+  const resolved = await params.invoke(match as PluginInteractiveMatch<TRegistration>);
+  if (dedupeKey) {
+    callbackDedupe.check(dedupeKey);
   }
+
+  return {
+    matched: true,
+    handled: resolved?.handled ?? true,
+    duplicate: false,
+  };
 }

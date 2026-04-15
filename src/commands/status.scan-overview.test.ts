@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { collectStatusScanOverview } from "./status.scan-overview.ts";
 
 const mocks = vi.hoisted(() => ({
   hasPotentialConfiguredChannels: vi.fn(),
@@ -50,6 +49,7 @@ vi.mock("./status.scan.runtime.js", () => ({
 
 describe("collectStatusScanOverview", () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.clearAllMocks();
 
     mocks.hasPotentialConfiguredChannels.mockReturnValue(true);
@@ -96,6 +96,8 @@ describe("collectStatusScanOverview", () => {
   });
 
   it("uses gateway fallback overrides for channels.status when requested", async () => {
+    const { collectStatusScanOverview } = await import("./status.scan-overview.ts");
+
     const result = await collectStatusScanOverview({
       commandName: "status --all",
       opts: { timeoutMs: 1234 },
@@ -147,6 +149,8 @@ describe("collectStatusScanOverview", () => {
       resolveTailscaleHttpsUrl: vi.fn(async () => null),
       skipColdStartNetworkChecks: false,
     });
+    const { collectStatusScanOverview } = await import("./status.scan-overview.ts");
+
     const result = await collectStatusScanOverview({
       commandName: "status",
       opts: {},

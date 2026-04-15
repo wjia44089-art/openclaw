@@ -19,7 +19,6 @@ export const handlePluginCommand: CommandHandler = async (
   allowTextCommands,
 ): Promise<CommandHandlerResult | null> => {
   const { command, cfg } = params;
-  const targetSessionEntry = params.sessionStore?.[params.sessionKey] ?? params.sessionEntry;
 
   if (!allowTextCommands) {
     return null;
@@ -41,8 +40,7 @@ export const handlePluginCommand: CommandHandler = async (
     isAuthorizedSender: command.isAuthorizedSender,
     gatewayClientScopes: params.ctx.GatewayClientScopes,
     sessionKey: params.sessionKey,
-    sessionId: targetSessionEntry?.sessionId,
-    sessionFile: targetSessionEntry?.sessionFile,
+    sessionId: params.sessionEntry?.sessionId,
     commandBody: command.commandBodyNormalized,
     config: cfg,
     from: command.from,

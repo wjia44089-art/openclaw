@@ -405,10 +405,10 @@ describe("acquireSessionWriteLock", () => {
       const lockPath = `${sessionFile}.lock`;
       await acquireSessionWriteLock({ sessionFile, timeoutMs: 500 });
 
-      __testing.handleTerminationSignal("SIGINT");
+      process.emit("SIGINT");
 
       await expect(fs.access(lockPath)).rejects.toThrow();
-      expect(otherHandlerCalled).toBe(false);
+      expect(otherHandlerCalled).toBe(true);
       expect(killCalls).toEqual([]);
     } finally {
       process.off("SIGINT", otherHandler);
@@ -426,32 +426,13 @@ describe("acquireSessionWriteLock", () => {
       await expect(fs.access(lockPath)).rejects.toThrow();
     });
   });
-
-  it("does not accumulate exit listeners across reset cycles", async () => {
-    const baselineExitListeners = process.listenerCount("exit");
-
-    await withTempSessionLockFile(async ({ sessionFile }) => {
-      for (let i = 0; i < 3; i += 1) {
-        const lock = await acquireSessionWriteLock({ sessionFile, timeoutMs: 500 });
-        await lock.release();
-        resetSessionWriteLockStateForTest();
-        expect(process.listenerCount("exit")).toBe(baselineExitListeners);
-      }
-    });
-  });
-
   it("keeps other signal listeners registered", () => {
     const keepAlive = () => {};
-    const originalKill = process.kill.bind(process);
-    process.kill = ((_pid: number, _signal?: NodeJS.Signals) => true) as typeof process.kill;
     process.on("SIGINT", keepAlive);
 
-    try {
-      __testing.handleTerminationSignal("SIGINT");
-      expect(process.listeners("SIGINT")).toContain(keepAlive);
-    } finally {
-      process.off("SIGINT", keepAlive);
-      process.kill = originalKill;
-    }
+    __testing.handleTerminationSignal("SIGINT");
+
+    expect(process.listeners("SIGINT")).toContain(keepAlive);
+    process.off("SIGINT", keepAlive);
   });
 });

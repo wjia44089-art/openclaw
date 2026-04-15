@@ -5,7 +5,7 @@ import {
   signalOutbound,
   whatsappOutbound,
 } from "../../../test/helpers/infra/deliver-test-outbounds.js";
-import type { OpenClawConfig } from "../../config/types.openclaw.js";
+import type { OpenClawConfig } from "../../config/config.js";
 import {
   releasePinnedPluginChannelRegistry,
   setActivePluginRegistry,

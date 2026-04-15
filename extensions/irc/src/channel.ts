@@ -101,7 +101,11 @@ const listIrcDirectoryGroupsFromConfig = createResolvedDirectoryEntriesLister<Re
   },
 });
 
-const ircConfigAdapter = createScopedChannelConfigAdapter<ResolvedIrcAccount, ResolvedIrcAccount>({
+const ircConfigAdapter = createScopedChannelConfigAdapter<
+  ResolvedIrcAccount,
+  ResolvedIrcAccount,
+  CoreConfig
+>({
   sectionKey: "irc",
   listAccountIds: listIrcAccountIds,
   resolveAccount: adaptScopedAccountAccessor(resolveIrcAccount),

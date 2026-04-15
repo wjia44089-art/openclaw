@@ -42,14 +42,8 @@ export function extractEnvVarFromSourceLabel(source: string): string | undefined
   return match?.[1];
 }
 
-function resolveDefaultProviderEnvVar(
-  provider: string,
-  config?: OpenClawConfig,
-): string | undefined {
-  const envVars = getProviderEnvVars(provider, {
-    ...(config ? { config } : {}),
-    includeUntrustedWorkspacePlugins: false,
-  });
+function resolveDefaultProviderEnvVar(provider: string): string | undefined {
+  const envVars = getProviderEnvVars(provider);
   return envVars?.find((candidate) => normalizeOptionalString(candidate) !== undefined);
 }
 
@@ -63,12 +57,7 @@ export function resolveRefFallbackInput(params: {
   preferredEnvVar?: string;
   env?: NodeJS.ProcessEnv;
 }): { ref: SecretRef; resolvedValue: string } {
-  const fallbackEnvVar =
-    params.preferredEnvVar ??
-    getProviderEnvVars(params.provider, {
-      config: params.config,
-      includeUntrustedWorkspacePlugins: false,
-    }).find((candidate) => normalizeOptionalString(candidate) !== undefined);
+  const fallbackEnvVar = params.preferredEnvVar ?? resolveDefaultProviderEnvVar(params.provider);
   if (!fallbackEnvVar) {
     throw new Error(
       `No default environment variable mapping found for provider "${params.provider}". Set a provider-specific env var, or re-run setup in an interactive terminal to configure a ref.`,
@@ -273,7 +262,7 @@ export async function promptSecretRefForSetup(params: {
   env?: NodeJS.ProcessEnv;
 }): Promise<{ ref: SecretRef; resolvedValue: string }> {
   const defaultEnvVar =
-    params.preferredEnvVar ?? resolveDefaultProviderEnvVar(params.provider, params.config) ?? "";
+    params.preferredEnvVar ?? resolveDefaultProviderEnvVar(params.provider) ?? "";
   const defaultFilePointer = resolveDefaultFilePointerId(params.provider);
   let sourceChoice: SecretRefChoice = "env"; // pragma: allowlist secret
 

@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { resetInboundDedupe } from "openclaw/plugin-sdk/reply-runtime";
 import { resetLogger, setLoggerOverride } from "openclaw/plugin-sdk/runtime-env";
-import { mockPinnedHostnameResolution } from "openclaw/plugin-sdk/testing";
+import { normalizeLowercaseStringOrEmpty } from "openclaw/plugin-sdk/text-runtime";
 import { afterAll, afterEach, beforeAll, beforeEach, vi, type Mock } from "vitest";
 import type { WebInboundMessage, WebListenerCloseReason } from "./inbound.js";
 import {
@@ -38,23 +38,7 @@ type WebAutoReplyMonitorHarness = {
   run: Promise<unknown>;
 };
 
-export const TEST_NET_IP = "93.184.216.34";
-
-vi.mock("./session.js", async () => {
-  const actual = await vi.importActual<typeof import("./session.js")>("./session.js");
-  return {
-    ...actual,
-    createWaSocket: vi.fn(async () => ({
-      ev: {
-        on: vi.fn(),
-        off: vi.fn(),
-      },
-      ws: { close: vi.fn() },
-      user: { id: "123@s.whatsapp.net" },
-    })),
-    waitForWaConnection: vi.fn().mockResolvedValue(undefined),
-  };
-});
+export const TEST_NET_IP = "203.0.113.10";
 
 vi.mock("openclaw/plugin-sdk/agent-runtime", () => ({
   abortEmbeddedPiRun: vi.fn().mockReturnValue(false),
@@ -164,7 +148,19 @@ export function installWebAutoReplyUnitTestHooks(opts?: { pinDns?: boolean }) {
     _resetBaileysMocks();
     _resetLoadConfigMock();
     if (opts?.pinDns) {
-      resolvePinnedHostnameSpy = mockPinnedHostnameResolution([TEST_NET_IP]);
+      const ssrf = await import("../../../src/infra/net/ssrf.js");
+      resolvePinnedHostnameSpy = vi
+        .spyOn(ssrf, "resolvePinnedHostname")
+        .mockImplementation(async (hostname) => {
+          // SSRF guard pins DNS; stub resolution to avoid live lookups in unit tests.
+          const normalized = normalizeLowercaseStringOrEmpty(hostname).replace(/\.$/, "");
+          const addresses = [TEST_NET_IP];
+          return {
+            hostname: normalized,
+            addresses,
+            lookup: ssrf.createPinnedLookup({ hostname: normalized, addresses }),
+          };
+        });
     }
   });
 

@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ConfiguredProviderRequest } from "../config/types.provider-request.js";
-import type { SecretRef } from "../config/types.secrets.js";
 import {
   buildProviderRequestDispatcherPolicy,
-  mergeModelProviderRequestOverrides,
   mergeProviderRequestOverrides,
   resolveProviderRequestPolicyConfig,
   resolveProviderRequestConfig,
@@ -297,32 +294,17 @@ describe("provider request config", () => {
   });
 
   it("fails fast when configured request overrides still contain unresolved SecretRefs", () => {
-    const tenantRef: SecretRef = {
-      source: "env",
-      provider: "default",
-      id: "MEDIA_AUDIO_TENANT",
-    };
-    const tokenRef: SecretRef = {
-      source: "env",
-      provider: "default",
-      id: "MEDIA_AUDIO_TOKEN",
-    };
-    const certRef: SecretRef = {
-      source: "env",
-      provider: "default",
-      id: "MEDIA_AUDIO_CERT",
-    };
     expect(() =>
       sanitizeConfiguredProviderRequest({
         headers: {
-          "X-Tenant": tenantRef,
+          "X-Tenant": { source: "env", provider: "default", id: "MEDIA_AUDIO_TENANT" },
         },
         auth: {
           mode: "authorization-bearer",
-          token: tokenRef,
+          token: { source: "env", provider: "default", id: "MEDIA_AUDIO_TOKEN" },
         },
         tls: {
-          cert: certRef,
+          cert: { source: "env", provider: "default", id: "MEDIA_AUDIO_CERT" },
         },
       }),
     ).toThrow(/request\.(headers\.X-Tenant|auth\.token|tls\.cert): unresolved SecretRef/i);
@@ -348,35 +330,6 @@ describe("provider request config", () => {
         url: "http://proxy.internal:8443",
       },
     });
-  });
-
-  it("preserves request.allowPrivateNetwork for operator-trusted LAN/overlay model bases", () => {
-    expect(sanitizeConfiguredModelProviderRequest({ allowPrivateNetwork: true })).toEqual({
-      allowPrivateNetwork: true,
-    });
-    expect(sanitizeConfiguredModelProviderRequest({ allowPrivateNetwork: false })).toEqual({
-      allowPrivateNetwork: false,
-    });
-    expect(
-      sanitizeConfiguredProviderRequest({
-        allowPrivateNetwork: true,
-      } as ConfiguredProviderRequest),
-    ).toBeUndefined();
-  });
-
-  it("merges allowPrivateNetwork with later override winning", () => {
-    expect(
-      mergeModelProviderRequestOverrides(
-        { allowPrivateNetwork: true },
-        { allowPrivateNetwork: false },
-      ),
-    ).toEqual({ allowPrivateNetwork: false });
-    expect(
-      mergeModelProviderRequestOverrides(
-        { allowPrivateNetwork: false },
-        { allowPrivateNetwork: true },
-      ),
-    ).toEqual({ allowPrivateNetwork: true });
   });
 
   it("merges configured request overrides with later entries winning", () => {

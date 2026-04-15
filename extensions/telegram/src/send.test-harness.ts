@@ -124,7 +124,7 @@ vi.mock("grammy", () => ({
   GrammyError: class GrammyError extends Error {
     description = "";
   },
-  InputFile: function InputFile() {},
+  InputFile: class {},
 }));
 
 vi.mock("undici", () => ({

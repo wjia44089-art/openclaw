@@ -1,6 +1,16 @@
 import path from "node:path";
-import { fileTypeFromBuffer } from "file-type";
+import {
+  normalizeLowercaseStringOrEmpty,
+  normalizeOptionalLowercaseString,
+} from "../shared/string-coerce.js";
 import { type MediaKind, mediaKindFromMime } from "./constants.js";
+
+let fileTypeModulePromise: Promise<typeof import("file-type")> | undefined;
+
+function loadFileTypeModule(): Promise<typeof import("file-type")> {
+  fileTypeModulePromise ??= import("file-type");
+  return fileTypeModulePromise;
+}
 
 // Map common mimes to preferred file extensions.
 const EXT_BY_MIME: Record<string, string> = {
@@ -48,7 +58,7 @@ const MIME_BY_EXT: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".js": "text/javascript",
   ".htm": "text/html",
-  ".xml": "text/xml",
+  ".xml": "text/xml", // pin text/xml as canonical (application/xml also maps to .xml in EXT_BY_MIME)
 };
 
 const AUDIO_FILE_EXTENSIONS = new Set([
@@ -64,11 +74,7 @@ const AUDIO_FILE_EXTENSIONS = new Set([
 ]);
 
 export function normalizeMimeType(mime?: string | null): string | undefined {
-  if (!mime) {
-    return undefined;
-  }
-  const cleaned = mime.split(";")[0]?.trim().toLowerCase();
-  return cleaned || undefined;
+  return normalizeOptionalLowercaseString(mime?.split(";")[0]);
 }
 
 async function sniffMime(buffer?: Buffer): Promise<string | undefined> {
@@ -76,6 +82,7 @@ async function sniffMime(buffer?: Buffer): Promise<string | undefined> {
     return undefined;
   }
   try {
+    const { fileTypeFromBuffer } = await loadFileTypeModule();
     const type = await fileTypeFromBuffer(buffer);
     return type?.mime ?? undefined;
   } catch {
@@ -90,21 +97,13 @@ export function getFileExtension(filePath?: string | null): string | undefined {
   try {
     if (/^https?:\/\//i.test(filePath)) {
       const url = new URL(filePath);
-      return path.extname(url.pathname).toLowerCase() || undefined;
+      return normalizeLowercaseStringOrEmpty(path.extname(url.pathname)) || undefined;
     }
   } catch {
     // fall back to plain path parsing
   }
-  const ext = path.extname(filePath).toLowerCase();
+  const ext = normalizeLowercaseStringOrEmpty(path.extname(filePath));
   return ext || undefined;
-}
-
-export function mimeTypeFromFilePath(filePath?: string | null): string | undefined {
-  const ext = getFileExtension(filePath);
-  if (!ext) {
-    return undefined;
-  }
-  return MIME_BY_EXT[ext];
 }
 
 export function isAudioFileName(fileName?: string | null): boolean {
@@ -127,7 +126,7 @@ function isGenericMime(mime?: string): boolean {
   if (!mime) {
     return true;
   }
-  const m = mime.toLowerCase();
+  const m = normalizeLowercaseStringOrEmpty(mime);
   return m === "application/octet-stream" || m === "application/zip";
 }
 
@@ -175,7 +174,7 @@ export function isGifMedia(opts: {
   contentType?: string | null;
   fileName?: string | null;
 }): boolean {
-  if (opts.contentType?.toLowerCase() === "image/gif") {
+  if (normalizeOptionalLowercaseString(opts.contentType) === "image/gif") {
     return true;
   }
   const ext = getFileExtension(opts.fileName);
@@ -186,7 +185,7 @@ export function imageMimeFromFormat(format?: string | null): string | undefined 
   if (!format) {
     return undefined;
   }
-  switch (format.toLowerCase()) {
+  switch (normalizeLowercaseStringOrEmpty(format)) {
     case "jpg":
     case "jpeg":
       return "image/jpeg";

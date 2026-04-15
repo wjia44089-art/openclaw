@@ -492,7 +492,7 @@ function createToolWithScreenshotter(
   store: DiffArtifactStore,
   screenshotter: DiffScreenshotter,
   defaults = DEFAULT_DIFFS_TOOL_DEFAULTS,
-  context: OpenClawPluginToolContext = {
+  context: OpenClawPluginToolContext | undefined = {
     agentId: "main",
     sessionId: "session-123",
     messageChannel: "discord",

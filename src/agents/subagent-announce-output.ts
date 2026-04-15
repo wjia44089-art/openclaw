@@ -241,7 +241,7 @@ export async function readSubagentOutput(
   sessionKey: string,
   outcome?: SubagentRunOutcome,
 ): Promise<string | undefined> {
-  const history = await subagentAnnounceOutputDeps.callGateway({
+  const history = await subagentAnnounceOutputDeps.callGateway<{ messages?: Array<unknown> }>({
     method: "chat.history",
     params: { sessionKey, limit: 100 },
   });
@@ -276,7 +276,7 @@ export async function waitForSubagentRunOutcome(
   timeoutMs: number,
 ): Promise<AgentWaitResult> {
   const waitMs = Math.max(0, Math.floor(timeoutMs));
-  return await subagentAnnounceOutputDeps.callGateway({
+  return await subagentAnnounceOutputDeps.callGateway<AgentWaitResult>({
     method: "agent.wait",
     params: {
       runId,

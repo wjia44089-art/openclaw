@@ -1,13 +1,8 @@
 import os from "node:os";
 import { formatSkillsForPrompt as upstreamFormatSkillsForPrompt } from "@mariozechner/pi-coding-agent";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { OpenClawConfig } from "../../config/config.js";
 import { createCanonicalFixtureSkill } from "../skills.test-helpers.js";
-import {
-  restoreMockSkillsHomeEnv,
-  setMockSkillsHomeEnv,
-  type SkillsHomeEnvSnapshot,
-} from "./home-env.test-support.js";
 import { formatSkillsForPrompt, type Skill } from "./skill-contract.js";
 import type { SkillEntry } from "./types.js";
 import {
@@ -105,14 +100,6 @@ describe("formatSkillsCompact", () => {
 });
 
 describe("applySkillsPromptLimits (via buildWorkspaceSkillsPrompt)", () => {
-  let envSnapshot: SkillsHomeEnvSnapshot;
-
-  beforeEach(() => {
-    envSnapshot = setMockSkillsHomeEnv("/Users/openclaw-test-user");
-  });
-
-  afterEach(() => restoreMockSkillsHomeEnv(envSnapshot));
-
   it("respects explicit exposure metadata before compact formatting", () => {
     const hidden = makeEntry({ ...makeSkill("hidden"), disableModelInvocation: true });
     hidden.exposure = {

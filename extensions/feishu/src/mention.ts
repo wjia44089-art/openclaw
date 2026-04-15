@@ -1,6 +1,4 @@
-import type { FeishuMessageEvent } from "./event-types.js";
-export type { MentionTarget } from "./mention-target.types.js";
-import type { MentionTarget } from "./mention-target.types.js";
+import type { FeishuMessageEvent } from "./bot.js";
 
 /**
  * Escape regex metacharacters so user-controlled mention fields are treated literally.
@@ -8,6 +6,15 @@ import type { MentionTarget } from "./mention-target.types.js";
 export function escapeRegExp(input: string): string {
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+/**
+ * Mention target user info
+ */
+export type MentionTarget = {
+  openId: string;
+  name: string;
+  key: string; // Placeholder in original message, e.g. @_user_1
+};
 
 /**
  * Extract mention targets from message event (excluding the bot itself)

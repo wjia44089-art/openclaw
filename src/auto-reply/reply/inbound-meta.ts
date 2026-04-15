@@ -1,72 +1,11 @@
 import { normalizeChatType } from "../../channels/chat-type.js";
-import { getLoadedChannelPluginById } from "../../channels/plugins/registry-loaded.js";
-import type { ChannelPlugin } from "../../channels/plugins/types.plugin.js";
-import { normalizeAnyChannelId } from "../../channels/registry.js";
+import { getBundledChannelPlugin } from "../../channels/plugins/bundled.js";
+import { getLoadedChannelPlugin, normalizeChannelId } from "../../channels/plugins/index.js";
 import { resolveSenderLabel } from "../../channels/sender-label.js";
 import { normalizeOptionalString } from "../../shared/string-coerce.js";
-import { truncateUtf16Safe } from "../../utils.js";
 import type { EnvelopeFormatOptions } from "../envelope.js";
 import { formatEnvelopeTimestamp } from "../envelope.js";
 import type { TemplateContext } from "../templating.js";
-
-const MAX_UNTRUSTED_JSON_STRING_CHARS = 2_000;
-const MAX_UNTRUSTED_HISTORY_ENTRIES = 20;
-
-function stripNullBytes(value: string): string {
-  return value.replaceAll("\u0000", "");
-}
-
-function normalizePromptMetadataString(value: unknown): string | undefined {
-  const normalized = normalizeOptionalString(value);
-  if (!normalized) {
-    return undefined;
-  }
-  const sanitized = stripNullBytes(normalized);
-  return sanitized || undefined;
-}
-
-function sanitizePromptBody(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  const sanitized = stripNullBytes(value);
-  return sanitized || undefined;
-}
-
-function neutralizeMarkdownFences(value: string): string {
-  return value.replaceAll("```", "`\u200b``");
-}
-
-function truncateUntrustedJsonString(value: string): string {
-  if (value.length <= MAX_UNTRUSTED_JSON_STRING_CHARS) {
-    return value;
-  }
-  return `${truncateUtf16Safe(value, Math.max(0, MAX_UNTRUSTED_JSON_STRING_CHARS - 14)).trimEnd()}…[truncated]`;
-}
-
-function sanitizeUntrustedJsonValue(value: unknown): unknown {
-  if (typeof value === "string") {
-    return neutralizeMarkdownFences(truncateUntrustedJsonString(value));
-  }
-  if (Array.isArray(value)) {
-    return value.map((entry) => sanitizeUntrustedJsonValue(entry));
-  }
-  if (!value || typeof value !== "object") {
-    return value;
-  }
-  return Object.fromEntries(
-    Object.entries(value).map(([key, entry]) => [key, sanitizeUntrustedJsonValue(entry)]),
-  );
-}
-
-function formatUntrustedJsonBlock(label: string, payload: unknown): string {
-  return [
-    label,
-    "```json",
-    JSON.stringify(sanitizeUntrustedJsonValue(payload), null, 2),
-    "```",
-  ].join("\n");
-}
 
 function formatConversationTimestamp(
   value: unknown,
@@ -79,11 +18,11 @@ function formatConversationTimestamp(
 }
 
 function resolveInboundChannel(ctx: TemplateContext): string | undefined {
-  const surfaceValue = normalizePromptMetadataString(ctx.Surface);
-  let channelValue = normalizePromptMetadataString(ctx.OriginatingChannel) ?? surfaceValue;
+  let channelValue =
+    normalizeOptionalString(ctx.OriginatingChannel) ?? normalizeOptionalString(ctx.Surface);
   if (!channelValue) {
-    const provider = normalizePromptMetadataString(ctx.Provider);
-    if (provider !== "webchat" && surfaceValue !== "webchat") {
+    const provider = normalizeOptionalString(ctx.Provider);
+    if (provider !== "webchat" && ctx.Surface !== "webchat") {
       channelValue = provider;
     }
   }
@@ -100,11 +39,12 @@ function resolveInboundFormattingHints(ctx: TemplateContext):
   if (!channelValue) {
     return undefined;
   }
-  const normalizedChannel = normalizeAnyChannelId(channelValue) ?? channelValue;
-  const agentPrompt = (getLoadedChannelPluginById(normalizedChannel) as ChannelPlugin | undefined)
-    ?.agentPrompt;
+  const normalizedChannel = normalizeChannelId(channelValue) ?? channelValue;
+  const agentPrompt =
+    getLoadedChannelPlugin(normalizedChannel)?.agentPrompt ??
+    getBundledChannelPlugin(normalizedChannel)?.agentPrompt;
   return agentPrompt?.inboundFormattingHints?.({
-    accountId: normalizePromptMetadataString(ctx.AccountId) ?? undefined,
+    accountId: normalizeOptionalString(ctx.AccountId) ?? undefined,
   });
 }
 
@@ -127,12 +67,12 @@ export function buildInboundMetaSystemPrompt(
   const channelValue = resolveInboundChannel(ctx);
 
   const payload = {
-    schema: "openclaw.inbound_meta.v2",
-    chat_id: normalizePromptMetadataString(ctx.OriginatingTo),
-    account_id: normalizePromptMetadataString(ctx.AccountId),
+    schema: "openclaw.inbound_meta.v1",
+    chat_id: normalizeOptionalString(ctx.OriginatingTo),
+    account_id: normalizeOptionalString(ctx.AccountId),
     channel: channelValue,
-    provider: normalizePromptMetadataString(ctx.Provider),
-    surface: normalizePromptMetadataString(ctx.Surface),
+    provider: normalizeOptionalString(ctx.Provider),
+    surface: normalizeOptionalString(ctx.Surface),
     chat_type: chatType ?? (isDirect ? "direct" : undefined),
     response_format:
       options?.includeFormattingHints === false ? undefined : resolveInboundFormattingHints(ctx),
@@ -165,117 +105,141 @@ export function buildInboundUserContextPrefix(
   );
   const shouldIncludeConversationInfo = !isDirect || includeDirectConversationInfo;
 
-  const messageId = normalizePromptMetadataString(ctx.MessageSid);
-  const messageIdFull = normalizePromptMetadataString(ctx.MessageSidFull);
+  const messageId = normalizeOptionalString(ctx.MessageSid);
+  const messageIdFull = normalizeOptionalString(ctx.MessageSidFull);
   const resolvedMessageId = messageId ?? messageIdFull;
   const timestampStr = formatConversationTimestamp(ctx.Timestamp, envelope);
-  const inboundHistory = Array.isArray(ctx.InboundHistory) ? ctx.InboundHistory : [];
-  const boundedHistory = inboundHistory.slice(-MAX_UNTRUSTED_HISTORY_ENTRIES);
 
   const conversationInfo = {
     message_id: shouldIncludeConversationInfo ? resolvedMessageId : undefined,
-    reply_to_id: shouldIncludeConversationInfo
-      ? normalizePromptMetadataString(ctx.ReplyToId)
-      : undefined,
-    sender_id: shouldIncludeConversationInfo
-      ? normalizePromptMetadataString(ctx.SenderId)
-      : undefined,
-    conversation_label: isDirect ? undefined : normalizePromptMetadataString(ctx.ConversationLabel),
+    reply_to_id: shouldIncludeConversationInfo ? normalizeOptionalString(ctx.ReplyToId) : undefined,
+    sender_id: shouldIncludeConversationInfo ? normalizeOptionalString(ctx.SenderId) : undefined,
+    conversation_label: isDirect ? undefined : normalizeOptionalString(ctx.ConversationLabel),
     sender: shouldIncludeConversationInfo
-      ? (normalizePromptMetadataString(ctx.SenderName) ??
-        normalizePromptMetadataString(ctx.SenderE164) ??
-        normalizePromptMetadataString(ctx.SenderId) ??
-        normalizePromptMetadataString(ctx.SenderUsername))
+      ? (normalizeOptionalString(ctx.SenderName) ??
+        normalizeOptionalString(ctx.SenderE164) ??
+        normalizeOptionalString(ctx.SenderId) ??
+        normalizeOptionalString(ctx.SenderUsername))
       : undefined,
     timestamp: timestampStr,
-    group_subject: normalizePromptMetadataString(ctx.GroupSubject),
-    group_channel: normalizePromptMetadataString(ctx.GroupChannel),
-    group_space: normalizePromptMetadataString(ctx.GroupSpace),
-    thread_label: normalizePromptMetadataString(ctx.ThreadLabel),
-    topic_id:
-      ctx.MessageThreadId != null
-        ? (normalizePromptMetadataString(String(ctx.MessageThreadId)) ?? undefined)
-        : undefined,
-    topic_name: normalizePromptMetadataString(ctx.TopicName) ?? undefined,
+    group_subject: normalizeOptionalString(ctx.GroupSubject),
+    group_channel: normalizeOptionalString(ctx.GroupChannel),
+    group_space: normalizeOptionalString(ctx.GroupSpace),
+    thread_label: normalizeOptionalString(ctx.ThreadLabel),
+    topic_id: ctx.MessageThreadId != null ? String(ctx.MessageThreadId) : undefined,
     is_forum: ctx.IsForum === true ? true : undefined,
     is_group_chat: !isDirect ? true : undefined,
     was_mentioned: ctx.WasMentioned === true ? true : undefined,
-    has_reply_context: sanitizePromptBody(ctx.ReplyToBody) ? true : undefined,
-    has_forwarded_context: normalizePromptMetadataString(ctx.ForwardedFrom) ? true : undefined,
-    has_thread_starter: sanitizePromptBody(ctx.ThreadStarterBody) ? true : undefined,
-    history_count: boundedHistory.length > 0 ? boundedHistory.length : undefined,
-    history_truncated: inboundHistory.length > MAX_UNTRUSTED_HISTORY_ENTRIES ? true : undefined,
+    has_reply_context: ctx.ReplyToBody ? true : undefined,
+    has_forwarded_context: ctx.ForwardedFrom ? true : undefined,
+    has_thread_starter: normalizeOptionalString(ctx.ThreadStarterBody) ? true : undefined,
+    history_count:
+      Array.isArray(ctx.InboundHistory) && ctx.InboundHistory.length > 0
+        ? ctx.InboundHistory.length
+        : undefined,
   };
   if (Object.values(conversationInfo).some((v) => v !== undefined)) {
     blocks.push(
-      formatUntrustedJsonBlock("Conversation info (untrusted metadata):", conversationInfo),
+      [
+        "Conversation info (untrusted metadata):",
+        "```json",
+        JSON.stringify(conversationInfo, null, 2),
+        "```",
+      ].join("\n"),
     );
   }
 
   const senderInfo = {
     label: resolveSenderLabel({
-      name: normalizePromptMetadataString(ctx.SenderName),
-      username: normalizePromptMetadataString(ctx.SenderUsername),
-      tag: normalizePromptMetadataString(ctx.SenderTag),
-      e164: normalizePromptMetadataString(ctx.SenderE164),
-      id: normalizePromptMetadataString(ctx.SenderId),
+      name: normalizeOptionalString(ctx.SenderName),
+      username: normalizeOptionalString(ctx.SenderUsername),
+      tag: normalizeOptionalString(ctx.SenderTag),
+      e164: normalizeOptionalString(ctx.SenderE164),
+      id: normalizeOptionalString(ctx.SenderId),
     }),
-    id: normalizePromptMetadataString(ctx.SenderId),
-    name: normalizePromptMetadataString(ctx.SenderName),
-    username: normalizePromptMetadataString(ctx.SenderUsername),
-    tag: normalizePromptMetadataString(ctx.SenderTag),
-    e164: normalizePromptMetadataString(ctx.SenderE164),
+    id: normalizeOptionalString(ctx.SenderId),
+    name: normalizeOptionalString(ctx.SenderName),
+    username: normalizeOptionalString(ctx.SenderUsername),
+    tag: normalizeOptionalString(ctx.SenderTag),
+    e164: normalizeOptionalString(ctx.SenderE164),
   };
   if (senderInfo?.label) {
-    blocks.push(formatUntrustedJsonBlock("Sender (untrusted metadata):", senderInfo));
-  }
-
-  const threadStarterBody = sanitizePromptBody(ctx.ThreadStarterBody);
-  if (threadStarterBody) {
     blocks.push(
-      formatUntrustedJsonBlock("Thread starter (untrusted, for context):", {
-        body: threadStarterBody,
-      }),
-    );
-  }
-
-  const replyToBody = sanitizePromptBody(ctx.ReplyToBody);
-  if (replyToBody) {
-    blocks.push(
-      formatUntrustedJsonBlock("Replied message (untrusted, for context):", {
-        sender_label: normalizePromptMetadataString(ctx.ReplyToSender),
-        is_quote: ctx.ReplyToIsQuote === true ? true : undefined,
-        body: replyToBody,
-      }),
-    );
-  }
-
-  const forwardedFrom = normalizePromptMetadataString(ctx.ForwardedFrom);
-  const forwardedContext = {
-    from: forwardedFrom,
-    type: normalizePromptMetadataString(ctx.ForwardedFromType),
-    username: normalizePromptMetadataString(ctx.ForwardedFromUsername),
-    title: normalizePromptMetadataString(ctx.ForwardedFromTitle),
-    signature: normalizePromptMetadataString(ctx.ForwardedFromSignature),
-    chat_type: normalizePromptMetadataString(ctx.ForwardedFromChatType),
-    date_ms: typeof ctx.ForwardedDate === "number" ? ctx.ForwardedDate : undefined,
-  };
-  if (forwardedFrom) {
-    blocks.push(
-      formatUntrustedJsonBlock("Forwarded message context (untrusted metadata):", forwardedContext),
-    );
-  }
-
-  if (boundedHistory.length > 0) {
-    blocks.push(
-      formatUntrustedJsonBlock(
-        "Chat history since last reply (untrusted, for context):",
-        boundedHistory.map((entry) => ({
-          sender: sanitizePromptBody(entry.sender),
-          timestamp_ms: entry.timestamp,
-          body: sanitizePromptBody(entry.body),
-        })),
+      ["Sender (untrusted metadata):", "```json", JSON.stringify(senderInfo, null, 2), "```"].join(
+        "\n",
       ),
+    );
+  }
+
+  if (normalizeOptionalString(ctx.ThreadStarterBody)) {
+    blocks.push(
+      [
+        "Thread starter (untrusted, for context):",
+        "```json",
+        JSON.stringify({ body: ctx.ThreadStarterBody }, null, 2),
+        "```",
+      ].join("\n"),
+    );
+  }
+
+  if (ctx.ReplyToBody) {
+    blocks.push(
+      [
+        "Replied message (untrusted, for context):",
+        "```json",
+        JSON.stringify(
+          {
+            sender_label: normalizeOptionalString(ctx.ReplyToSender),
+            is_quote: ctx.ReplyToIsQuote === true ? true : undefined,
+            body: ctx.ReplyToBody,
+          },
+          null,
+          2,
+        ),
+        "```",
+      ].join("\n"),
+    );
+  }
+
+  if (ctx.ForwardedFrom) {
+    blocks.push(
+      [
+        "Forwarded message context (untrusted metadata):",
+        "```json",
+        JSON.stringify(
+          {
+            from: normalizeOptionalString(ctx.ForwardedFrom),
+            type: normalizeOptionalString(ctx.ForwardedFromType),
+            username: normalizeOptionalString(ctx.ForwardedFromUsername),
+            title: normalizeOptionalString(ctx.ForwardedFromTitle),
+            signature: normalizeOptionalString(ctx.ForwardedFromSignature),
+            chat_type: normalizeOptionalString(ctx.ForwardedFromChatType),
+            date_ms: typeof ctx.ForwardedDate === "number" ? ctx.ForwardedDate : undefined,
+          },
+          null,
+          2,
+        ),
+        "```",
+      ].join("\n"),
+    );
+  }
+
+  if (Array.isArray(ctx.InboundHistory) && ctx.InboundHistory.length > 0) {
+    blocks.push(
+      [
+        "Chat history since last reply (untrusted, for context):",
+        "```json",
+        JSON.stringify(
+          ctx.InboundHistory.map((entry) => ({
+            sender: entry.sender,
+            timestamp_ms: entry.timestamp,
+            body: entry.body,
+          })),
+          null,
+          2,
+        ),
+        "```",
+      ].join("\n"),
     );
   }
 

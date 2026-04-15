@@ -9,7 +9,7 @@ const [
 
 const { sendTypingMock, sendReadReceiptMock, dispatchInboundMessageMock, capture } = vi.hoisted(
   () => {
-    const captureState: { ctx?: MsgContext } = {};
+    const captureState: { ctx: MsgContext | undefined } = { ctx: undefined };
     return {
       sendTypingMock: vi.fn(),
       sendReadReceiptMock: vi.fn(),
@@ -53,7 +53,7 @@ vi.mock("../../../../src/pairing/pairing-store.js", () => ({
 
 describe("signal createSignalEventHandler inbound context", () => {
   beforeEach(() => {
-    delete capture.ctx;
+    capture.ctx = undefined;
     sendTypingMock.mockReset().mockResolvedValue(true);
     sendReadReceiptMock.mockReset().mockResolvedValue(true);
     dispatchInboundMessageMock.mockClear();

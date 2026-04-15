@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
 import type { QaBusState } from "./bus-state.js";
-import { createQaTransportAdapter, type QaTransportId } from "./qa-transport-registry.js";
+import { startQaLabServer } from "./lab-server.js";
 import { renderQaMarkdownReport } from "./report.js";
 import { runQaScenario, type QaScenarioResult } from "./scenario.js";
 import { createQaSelfCheckScenario } from "./self-check-scenario.js";
@@ -25,26 +25,14 @@ export function resolveQaSelfCheckOutputPath(params?: { outputPath?: string; rep
 export async function runQaSelfCheckAgainstState(params: {
   state: QaBusState;
   cfg: OpenClawConfig;
-  transportId?: QaTransportId;
   outputPath?: string;
   repoRoot?: string;
   notes?: string[];
 }): Promise<QaSelfCheckResult> {
   const startedAt = new Date();
-  const transport = createQaTransportAdapter({
-    id: params.transportId ?? "qa-channel",
-    state: params.state,
-  });
   params.state.reset();
-  const scenarioResult = await runQaScenario(createQaSelfCheckScenario(), {
+  const scenarioResult = await runQaScenario(createQaSelfCheckScenario(params.cfg), {
     state: params.state,
-    performAction: async (action, args) =>
-      await transport.handleAction({
-        action,
-        args,
-        cfg: params.cfg,
-        accountId: transport.accountId,
-      }),
   });
   const checks = [
     {
@@ -99,3 +87,17 @@ export async function runQaSelfCheckAgainstState(params: {
     scenarioResult,
   };
 }
+
+export async function runQaLabSelfCheck(params?: { repoRoot?: string; outputPath?: string }) {
+  const server = await startQaLabServer({
+    repoRoot: params?.repoRoot,
+    outputPath: params?.outputPath,
+  });
+  try {
+    return await server.runSelfCheck();
+  } finally {
+    await server.stop();
+  }
+}
+
+export const runQaE2eSelfCheck = runQaLabSelfCheck;

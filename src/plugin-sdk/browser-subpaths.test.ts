@@ -9,9 +9,10 @@ import {
 
 describe("plugin-sdk browser subpaths", () => {
   it("keeps browser profile helpers available on the narrow subpath", () => {
+    const resolved = resolveBrowserConfig(undefined, { gateway: { port: 18789 } });
     expect(DEFAULT_OPENCLAW_BROWSER_ENABLED).toBe(true);
     expect(DEFAULT_BROWSER_DEFAULT_PROFILE_NAME).toBe("openclaw");
-    expect(resolveBrowserConfig).toBeTypeOf("function");
+    expect(resolved.controlPort).toBeTypeOf("number");
   });
 
   it("parses and redacts CDP urls on the dedicated CDP subpath", () => {
@@ -21,6 +22,17 @@ describe("plugin-sdk browser subpaths", () => {
   });
 
   it("resolves browser control auth on the dedicated auth subpath", () => {
-    expect(resolveBrowserControlAuth).toBeTypeOf("function");
+    expect(
+      resolveBrowserControlAuth(
+        {
+          gateway: {
+            auth: {
+              token: "token-1",
+            },
+          },
+        },
+        {},
+      ),
+    ).toEqual({ token: "token-1", password: undefined });
   });
 });

@@ -8,7 +8,24 @@ type GatewayRequest = { method?: string; params?: Record<string, unknown> };
 
 const hoisted = vi.hoisted(() => ({
   callGatewayMock: vi.fn(),
-  configOverride: {} as Record<string, unknown>,
+  configOverride: {
+    session: { mainKey: "main", scope: "per-sender" },
+    tools: {
+      sessions_spawn: {
+        attachments: {
+          enabled: true,
+          maxFiles: 50,
+          maxFileBytes: 1 * 1024 * 1024,
+          maxTotalBytes: 5 * 1024 * 1024,
+        },
+      },
+    },
+    agents: {
+      defaults: {
+        workspace: "/tmp",
+      },
+    },
+  },
 }));
 
 const hookRunnerMocks = vi.hoisted(() => ({

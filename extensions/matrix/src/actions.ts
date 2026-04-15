@@ -7,11 +7,11 @@ import {
   createActionGate,
   readNumberParam,
   readStringParam,
-  ToolAuthorizationError,
   type ChannelMessageActionAdapter,
   type ChannelMessageActionContext,
   type ChannelMessageActionName,
   type ChannelMessageToolDiscovery,
+  type ChannelToolSend,
 } from "./runtime-api.js";
 import type { CoreConfig } from "./types.js";
 
@@ -35,7 +35,6 @@ const MATRIX_PLUGIN_HANDLED_ACTIONS = new Set<ChannelMessageActionName>([
 function createMatrixExposedActions(params: {
   gate: ReturnType<typeof createActionGate>;
   encryptionEnabled: boolean;
-  senderIsOwner?: boolean;
 }) {
   const actions = new Set<ChannelMessageActionName>(["poll", "poll-vote"]);
   if (params.gate("messages")) {
@@ -53,7 +52,7 @@ function createMatrixExposedActions(params: {
     actions.add("unpin");
     actions.add("list-pins");
   }
-  if (params.gate("profile") && params.senderIsOwner === true) {
+  if (params.gate("profile")) {
     actions.add("set-profile");
   }
   if (params.gate("memberInfo")) {
@@ -110,7 +109,7 @@ function buildMatrixProfileToolSchema(): NonNullable<ChannelMessageToolDiscovery
 }
 
 export const matrixMessageActions: ChannelMessageActionAdapter = {
-  describeMessageTool: ({ cfg, accountId, senderIsOwner }) => {
+  describeMessageTool: ({ cfg, accountId }) => {
     const resolvedCfg = cfg as CoreConfig;
     if (!accountId && requiresExplicitMatrixDefaultAccount(resolvedCfg)) {
       return { actions: [], capabilities: [] };
@@ -126,7 +125,6 @@ export const matrixMessageActions: ChannelMessageActionAdapter = {
     const actions = createMatrixExposedActions({
       gate,
       encryptionEnabled: account.config.encryption === true,
-      senderIsOwner,
     });
     const listedActions = Array.from(actions);
     return {
@@ -136,7 +134,7 @@ export const matrixMessageActions: ChannelMessageActionAdapter = {
     };
   },
   supportsAction: ({ action }) => MATRIX_PLUGIN_HANDLED_ACTIONS.has(action),
-  extractToolSend: ({ args }) => {
+  extractToolSend: ({ args }): ChannelToolSend | null => {
     return extractToolSend(args, "sendMessage");
   },
   handleAction: async (ctx: ChannelMessageActionContext) => {
@@ -261,9 +259,6 @@ export const matrixMessageActions: ChannelMessageActionAdapter = {
     }
 
     if (action === "set-profile") {
-      if (ctx.senderIsOwner !== true) {
-        throw new ToolAuthorizationError("Matrix profile updates require owner access.");
-      }
       const avatarPath =
         readStringParam(params, "avatarPath") ??
         readStringParam(params, "path") ??

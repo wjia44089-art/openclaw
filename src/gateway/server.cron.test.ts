@@ -25,7 +25,6 @@ const fetchWithSsrFGuardMock = vi.hoisted(() =>
 );
 
 const sendFailureNotificationAnnounceMock = vi.hoisted(() => vi.fn(async () => undefined));
-const closeTrackedBrowserTabsForSessionsMock = vi.hoisted(() => vi.fn(async () => 0));
 
 vi.mock("../infra/net/fetch-guard.js", () => ({
   fetchWithSsrFGuard: (...args: unknown[]) =>
@@ -48,10 +47,6 @@ vi.mock("../cron/delivery.js", async () => {
       )(...args),
   };
 });
-
-vi.mock("../plugin-sdk/browser-maintenance.js", () => ({
-  closeTrackedBrowserTabsForSessions: closeTrackedBrowserTabsForSessionsMock,
-}));
 
 installGatewayTestHooks({ scope: "suite" });
 const CRON_WAIT_TIMEOUT_MS = 3_000;
@@ -251,7 +246,6 @@ describe("gateway server cron", () => {
     // Keep polling helpers deterministic even if other tests left fake timers enabled.
     vi.useRealTimers();
     sendFailureNotificationAnnounceMock.mockClear();
-    closeTrackedBrowserTabsForSessionsMock.mockClear();
   });
 
   test("handles cron CRUD, normalization, and patch semantics", { timeout: 45_000 }, async () => {
@@ -698,16 +692,16 @@ describe("gateway server cron", () => {
         ws,
         (payload) => payload?.jobId === jobId && payload?.action === "started",
       );
+      const finishedRun = waitForCronEvent(
+        ws,
+        (payload) => payload?.jobId === jobId && payload?.action === "finished",
+      );
       const runRes = await rpcReq(ws, "cron.run", { id: jobId, mode: "force" }, 1_000);
       expect(runRes.ok).toBe(true);
       expect(runRes.payload).toEqual({ ok: true, enqueued: true, runId: expect.any(String) });
       await startedRun;
       expect(cronIsolatedRun).toHaveBeenCalledTimes(1);
 
-      const finishedRun = waitForCronEvent(
-        ws,
-        (payload) => payload?.jobId === jobId && payload?.action === "finished",
-      );
       resolveRun?.({ status: "ok", summary: "background finished" });
       const finishedPayload = await finishedRun;
       expect(finishedPayload).toMatchObject({

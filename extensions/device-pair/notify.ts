@@ -1,6 +1,5 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
 import { normalizeOptionalString } from "openclaw/plugin-sdk/text-runtime";
 import type { OpenClawPluginApi } from "./api.js";
 import { listDevicePairing } from "./api.js";
@@ -154,32 +153,7 @@ function notifySubscriberKey(subscriber: {
   accountId?: string;
   messageThreadId?: string | number;
 }): string {
-  return JSON.stringify([
-    subscriber.to,
-    subscriber.accountId ?? "",
-    normalizeNotifyThreadKey(subscriber.messageThreadId),
-  ]);
-}
-
-function normalizeNotifyThreadKey(messageThreadId?: string | number): string {
-  if (typeof messageThreadId === "number" && Number.isFinite(messageThreadId)) {
-    return String(Math.trunc(messageThreadId));
-  }
-  if (typeof messageThreadId !== "string") {
-    return "";
-  }
-  const normalized = normalizeOptionalString(messageThreadId);
-  if (!normalized) {
-    return "";
-  }
-  if (!/^-?\d+$/u.test(normalized)) {
-    return normalized;
-  }
-  try {
-    return BigInt(normalized).toString();
-  } catch {
-    return normalized;
-  }
+  return [subscriber.to, subscriber.accountId ?? "", subscriber.messageThreadId ?? ""].join("|");
 }
 
 type NotifyTarget = {
@@ -305,7 +279,9 @@ async function notifySubscriber(params: {
     return true;
   } catch (err) {
     params.api.logger.warn(
-      `device-pair: failed to send pairing notification to ${params.subscriber.to}: ${formatErrorMessage(err)}`,
+      `device-pair: failed to send pairing notification to ${params.subscriber.to}: ${String(
+        (err as Error)?.message ?? err,
+      )}`,
     );
     return false;
   }
@@ -500,12 +476,16 @@ export function registerPairingNotifierService(api: OpenClawPluginApi): void {
       };
 
       await tick().catch((err) => {
-        api.logger.warn(`device-pair: initial notify poll failed: ${formatErrorMessage(err)}`);
+        api.logger.warn(
+          `device-pair: initial notify poll failed: ${String((err as Error)?.message ?? err)}`,
+        );
       });
 
       notifyInterval = setInterval(() => {
         tick().catch((err) => {
-          api.logger.warn(`device-pair: notify poll failed: ${formatErrorMessage(err)}`);
+          api.logger.warn(
+            `device-pair: notify poll failed: ${String((err as Error)?.message ?? err)}`,
+          );
         });
       }, NOTIFY_POLL_INTERVAL_MS);
       notifyInterval.unref?.();

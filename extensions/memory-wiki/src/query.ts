@@ -75,8 +75,6 @@ export type WikiGetResult = {
   content: string;
   fromLine: number;
   lineCount: number;
-  totalLines?: number;
-  truncated?: boolean;
   id?: string;
   sourceType?: string;
   provenanceMode?: string;
@@ -711,9 +709,7 @@ export async function getMemoryWikiPage(params: {
     if (page) {
       const parsed = parseWikiMarkdown(page.raw);
       const lines = parsed.body.split(/\r?\n/);
-      const totalLines = lines.length;
       const slice = lines.slice(fromLine - 1, fromLine - 1 + lineCount).join("\n");
-      const truncated = fromLine - 1 + lineCount < totalLines;
 
       return {
         corpus: "wiki",
@@ -723,8 +719,6 @@ export async function getMemoryWikiPage(params: {
         content: slice,
         fromLine,
         lineCount,
-        totalLines,
-        truncated,
         ...(page.id ? { id: page.id } : {}),
         ...(page.sourceType ? { sourceType: page.sourceType } : {}),
         ...(page.provenanceMode ? { provenanceMode: page.provenanceMode } : {}),

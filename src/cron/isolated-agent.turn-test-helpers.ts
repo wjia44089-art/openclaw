@@ -60,10 +60,7 @@ export function expectEmbeddedProviderModel(expected: { provider: string; model:
 
 export async function readSessionEntry(storePath: string, key: string) {
   const raw = await fs.readFile(storePath, "utf-8");
-  const store = JSON.parse(raw) as Record<
-    string,
-    { sessionId?: string; label?: string; sessionFile?: string }
-  >;
+  const store = JSON.parse(raw) as Record<string, { sessionId?: string; label?: string }>;
   return store[key];
 }
 

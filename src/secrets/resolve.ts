@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import type {
   ExecSecretProviderConfig,
   FileSecretProviderConfig,
@@ -22,7 +22,6 @@ import {
   resolveDefaultSecretProviderAlias,
   secretRefKey,
 } from "./ref-contract.js";
-import type { SecretRefResolveCache } from "./resolve-types.js";
 import { isNonEmptyString, isRecord, normalizePositiveInt } from "./shared.js";
 
 const DEFAULT_PROVIDER_CONCURRENCY = 4;
@@ -35,7 +34,10 @@ const DEFAULT_EXEC_MAX_OUTPUT_BYTES = 1024 * 1024;
 const WINDOWS_ABS_PATH_PATTERN = /^[A-Za-z]:[\\/]/;
 const WINDOWS_UNC_PATH_PATTERN = /^\\\\[^\\]+\\[^\\]+/;
 
-export type { SecretRefResolveCache } from "./resolve-types.js";
+export type SecretRefResolveCache = {
+  resolvedByRefKey?: Map<string, Promise<unknown>>;
+  filePayloadByProvider?: Map<string, Promise<unknown>>;
+};
 
 type ResolveSecretRefOptions = {
   config: OpenClawConfig;
@@ -276,9 +278,8 @@ async function readFileProviderPayload(params: {
 }): Promise<unknown> {
   const cacheKey = params.providerName;
   const cache = params.cache;
-  const cachedFilePayload = cache?.filePayloadByProvider?.get(cacheKey);
-  if (cachedFilePayload) {
-    return await cachedFilePayload;
+  if (cache?.filePayloadByProvider?.has(cacheKey)) {
+    return await (cache.filePayloadByProvider.get(cacheKey) as Promise<unknown>);
   }
 
   const filePath = resolveUserPath(params.providerConfig.path);
@@ -818,7 +819,7 @@ async function resolveProviderRefs(params: {
       message: `Unsupported secret provider source "${String((params.providerConfig as { source?: unknown }).source)}".`,
     });
   } catch (err) {
-    return throwUnknownProviderResolutionError({
+    throwUnknownProviderResolutionError({
       source: params.source,
       provider: params.providerName,
       err,
@@ -916,9 +917,8 @@ export async function resolveSecretRefValue(
 ): Promise<unknown> {
   const cache = options.cache;
   const key = secretRefKey(ref);
-  const cachedResolvedValue = cache?.resolvedByRefKey?.get(key);
-  if (cachedResolvedValue) {
-    return await cachedResolvedValue;
+  if (cache?.resolvedByRefKey?.has(key)) {
+    return await (cache.resolvedByRefKey.get(key) as Promise<unknown>);
   }
 
   const promise = (async () => {

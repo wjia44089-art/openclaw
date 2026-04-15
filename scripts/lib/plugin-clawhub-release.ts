@@ -105,7 +105,7 @@ export function collectClawHubPublishablePluginPackages(
   const publishable: PublishablePluginPackage[] = [];
   const validationErrors: string[] = [];
 
-  for (const candidate of collectExtensionPackageJsonCandidates(rootDir)) {
+  for (const candidate of collectExtensionPackageJsonCandidates<PluginPackageJson>(rootDir)) {
     const { extensionId, packageDir, packageJson } = candidate;
     if (packageJson.openclaw?.release?.publishToClawHub !== true) {
       continue;

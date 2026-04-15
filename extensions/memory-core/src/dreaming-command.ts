@@ -75,10 +75,6 @@ function formatUsage(includeStatus: string): string {
   ].join("\n");
 }
 
-function requiresAdminToMutateDreaming(gatewayClientScopes?: readonly string[]): boolean {
-  return Array.isArray(gatewayClientScopes) && !gatewayClientScopes.includes("operator.admin");
-}
-
 export function registerDreamingCommand(api: OpenClawPluginApi): void {
   api.registerCommand({
     name: "dreaming",
@@ -106,9 +102,6 @@ export function registerDreamingCommand(api: OpenClawPluginApi): void {
       }
 
       if (firstToken === "on" || firstToken === "off") {
-        if (requiresAdminToMutateDreaming(ctx.gatewayClientScopes)) {
-          return { text: "⚠️ /dreaming on|off requires operator.admin for gateway clients." };
-        }
         const enabled = firstToken === "on";
         const nextConfig = updateDreamingEnabledInConfig(currentConfig, enabled);
         await api.runtime.config.writeConfigFile(nextConfig);

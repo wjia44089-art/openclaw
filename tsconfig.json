@@ -16,7 +16,6 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "es2023",
-    "types": ["node"],
     "useDefineForClassFields": false,
     "paths": {
       "openclaw/extension-api": ["./src/extensionAPI.ts"],
@@ -29,5 +28,5 @@
     }
   },
   "include": ["src/**/*", "ui/**/*", "extensions/**/*", "packages/**/*"],
-  "exclude": ["node_modules", "dist", "**/dist/**"]
+  "exclude": ["node_modules", "dist"]
 }

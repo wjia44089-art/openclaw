@@ -15,9 +15,9 @@ import type {
   ChannelAccountSnapshot,
   ChannelId,
   ChannelPlugin,
-} from "../../channels/plugins/types.public.js";
+} from "../../channels/plugins/types.js";
 import { inspectReadOnlyChannelAccount } from "../../channels/read-only-account-inspect.js";
-import type { OpenClawConfig } from "../../config/types.openclaw.js";
+import type { OpenClawConfig } from "../../config/config.js";
 import { sha256HexPrefix } from "../../logging/redact-identifier.js";
 import { asRecord } from "../../shared/record-coerce.js";
 import { normalizeOptionalString } from "../../shared/string-coerce.js";

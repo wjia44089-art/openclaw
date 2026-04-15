@@ -1,4 +1,4 @@
-import type { ChannelId } from "../channels/plugins/types.public.js";
+import type { ChannelId } from "../channels/plugins/types.js";
 export {
   createLoggedPairingApprovalNotifier,
   createPairingPrefixStripper,

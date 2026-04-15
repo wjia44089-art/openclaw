@@ -1,28 +1,38 @@
-import { getLoadedChannelPluginById } from "../../channels/plugins/registry-loaded.js";
-import type { ChannelPlugin } from "../../channels/plugins/types.plugin.js";
-import { normalizeAnyChannelId } from "../../channels/registry.js";
+import { getBundledChannelPlugin } from "../../channels/plugins/bundled.js";
+import { getLoadedChannelPlugin, normalizeChannelId } from "../../channels/plugins/index.js";
 import {
   normalizeOptionalLowercaseString,
   normalizeOptionalString,
 } from "../../shared/string-coerce.js";
-import { extractSimpleExplicitGroupId } from "./group-id-simple.js";
-
-export { extractSimpleExplicitGroupId };
 
 export function extractExplicitGroupId(raw: string | undefined | null): string | undefined {
   const trimmed = normalizeOptionalString(raw) ?? "";
   if (!trimmed) {
     return undefined;
   }
-  const simple = extractSimpleExplicitGroupId(trimmed);
-  if (simple) {
-    return simple;
+  const parts = trimmed.split(":").filter(Boolean);
+  if (parts.length >= 3 && (parts[1] === "group" || parts[1] === "channel")) {
+    const joined = parts.slice(2).join(":");
+    return joined.replace(/:topic:.*$/, "") || undefined;
   }
-  const firstPart = trimmed.split(":").find(Boolean);
+  if (parts.length >= 2 && (parts[0] === "group" || parts[0] === "channel")) {
+    const joined = parts.slice(1).join(":");
+    return joined.replace(/:topic:.*$/, "") || undefined;
+  }
+  if (parts.length >= 2 && parts[0] === "whatsapp") {
+    const joined = parts
+      .slice(1)
+      .join(":")
+      .replace(/:topic:.*$/, "");
+    if (/@g\.us$/i.test(joined)) {
+      return joined || undefined;
+    }
+  }
   const channelId =
-    normalizeAnyChannelId(firstPart ?? "") ?? normalizeOptionalLowercaseString(firstPart);
+    normalizeChannelId(parts[0] ?? "") ?? normalizeOptionalLowercaseString(parts[0]);
   const messaging = channelId
-    ? (getLoadedChannelPluginById(channelId) as ChannelPlugin | undefined)?.messaging
+    ? (getLoadedChannelPlugin(channelId)?.messaging ??
+      getBundledChannelPlugin(channelId)?.messaging)
     : undefined;
   const parsed = messaging?.parseExplicitTarget?.({ raw: trimmed }) ?? null;
   if (parsed && parsed.chatType && parsed.chatType !== "direct") {

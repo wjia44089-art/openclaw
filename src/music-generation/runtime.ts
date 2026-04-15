@@ -1,6 +1,7 @@
+import type { AuthProfileStore } from "../agents/auth-profiles.js";
 import { describeFailoverError, isFailoverError } from "../agents/failover-error.js";
 import type { FallbackAttempt } from "../agents/model-fallback.types.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import {
@@ -12,12 +13,40 @@ import {
 import { parseMusicGenerationModelRef } from "./model-ref.js";
 import { resolveMusicGenerationOverrides } from "./normalization.js";
 import { getMusicGenerationProvider, listMusicGenerationProviders } from "./provider-registry.js";
-import type { GenerateMusicParams, GenerateMusicRuntimeResult } from "./runtime-types.js";
-import type { MusicGenerationResult } from "./types.js";
+import type {
+  GeneratedMusicAsset,
+  MusicGenerationIgnoredOverride,
+  MusicGenerationNormalization,
+  MusicGenerationOutputFormat,
+  MusicGenerationResult,
+  MusicGenerationSourceImage,
+} from "./types.js";
 
 const log = createSubsystemLogger("music-generation");
 
-export type { GenerateMusicParams, GenerateMusicRuntimeResult } from "./runtime-types.js";
+export type GenerateMusicParams = {
+  cfg: OpenClawConfig;
+  prompt: string;
+  agentDir?: string;
+  authStore?: AuthProfileStore;
+  modelOverride?: string;
+  lyrics?: string;
+  instrumental?: boolean;
+  durationSeconds?: number;
+  format?: MusicGenerationOutputFormat;
+  inputImages?: MusicGenerationSourceImage[];
+};
+
+export type GenerateMusicRuntimeResult = {
+  tracks: GeneratedMusicAsset[];
+  provider: string;
+  model: string;
+  attempts: FallbackAttempt[];
+  lyrics?: string[];
+  normalization?: MusicGenerationNormalization;
+  metadata?: Record<string, unknown>;
+  ignoredOverrides: MusicGenerationIgnoredOverride[];
+};
 
 export function listRuntimeMusicGenerationProviders(params?: { config?: OpenClawConfig }) {
   return listMusicGenerationProviders(params?.config);
@@ -117,7 +146,7 @@ export async function generateMusic(
     }
   }
 
-  return throwCapabilityGenerationFailure({
+  throwCapabilityGenerationFailure({
     capabilityLabel: "music generation",
     attempts,
     lastError,

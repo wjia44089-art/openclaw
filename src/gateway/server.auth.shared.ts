@@ -63,11 +63,11 @@ const readConnectChallengeNonce = async (ws: WebSocket) => {
   if (cached) {
     return cached;
   }
-  const challenge: {
+  const challenge = await onceMessage<{
     type?: string;
     event?: string;
     payload?: Record<string, unknown> | null;
-  } = await onceMessage(ws, (o) => o.type === "event" && o.event === "connect.challenge");
+  }>(ws, (o) => o.type === "event" && o.event === "connect.challenge");
   const nonce = (challenge.payload as { nonce?: unknown } | undefined)?.nonce;
   expect(typeof nonce).toBe("string");
   return String(nonce);
@@ -203,7 +203,7 @@ function resolveGatewayTokenOrEnv(): string {
       ? ((testState.gatewayAuth as { token?: string }).token ?? undefined)
       : process.env.OPENCLAW_GATEWAY_TOKEN;
   expect(typeof token).toBe("string");
-  return token ?? "";
+  return String(token ?? "");
 }
 
 async function approvePendingPairingIfNeeded() {
@@ -290,7 +290,7 @@ async function sendRawConnectReq(
       },
     }),
   );
-  const response: {
+  return onceMessage<{
     type?: string;
     id?: string;
     ok?: boolean;
@@ -302,8 +302,7 @@ async function sendRawConnectReq(
         reason?: string;
       };
     };
-  } = await onceMessage(ws, isConnectResMessage(params.id));
-  return response;
+  }>(ws, isConnectResMessage(params.id));
 }
 
 async function resolvePairedTokenForDeviceIdentityPath(deviceIdentityPath: string): Promise<{
@@ -318,7 +317,7 @@ async function resolvePairedTokenForDeviceIdentityPath(deviceIdentityPath: strin
   const deviceToken = paired?.tokens?.operator?.token;
   expect(paired?.deviceId).toBe(identity.deviceId);
   expect(deviceToken).toBeDefined();
-  return { identity: { deviceId: identity.deviceId }, deviceToken: deviceToken ?? "" };
+  return { identity: { deviceId: identity.deviceId }, deviceToken: String(deviceToken ?? "") };
 }
 
 async function startRateLimitedTokenServerWithPairedDeviceToken() {
@@ -340,7 +339,7 @@ async function startRateLimitedTokenServerWithPairedDeviceToken() {
     const { deviceToken } = await resolvePairedTokenForDeviceIdentityPath(deviceIdentityPath);
 
     ws.close();
-    return { server, port, prevToken, deviceToken: deviceToken ?? "", deviceIdentityPath };
+    return { server, port, prevToken, deviceToken: String(deviceToken ?? ""), deviceIdentityPath };
   } catch (err) {
     ws.close();
     await server.close();

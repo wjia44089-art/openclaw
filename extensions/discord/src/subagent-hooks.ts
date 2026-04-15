@@ -52,22 +52,6 @@ type DiscordSubagentDeliveryTargetEvent = {
   };
 };
 
-type DiscordSubagentSpawningResult =
-  | { status: "ok"; threadBindingReady?: boolean }
-  | { status: "error"; error: string }
-  | undefined;
-
-type DiscordSubagentDeliveryTargetResult =
-  | {
-      origin: {
-        channel: "discord";
-        accountId?: string;
-        to: string;
-        threadId?: string | number;
-      };
-    }
-  | undefined;
-
 function normalizeThreadBindingTargetKind(raw?: string): ThreadBindingTargetKind | undefined {
   const normalized = normalizeOptionalLowercaseString(raw);
   if (normalized === "subagent" || normalized === "acp") {
@@ -100,13 +84,13 @@ function resolveThreadBindingFlags(api: OpenClawPluginApi, accountId?: string) {
 export async function handleDiscordSubagentSpawning(
   api: OpenClawPluginApi,
   event: DiscordSubagentSpawningEvent,
-): Promise<DiscordSubagentSpawningResult> {
+) {
   if (!event.threadRequested) {
-    return undefined;
+    return;
   }
   const channel = normalizeOptionalLowercaseString(event.requester?.channel);
   if (channel !== "discord") {
-    return undefined;
+    return;
   }
   const threadBindingFlags = resolveThreadBindingFlags(api, event.requester?.accountId);
   if (!threadBindingFlags.enabled) {
@@ -161,15 +145,13 @@ export function handleDiscordSubagentEnded(event: DiscordSubagentEndedEvent) {
   });
 }
 
-export function handleDiscordSubagentDeliveryTarget(
-  event: DiscordSubagentDeliveryTargetEvent,
-): DiscordSubagentDeliveryTargetResult {
+export function handleDiscordSubagentDeliveryTarget(event: DiscordSubagentDeliveryTargetEvent) {
   if (!event.expectsCompletionMessage) {
-    return undefined;
+    return;
   }
   const requesterChannel = normalizeOptionalLowercaseString(event.requesterOrigin?.channel);
   if (requesterChannel !== "discord") {
-    return undefined;
+    return;
   }
   const requesterAccountId = event.requesterOrigin?.accountId?.trim();
   const requesterThreadId =
@@ -182,7 +164,7 @@ export function handleDiscordSubagentDeliveryTarget(
     targetKind: "subagent",
   });
   if (bindings.length === 0) {
-    return undefined;
+    return;
   }
 
   let binding: (typeof bindings)[number] | undefined;
@@ -201,7 +183,7 @@ export function handleDiscordSubagentDeliveryTarget(
     binding = bindings[0];
   }
   if (!binding) {
-    return undefined;
+    return;
   }
   return {
     origin: {

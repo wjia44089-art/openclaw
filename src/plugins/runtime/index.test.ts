@@ -215,7 +215,6 @@ describe("plugin runtime command execution", () => {
           provider: DEFAULT_PROVIDER,
         });
         expectFunctionKeys(runtime.agent as Record<string, unknown>, [
-          "runEmbeddedAgent",
           "runEmbeddedPiAgent",
           "resolveAgentDir",
         ]);

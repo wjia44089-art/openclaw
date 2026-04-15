@@ -1,4 +1,3 @@
-import { isQaLabCliAvailable } from "../../plugin-sdk/qa-lab.js";
 import { defineCommandDescriptorCatalog } from "./command-descriptor-utils.js";
 import type { NamedCommandDescriptor } from "./command-group-descriptors.js";
 
@@ -36,11 +35,6 @@ const subCliCommandCatalog = defineCommandDescriptorCatalog([
   {
     name: "approvals",
     description: "Manage exec approvals (gateway or node host)",
-    hasSubcommands: true,
-  },
-  {
-    name: "exec-policy",
-    description: "Show or synchronize requested exec policy with host approvals",
     hasSubcommands: true,
   },
   {
@@ -86,11 +80,6 @@ const subCliCommandCatalog = defineCommandDescriptorCatalog([
   {
     name: "qa",
     description: "Run QA scenarios and launch the private QA debugger UI",
-    hasSubcommands: true,
-  },
-  {
-    name: "proxy",
-    description: "Run the OpenClaw debug proxy and inspect captured traffic",
     hasSubcommands: true,
   },
   {
@@ -163,17 +152,9 @@ const subCliCommandCatalog = defineCommandDescriptorCatalog([
 export const SUB_CLI_DESCRIPTORS = subCliCommandCatalog.descriptors;
 
 export function getSubCliEntries(): ReadonlyArray<SubCliDescriptor> {
-  const descriptors = subCliCommandCatalog.getDescriptors();
-  if (isQaLabCliAvailable()) {
-    return descriptors;
-  }
-  return descriptors.filter((descriptor) => descriptor.name !== "qa");
+  return subCliCommandCatalog.getDescriptors();
 }
 
 export function getSubCliCommandsWithSubcommands(): string[] {
-  const commands = subCliCommandCatalog.getCommandsWithSubcommands();
-  if (isQaLabCliAvailable()) {
-    return commands;
-  }
-  return commands.filter((command) => command !== "qa");
+  return subCliCommandCatalog.getCommandsWithSubcommands();
 }

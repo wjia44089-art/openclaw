@@ -13,11 +13,7 @@ import { normalizeOptionalString } from "../../shared/string-coerce.js";
 import type { EmbeddingInput } from "./embedding-inputs.js";
 import { sanitizeAndNormalizeEmbedding } from "./embedding-vectors.js";
 import { debugEmbeddingsLog } from "./embeddings-debug.js";
-import type {
-  EmbeddingProvider,
-  EmbeddingProviderOptions,
-  GeminiTaskType,
-} from "./embeddings.types.js";
+import type { EmbeddingProvider, EmbeddingProviderOptions } from "./embeddings.js";
 import { buildRemoteBaseUrlPolicy, withRemoteHttpResponse } from "./remote-http.js";
 import { resolveMemorySecretInputString } from "./secret-input.js";
 
@@ -46,7 +42,14 @@ export const GEMINI_EMBEDDING_2_MODELS = new Set([
 const GEMINI_EMBEDDING_2_DEFAULT_DIMENSIONS = 3072;
 const GEMINI_EMBEDDING_2_VALID_DIMENSIONS = [768, 1536, 3072] as const;
 
-export type { GeminiTaskType } from "./embeddings.types.js";
+export type GeminiTaskType =
+  | "RETRIEVAL_QUERY"
+  | "RETRIEVAL_DOCUMENT"
+  | "SEMANTIC_SIMILARITY"
+  | "CLASSIFICATION"
+  | "CLUSTERING"
+  | "QUESTION_ANSWERING"
+  | "FACT_VERIFICATION";
 
 export type GeminiTextPart = { text: string };
 export type GeminiInlinePart = {
