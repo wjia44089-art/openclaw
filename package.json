@@ -1453,6 +1453,9 @@
       "@lancedb/lancedb": "npm:@dengxifeng/lancedb@^0.27.1",
       "node-llama-cpp": "0.0.0"
     },
+    "peerDependencyRules": {
+      "ignoreMissing": ["node-llama-cpp"]
+    },
     "onlyBuiltDependencies": [
       "@discordjs/opus",
       "@lydell/node-pty",
