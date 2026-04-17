@@ -124,6 +124,8 @@ async function main() {
   runPnpm(["-s", "exec", "tsc", "-p", path.join(a2uiRendererDir, "tsconfig.json")]);
 
   const localRolldownCliCandidates = [
+    // ✅ 新增：直接 node_modules
+    path.join(rootDir, "node_modules", "rolldown", "bin", "cli.mjs"),
     path.join(rootDir, "node_modules", ".pnpm", "node_modules", "rolldown", "bin", "cli.mjs"),
     path.join(
       rootDir,
